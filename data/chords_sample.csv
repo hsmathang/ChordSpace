@@ -1,0 +1,6 @@
+id,n,interval,notes,bass,octave,frequencies,chroma,tag,code
+,3,"[4, 3]","[0, 4, 7]",C,4,,,[Cmaj triad],Cmaj
+,3,"[3, 4]","[0, 3, 7]",A,3,,,[Amin triad],Amin
+,3,"[3, 3]","[0, 3, 6]",B,3,,,[Bdim triad],Bdim
+,2,"[7]","[0, 7]",C,4,,,[Perfect Fifth],P5
+,2,"[1]","[0, 1]",C,4,,,[Minor Second],m2

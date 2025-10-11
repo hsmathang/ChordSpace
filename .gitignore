@@ -35,3 +35,6 @@ dist/
 *.dll
 *.so
 *.dylib
+
+# Local DB env file
+db/.env.db
