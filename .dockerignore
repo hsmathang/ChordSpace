@@ -1,0 +1,13 @@
+# Reduce el contexto del build de Docker
+venv/
+.venv/
+__pycache__/
+.ipynb_checkpoints/
+outputs/
+.git/
+.gitignore
+.env
+*.tmp
+tmp_*.txt
+*.pyc
+*.pyo
