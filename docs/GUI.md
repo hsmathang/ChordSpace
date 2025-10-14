@@ -1,21 +1,54 @@
-# GUI Launcher (Tk)
+# GUI experiment launcher
 
-- Ensure you are using the project virtual environment:
-  - Windows: `py -m venv .venv && .\\.venv\\Scripts\\activate`
-  - macOS/Linux: `python3 -m venv .venv && source .venv/bin/activate`
-- Install requirements: `pip install -r requirements.txt`
+`tools/gui_experiment_launcher.py` ofrece una interfaz sencilla para ejecutar consultas definidas en `config.py`, calcular metricas y exportar visualizaciones interactivas.
 
-Run the GUI:
-- Windows: ` .\\.venv\\Scripts\\python -m tools.gui_experiment_launcher`
-- macOS/Linux: `python -m tools.gui_experiment_launcher`
+---
 
-Troubleshooting:
-- Verify the Python used is the venv one:
-  - Windows: `Get-Command python` should point to `.venv\\Scripts\\python.exe`
-  - macOS/Linux: `which python` should point to `.venv/bin/python`
-- If the window does not open and the command returns immediately, you likely used the system Python. Run with the explicit venv path as shown above.
-- Plotly in notebooks: set `PLOTLY_RENDERER=browser` if figures do not display.
-- Windows + `Illegal instruction (0xc000001d)` when launching the GUI:
-  1. `pip uninstall -y polars polars-runtime-32 polars-lts-cpu`
-  2. `pip install --no-cache-dir polars-lts-cpu==1.32.3`
-  3. `python -c "import polars; print(polars.__version__)"`
+## Preparacion rapida
+- Asegurate de tener la base `ChordCodex` poblada (consulta `README.md` y `docs/DB_SETUP.md`).
+- Activa el entorno virtual del proyecto:
+  - Windows PowerShell: `.\.venv\Scripts\Activate.ps1`
+  - macOS/Linux: `source .venv/bin/activate`
+- Instala dependencias si aun no lo hiciste: `pip install -r requirements.txt`
+
+Lanza la GUI:
+```bash
+python -m tools.gui_experiment_launcher
+```
+
+---
+
+## Flujo de trabajo recomendado
+1. Selecciona una consulta base de la lista (las mismas constantes que en `config.py`).
+2. Ajusta filtros opcionales (por ejemplo, limite de filas) para evitar traer millones de registros en la primera ejecucion.
+3. Escoge los graficos a generar (scatter, heatmap, shepard, etc.).
+4. Ejecuta y espera a que el progreso marque 100 %. El tiempo depende del tamano del subconjunto y de si la base esta en Docker o nativa.
+5. Revisa los archivos generados en `outputs/gui_runs/<timestamp>/`.
+
+> Sugerencia: inicia con consultas como `QUERY_CHORDS_WITH_NAME` o `QUERY_CHORDS_WITH_NAME_AND_RANDOM_CHORDS_POBLATION` que regresan subconjuntos razonables.
+
+---
+
+## Salidas
+Cada ejecucion crea un directorio con:
+- `config.json`: parametros usados en la sesion.
+- Archivos HTML interactivos (scatter, parallel coordinates, etc.).
+- CSV o Parquet con los datos filtrados.
+
+Puedes abrir los HTML directamente en el navegador o versionarlos como evidencia del experimento.
+
+---
+
+## Solucion de problemas
+- **La ventana no abre**: verifica que estas usando el Python del entorno virtual (`where python` o `Get-Command python` debe apuntar a `.venv`).
+- **Errores `Illegal instruction` en Apple Silicon**: reinstala `polars-lts-cpu==1.32.3` o usa un entorno Python ARM nativo (`arch -arm64 python3.11 -m venv .venv`).
+- **Consultas demasiado grandes**: ajusta limites en la GUI o modifica la constante en `config.py` para incluir `LIMIT`.
+- **Archivos HTML vacios**: confirma que la consulta devuelve filas con `python -m tools.run_sql --query TU_CONSTANTE --limit 5`.
+- **Docker lento**: si usas el contenedor de Postgres, asegurate de que la maquina virtual tiene suficiente RAM y disco.
+
+---
+
+## Referencias
+- `config.py`: catalogo completo de consultas y constantes usadas por la GUI.
+- `tools/run_sql.py`: runner minimo para depurar consultas antes de llevarlas a la interfaz.
+- `docs/DB_SETUP.md`: pasos detallados para montar la base y resolver problemas comunes.

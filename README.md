@@ -1,117 +1,121 @@
-# Análisis de Rugosidad Musical en Acordes
+# ChordSpace
 
-Este proyecto contiene una serie de herramientas y notebooks para el análisis de la rugosidad en acordes musicales, utilizando diversos modelos teóricos y técnicas de reducción de dimensionalidad.
-
----
-
-##  Prerequisites (Prerrequisitos)
-
-Antes de empezar, asegúrate de tener instalado el siguiente software en tu sistema. Estas herramientas son necesarias para preparar el entorno y compilar algunas de las librerías.
-
-1.  **Python (versión 3.9+):** El lenguaje de programación principal.
-
-    * [Descargar Python](https://www.python.org/downloads/)
-
-    * **Nota para Windows:** Durante la instalación, es crucial marcar la casilla **"Add Python to PATH"**.
-
-2.  **Git:** El sistema de control de versiones, necesario para instalar `chordcodex` directamente desde GitHub.
-
-    * [Descargar Git](https://git-scm.com/downloads/)
+Herramientas, notebooks y GUI para explorar rugosidad y consonancia en acordes usando la base masiva de ChordCodex.
 
 ---
 
-## ⚙️ Installation (Instalación)
-
-Sigue estos pasos para configurar el entorno de desarrollo localmente.
-
-1.  **Clona el repositorio:**
-
-    ```bash
-
-    git clone [https://github.com/tu-usuario/tu-repositorio.git](https://github.com/tu-usuario/tu-repositorio.git)
-
-    ```
-
-2.  **Navega a la carpeta del proyecto:**
-
-    ```bash
-
-    cd tu-repositorio
-
-    ```
-
-3.  **Crea un entorno virtual:**
-
-    *Esto crea una "caja de herramientas" aislada para el proyecto.*
-
-    ```bash
-
-    # En Windows
-
-    py -m venv venv
-
-    # En Mac/Linux
-
-    python3 -m venv venv
-
-    ```
-
-4.  **Activa el entorno virtual:**
-
-    ```bash
-
-    # En Windows
-
-    .\venv\Scripts\activate
-
-    # En Mac/Linux
-
-    source venv/bin/activate
-
-    ```
-
-    *Verás `(venv)` al principio de la línea de tu terminal si se activó correctamente.*
-
-5.  **Instala todas las librerias necesarias:**
-
-    *Este comando lee el archivo `requirements.txt` e instala todas las dependencias con las versiones exactas para garantizar la compatibilidad.*
-
-    ```bash
-
-    pip install -r requirements.txt
-
-    ```
-
-    *Nota:* La reproduccion de audio en los notebooks funciona con `IPython.display.Audio`, por lo que no requiere librerias nativas adicionales.
-
-6.  **Configura la conexion a la base de datos:**
-    *Actualiza el archivo `.env` con los valores de tu servidor PostgreSQL local (host, puerto, usuario, contrasena y nombre de la base).*
-    ```bash
-    DB_HOST=localhost
-    DB_PORT=5432
-    DB_USER=tu_usuario
-    DB_PASSWORD=tu_password
-    DB_NAME=ChordCodex
-    ```
-
+## TL;DR
+- Python 3.11.x (las dependencias fallan con 3.9 o 3.10).
+- PostgreSQL 16 con la tabla `public.chords` completa (interval como `integer[]`).
+- Popular la base con `python -m tools.populate_db --mode full` y validar ~2 579 129 filas.
+- Lanzar la GUI con `python -m tools.gui_experiment_launcher`.
 
 ---
 
-## 🚀 Running the Project (Ejecutar el Proyecto)
+## Requisitos clave
+- Python 3.11.x (recomendado 3.11.3). En macOS evita usar Homebrew para Python; descarga el instalador oficial.
+- PostgreSQL 16 (Postgres.app en macOS, instalador oficial en Windows/Linux) o Docker.
+- Git y virtualenv.
+- Opcional: `polars-lts-cpu` si ejecutas Python x86_64 sobre Apple Silicon (Rosetta).
 
-La forma más fiable de ejecutar los notebooks de Jupyter para este proyecto es lanzándolos directamente desde el terminal.
+> Nota macOS ARM: si `python -c "import platform; print(platform.machine())"` devuelve `x86_64`, estas bajo Rosetta. Instala `pip install --no-binary polars polars-lts-cpu==1.32.3` o crea un entorno Python ARM nativo.
 
-1.  Asegúrate de que tu entorno virtual `(venv)` esté activado.
+---
 
-2.  Ejecuta el siguiente comando en el terminal:
+## 1. Preparar el entorno Python
+```bash
+git clone https://github.com/hsmathang/ChordSpace.git
+cd ChordSpace
+python3.11 -m venv .venv
+# Windows PowerShell: .\.venv\Scripts\Activate.ps1
+source .venv/bin/activate
+pip install --upgrade pip
+pip install -r requirements.txt
+cp example.env .env
+```
+Edita `.env` con los datos de tu servidor PostgreSQL. Valores por defecto esperados:
+```
+DB_HOST=127.0.0.1
+DB_PORT=5432
+DB_USER=postgres
+DB_PASSWORD=postgres
+DB_NAME=ChordCodex
+```
 
-    ```bash
+---
 
-    python -m notebook
+## 2. Preparar PostgreSQL y la base ChordCodex
+### Opcion A (recomendada): Postgres nativo
+1. Instala Postgres 16 (Postgres.app en macOS o instalador oficial en Windows/Linux).
+2. Crea la base y aplica el esquema completo:
+   ```bash
+   createdb ChordCodex          # macOS/Linux
+   # Windows: createdb.exe -h 127.0.0.1 -U postgres ChordCodex
+   psql -d ChordCodex -f db/init/01-schema.sql
+   ```
+3. Poblacion guiada:
+   ```bash
+   python -m tools.populate_db --mode quick   # ~100k filas para validar
+   python -m tools.populate_db --mode full    # ~2.6M filas, varios minutos
+   ```
+4. Verifica el esquema e indices:
+   ```bash
+   psql -d ChordCodex -f tools/sql/check_schema.sql
+   psql -d ChordCodex -c "SELECT COUNT(*) FROM chords;"
+   ```
+   `COUNT` esperado: ~2,579,129 filas.
 
-    ```
+### Opcion B: Docker Compose
+1. Copia las variables de entorno del servicio:
+   ```bash
+   cp db/.env.db.example db/.env.db
+   docker compose -f docker-compose.db.yml up -d
+   ```
+2. Espera a que Postgres 16 este listo y aplica el esquema (solo la primera vez):
+   ```bash
+   docker compose -f docker-compose.db.yml exec db psql -d "$env:POSTGRES_DB" -f /docker-entrypoint-initdb.d/01-schema.sql
+   ```
+3. Desde tu host, carga los datos con el mismo comando del modo nativo:
+   ```bash
+   python -m tools.populate_db --mode full
+   ```
+4. Verifica desde el host (asegura que `psql` apunte al puerto mapeado):
+   ```bash
+   psql -h 127.0.0.1 -p 5432 -d ChordCodex -f tools/sql/check_schema.sql
+   psql -h 127.0.0.1 -p 5432 -d ChordCodex -c "SELECT COUNT(*) FROM chords;"
+   ```
 
-3.  Esto abrirá automáticamente una pestaña en tu navegador web. Desde allí, navega y abre el archivo `.ipynb` que desees ejecutar.
+> El archivo `data/chords_sample.csv` solo sirve para pruebas rapidas. No reemplaza al dataset completo.
 
-¡Y eso es todo! El entorno está listo para explorar los análisis.
+---
 
+## 3. Ejecutar herramientas y experimentos
+- Notebooks: `python -m notebook` y abre cualquiera de los `.ipynb`.
+- Consultas rapidas: `python -m tools.run_sql --query QUERY_CHORDS_WITH_NAME --limit 10`.
+- GUI: `python -m tools.gui_experiment_launcher` (lee [docs/GUI.md](docs/GUI.md)).
+- Pipelines CLI: revisa `tools/populate_db.py` y `tools/run_sql.py` para ejemplos reproducibles.
+
+Los componentes leyeran credenciales desde `.env`. Si necesitas usar variables del sistema, exportalas antes de lanzar el proceso.
+
+---
+
+## Troubleshooting recurrente
+- **Python 3.9 o 3.10**: veras errores de build con `contourpy` o `matplotlib`. Instala Python 3.11.x.
+- **Illegal instruction (AVX2) con polars**: ocurre en macOS ARM bajo Rosetta. Ejecuta:
+  ```bash
+  pip uninstall -y polars polars-lts-cpu
+  pip install --no-binary polars polars-lts-cpu==1.32.3
+  ```
+  o crea un entorno ARM nativo (`arch -arm64 python3.11 -m venv .venv`).
+- **Homebrew en macOS 12 falla con openssl**: usa Postgres.app en lugar de `brew install postgresql`.
+- **Docker lenta**: la carga completa supera los 2.5M registros. Asegura al menos 6 GB de RAM disponibles y disco libre >10 GB.
+- **Indices faltantes**: ejecuta `psql -d ChordCodex -f tools/sql/check_schema.sql` y recrea con `db/init/01-schema.sql` si es necesario.
+
+---
+
+## Referencias adicionales
+- [docs/DB_SETUP.md](docs/DB_SETUP.md): guia extendida con capturas y tiempos estimados.
+- [docs/GUI.md](docs/GUI.md): flujo del lanzador de experimentos y estructura de resultados.
+- [docs/REPRODUCIBILITY.md](docs/REPRODUCIBILITY.md): configuraciones para replicar los analisis.
+
+Para soporte adicional, abre un issue describiendo tu sistema operativo, version de Python, logs relevantes y resultado de `psql -d ChordCodex -f tools/sql/check_schema.sql`.
