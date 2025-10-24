@@ -318,7 +318,8 @@ def visualizar_scatter_density(
         hover_data={"X": False, "Y": False, "TotalRug": False, "Conocido": False},
         symbol="Conocido",
         symbol_sequence=["star", "circle"],
-        custom_data=["__idx__"]
+        custom_data=["__idx__"],
+        render_mode="svg"
         # title=title <-- Se define en layout final
     )
     # 4) Ajustes por grupo (sin cambios)
@@ -434,9 +435,9 @@ def graficar_shepard(embedded: np.ndarray, matriz_distancias: np.ndarray, title:
     })
     try:
         import statsmodels.api as sm  # noqa: F401
-        fig = px.scatter(df, x="Distancia_Original", y="Distancia_Embebida", trendline="ols", title=title)
+        fig = px.scatter(df, x="Distancia_Original", y="Distancia_Embebida", trendline="ols", title=title, render_mode="svg")
     except Exception:
-        fig = px.scatter(df, x="Distancia_Original", y="Distancia_Embebida", title=title)
+        fig = px.scatter(df, x="Distancia_Original", y="Distancia_Embebida", title=title, render_mode="svg")
         try:
             x = df["Distancia_Original"].values
             y = df["Distancia_Embebida"].values
@@ -542,6 +543,7 @@ def explore_umap_graph(reducer_obj, X_original: np.ndarray, acordes: list, n_nei
         symbol="Conocido", symbol_sequence=["star", "circle"],
         hover_name="hover_text",
         hover_data={"X": False, "Y": False, "TotalRug": False, "Conocido": False},
+        render_mode="svg",
         # title="Grafo UMAP" # <-- Se pone en layout final
     )
 
@@ -622,7 +624,8 @@ def visualizar_laplacian_scatter(embedding: np.ndarray, acordes: list, X_origina
         symbol="Conocido", symbol_sequence=["star", "circle"],
         hover_name="hover_text",
         title=title,
-        hover_data={"X": False, "Y": False, "TotalRug": False, "Conocido": False}
+        hover_data={"X": False, "Y": False, "TotalRug": False, "Conocido": False},
+        render_mode="svg"
     )
     outline_traces = []
     for trace in fig_scatter.data:

@@ -94,6 +94,13 @@ PONDERACION_IMPORTANCIA_DECAY_FACTOR_DEFAULT = 0.3
 DERIVE_FR_BASE_FREQ_DEFAULT = 440.0 # Frecuencia base por defecto para derive_fr
 DERIVE_FR_MAX_DENOMINATOR_DEFAULT = 20
 
+# --- Marcadores predeterminados por población ---
+PLOT_MARKERS = {
+    "dyads": {"label": "Diadas", "symbol": "circle", "size": 16, "line_width": 1, "line_color": "black"},
+    "triads": {"label": "Triadas", "symbol": "star", "size": 20, "line_width": 2, "line_color": "black"},
+    "other": {"label": "Otros", "symbol": "diamond", "size": 14, "line_width": 1, "line_color": "black"},
+}
+
 
 # --- Parámetros de Reducción Dimensional ---
 UMAP_N_COMPONENTS = 2

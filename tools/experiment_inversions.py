@@ -25,7 +25,7 @@ from __future__ import annotations
 
 import argparse
 from pathlib import Path
-from typing import List
+from typing import List, Optional
 
 import numpy as np
 import pandas as pd
@@ -36,7 +36,15 @@ try:
 except ModuleNotFoundError:  # pragma: no cover - fallback to local helper
     from synth_tools import QueryExecutor  # type: ignore
 from synth_tools import make_inversions_df, DB_TAG, calculate_row
-from pre_process import ChordAdapter, ModeloSetharesVec
+from pre_process import (
+    ChordAdapter,
+    ModeloSetharesVec,
+    ModeloEuler,
+    ModeloArmonicosCriticos,
+    PonderacionConsonancia,
+    PonderacionImportanciaPerceptual,
+    PonderacionCombinada,
+)
 from lab import LaboratorioAcordes
 from visualization import (
     visualizar_scatter_density,
@@ -212,6 +220,24 @@ def build_arg_parser() -> argparse.ArgumentParser:
     ap.add_argument("--query", default="QUERY_CHORDS_WITH_NAME",
                     help="Nombre de constante en config.py o consulta guardada")
     ap.add_argument("--reduction", choices=["MDS", "UMAP"], default="MDS")
+    ap.add_argument(
+        "--metric",
+        default="euclidean",
+        choices=["euclidean", "cosine", "cityblock", "chebyshev", "custom"],
+        help="Métrica de distancia para la matriz (por defecto: euclidean).",
+    )
+    ap.add_argument(
+        "--model",
+        default="Sethares",
+        choices=["Sethares", "SetharesVec", "Euler", "ArmonicosCriticos"],
+        help="Modelo de rugosidad a utilizar.",
+    )
+    ap.add_argument(
+        "--ponderation",
+        default="ninguna",
+        choices=["ninguna", "consonancia", "importancia", "combinada"],
+        help="Ponderación a aplicar sobre el vector de rugosidad.",
+    )
     ap.add_argument("--pops", action="append", default=None,
                     help="Modo conjunto: varias poblaciones 'A:QUERY'. Repetible.")
     ap.add_argument("--pops-csv", dest="pops_csv", default=None,
@@ -221,11 +247,17 @@ def build_arg_parser() -> argparse.ArgumentParser:
     return ap
 
 
-def run_experiment_with_args(args: argparse.Namespace) -> dict:
+def run_experiment_with_args(
+    args: argparse.Namespace,
+    df_override: Optional[pd.DataFrame] = None,
+    descriptor: Optional[str] = None,
+) -> dict:
     out_dir = Path(getattr(args, "out", Path("outputs/inversions_experiment"))).resolve()
     out_dir.mkdir(parents=True, exist_ok=True)
 
-    pops_specs = _collect_pops_specs(args)
+    override_used = df_override is not None
+
+    pops_specs = [] if override_used else _collect_pops_specs(args)
 
     if pops_specs:
         combined_frames: list[pd.DataFrame] = []
@@ -272,32 +304,68 @@ def run_experiment_with_args(args: argparse.Namespace) -> dict:
         else:
             df_pop = df_pop_raw
     else:
-        query_name = getattr(args, "query", None) or QUERY_CHORDS_WITH_NAME
-        df_src = load_chords_from_db(query_name)
-        run_type = getattr(args, "type", None) or "B"
-        if run_type == "A":
-            df_pop = df_src.copy()
-        elif run_type == "B":
-            df_pop = build_inversions_anchored_db(df_src, include_original=True)
+        if override_used:
+            df_pop = df_override.copy()
         else:
-            df_pop = make_inversions_df(df_src, tag=DB_TAG, include_original=True)
-            df_pop.to_csv(out_dir / "inversions_synthetic.csv", index=False, encoding="utf-8")
+            query_name = getattr(args, "query", None) or QUERY_CHORDS_WITH_NAME
+            df_src = load_chords_from_db(query_name)
+            run_type = getattr(args, "type", None) or "B"
+            if run_type == "A":
+                df_pop = df_src.copy()
+            elif run_type == "B":
+                df_pop = build_inversions_anchored_db(df_src, include_original=True)
+            else:
+                df_pop = make_inversions_df(df_src, tag=DB_TAG, include_original=True)
+                df_pop.to_csv(out_dir / "inversions_synthetic.csv", index=False, encoding="utf-8")
+
+    if df_pop is None or df_pop.empty:
+        raise ValueError("La población resultante está vacía. Verifica la selección o consulta utilizada.")
+
+    if override_used:
+        df_pop = df_pop.reset_index(drop=True)
+    elif pops_specs:
+        df_pop = df_pop.reset_index(drop=True)
+    else:
+        df_pop = df_pop.reset_index(drop=True)
 
     acordes = acordes_from_df(df_pop)
     lab = LaboratorioAcordes(acordes)
-    modelo = ModeloSetharesVec(config={})
-    metric = "euclidean"
-    res = lab.ejecutar_experimento(modelo, ponderacion=None, metrica=metric, reduccion=args.reduction)
+    # Seleccionar modelo
+    model_key = str(getattr(args, "model", "Sethares")).strip()
+    if model_key in {"Sethares", "SetharesVec"}:
+        modelo = ModeloSetharesVec(config={})
+    elif model_key == "Euler":
+        modelo = ModeloEuler(config={})
+    else:
+        modelo = ModeloArmonicosCriticos(config={})
+
+    # Seleccionar ponderación
+    pond_key = str(getattr(args, "ponderation", "ninguna")).strip().lower()
+    if pond_key == "consonancia":
+        ponderacion = PonderacionConsonancia()
+    elif pond_key == "importancia":
+        ponderacion = PonderacionImportanciaPerceptual()
+    elif pond_key == "combinada":
+        ponderacion = PonderacionCombinada(PonderacionConsonancia(), PonderacionImportanciaPerceptual())
+    else:
+        ponderacion = None
+
+    # Métrica de distancia
+    metric = str(getattr(args, "metric", "euclidean")).strip().lower()
+    res = lab.ejecutar_experimento(modelo, ponderacion=ponderacion, metrica=metric, reduccion=args.reduction)
 
     np.save(out_dir / "embeddings.npy", res.embeddings)
     np.save(out_dir / "distances.npy", res.matriz_distancias)
 
     if pops_specs:
         experiment_descriptor = " | ".join(pops_specs)
+        ttl = f"{args.reduction} ({metric}) - joint"
+    elif override_used:
+        experiment_descriptor = descriptor or "Selección manual"
+        ttl = f"{args.reduction} ({metric}) - {experiment_descriptor}"
     else:
         experiment_descriptor = f"Tipo {getattr(args, 'type', 'B')} | Query {getattr(args, 'query', QUERY_CHORDS_WITH_NAME)}"
-
-    ttl = f"{args.reduction} ({metric}) - joint" if pops_specs else f"{args.reduction} ({metric}) - tipo {getattr(args, 'type', 'B')} - {getattr(args, 'query', QUERY_CHORDS_WITH_NAME)}"
+        ttl = f"{args.reduction} ({metric}) - tipo {getattr(args, 'type', 'B')} - {getattr(args, 'query', QUERY_CHORDS_WITH_NAME)}"
     fig_sc = visualizar_scatter_density(res.embeddings, acordes, res.X_original, title=ttl)
     fig_hm = visualizar_heatmap(res.matriz_distancias, acordes, title="Matriz de Distancias")
     fig_sh = graficar_shepard(res.embeddings, res.matriz_distancias, title="Grafico de Shepard")
@@ -309,6 +377,7 @@ def run_experiment_with_args(args: argparse.Namespace) -> dict:
         f.write("Experimento: inversiones\n")
         f.write(f"Población: {experiment_descriptor}\n")
         f.write(f"Modelo: {res.nombre_modelo}\n")
+        f.write(f"Ponderación: {pond_key}\n")
         f.write(f"Métrica: {metric}\n")
         f.write(f"Reducción: {args.reduction}\n")
         f.write(f"Total acordes: {len(acordes)}\n")
