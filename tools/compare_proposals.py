@@ -15,6 +15,9 @@ from datetime import datetime
 from pathlib import Path
 from typing import Callable, Dict, Iterable, List, Optional, Sequence, Tuple
 
+def _format_exp(val: float) -> str:
+    return f"{val:.2f}".rstrip("0").rstrip(".")
+
 import numpy as np
 import pandas as pd
 import plotly.graph_objects as go
@@ -73,7 +76,7 @@ EPS = 1e-12
 #   log(1+·)         -> se aplica después de cada modo correspondiente.
 
 # Para "per_pair" y derivados (evita dividir por cero en díadas)
-COLOR_PER_PAIR_SUBTRACT: float = 1.0  # usa 0.0 para dividir por P directamente.
+COLOR_PER_PAIR_SUBTRACT: float = 0.0  # divide por P (sin restar).
 
 # Para "per_note" y derivados
 COLOR_PER_NOTE_SUBTRACT: float = 0.0  # usa 1.0 para N-1, etc.
@@ -85,6 +88,9 @@ COLOR_EXISTING_THRESHOLD: float = 1e-6
 # Exponentes opcionales (γ). Mantener en 1.0 para comportamiento lineal.
 COLOR_DEN_EXPONENT: float = 1.0      # aplica a todos los denominadores.
 COLOR_OUTPUT_EXPONENT: float = 1.0   # potencia antes de aplicar logs.
+
+# Lista de exponentes a explorar en las pestañas de color (aplicados al denominador).
+COLOR_EXPONENTS: List[float] = [0.25, 0.50, 0.75, 1.00]
 
 def _safe_denominator(raw: np.ndarray, subtract: float = 0.0) -> np.ndarray:
     """Construye un denominador seguro: max(raw - subtract, 1.0).
@@ -637,19 +643,21 @@ def group_entries_by_cardinality(entries: List[ChordEntry]) -> List[Tuple[int, L
 def build_scatter_figure(
     embedding: np.ndarray,
     entries: List[ChordEntry],
-    totals: np.ndarray,
+    color_values: np.ndarray,
+    pair_counts: np.ndarray,
+    type_counts: np.ndarray,
     vectors: np.ndarray,
     adjusted_vectors: np.ndarray,
     title: str,
     *,
     is_proposal: bool = False,
-    color_title: str = "Total Rugosidad",
+    color_title: str = "Color",
 ) -> go.Figure:
     x = embedding[:, 0]
     y = embedding[:, 1]
-    totals = np.asarray(totals, dtype=float)
-    cmin = float(np.min(totals))
-    cmax = float(np.max(totals))
+    color_values = np.asarray(color_values, dtype=float)
+    cmin = float(np.min(color_values))
+    cmax = float(np.max(color_values))
 
     fig = go.Figure()
     total_points = len(entries)
@@ -667,8 +675,6 @@ def build_scatter_figure(
         return max(size, 4.0), max(min(opacity, 0.5), 0.2)
 
     def _symbol_for_cardinality(n: int) -> str:
-        if n == 2:
-            return "circle"
         if n == 3:
             return "triangle-up"
         if n == 4:
@@ -677,44 +683,120 @@ def build_scatter_figure(
             return "star"
         return "circle"
 
-    def _size_for_cardinality(n: int, base: float) -> float:
-        if n == 2:
-            return base
-        if n == 3:
-            return max(base * 1.05, base + 1.0)
-        if n == 4:
-            return max(base * 0.95, base - 0.5)
-        if n == 5:
-            return max(base * 0.85, base - 2.0)
-        return max(base * 0.6, 3.5)
+    def _size_for_cardinality(_n: int, base: float) -> float:
+        return base
 
     base_size, base_opacity = _base_marker_params(total_points)
 
-    named_indices = [i for i, entry in enumerate(entries) if entry.is_named]
-    unnamed_by_card: Dict[int, List[int]] = {}
-    for idx, entry in enumerate(entries):
-        if entry.is_named:
-            continue
-        unnamed_by_card.setdefault(entry.n_notes, []).append(idx)
+    named_groups = {
+        "Diadas": [],
+        "Triadas": [],
+        "Séptimas": [],
+        "Extensiones": [],
+    }
+    unnamed_groups: Dict[str, List[int]] = {
+        "3 notas": [],
+        "4 notas": [],
+        "5 notas": [],
+        "Más de 5 notas": [],
+    }
 
-    for n_notes in sorted(unnamed_by_card.keys()):
-        idxs = unnamed_by_card[n_notes]
+    def _classify_named(entry: ChordEntry) -> Optional[str]:
+        if not entry.is_named:
+            return None
+        n = entry.n_notes
+        name = (entry.identity_name or "").lower()
+        if n == 2:
+            return "Diadas"
+        if n == 3:
+            return "Triadas"
+        if n == 4 and "7" in name:
+            return "Séptimas"
+        return "Extensiones"
+
+    for idx, entry in enumerate(entries):
+        category = _classify_named(entry)
+        if category is not None:
+            named_groups[category].append(idx)
+            continue
+        if entry.n_notes == 3:
+            unnamed_groups["3 notas"].append(idx)
+        elif entry.n_notes == 4:
+            unnamed_groups["4 notas"].append(idx)
+        elif entry.n_notes == 5:
+            unnamed_groups["5 notas"].append(idx)
+        else:
+            unnamed_groups["Más de 5 notas"].append(idx)
+
+    named_symbol_map = {
+        "Diadas": "diamond",
+        "Triadas": "triangle-down",
+        "Séptimas": "square",
+        "Extensiones": "cross",
+    }
+
+    named_size = max(base_size + 2.5, base_size * 1.2, 8.0)
+    named_opacity = min(0.9, base_opacity + 0.25)
+
+    for label in ["Diadas", "Triadas", "Séptimas", "Extensiones"]:
+        idxs = named_groups[label]
         if not idxs:
             continue
-        symbol = _symbol_for_cardinality(n_notes)
-        point_size = _size_for_cardinality(n_notes, base_size)
-        label = f"{n_notes} notas ({len(idxs)})"
-
         fig.add_trace(
             go.Scatter(
                 x=x[idxs],
                 y=y[idxs],
                 mode="markers",
-                name=label,
+                name=f"{label} ({len(idxs)})",
                 marker=dict(
-                    symbol=symbol,
-                    size=point_size,
-                    color=totals[idxs],
+                    symbol=named_symbol_map[label],
+                    size=named_size,
+                    color=color_values[idxs],
+                    colorscale="Turbo",
+                    cmin=cmin,
+                    cmax=cmax,
+                    coloraxis="coloraxis",
+                    opacity=named_opacity,
+                    line=dict(width=0),
+                ),
+                text=[
+                    build_hover(
+                        entries[i],
+                        vectors[i],
+                        adjusted_vectors[i],
+                        color_values[i],
+                        color_title,
+                        int(round(pair_counts[i])),
+                        int(round(type_counts[i])),
+                        is_proposal=is_proposal,
+                    )
+                    for i in idxs
+                ],
+                hovertemplate="%{text}<extra></extra>",
+            )
+        )
+
+    unnamed_symbol_map = {
+        "3 notas": "triangle-up",
+        "4 notas": "x",
+        "5 notas": "star",
+        "Más de 5 notas": "circle",
+    }
+
+    for label in ["3 notas", "4 notas", "5 notas", "Más de 5 notas"]:
+        idxs = unnamed_groups[label]
+        if not idxs:
+            continue
+        fig.add_trace(
+            go.Scatter(
+                x=x[idxs],
+                y=y[idxs],
+                mode="markers",
+                name=f"{label} ({len(idxs)})",
+                marker=dict(
+                    symbol=unnamed_symbol_map[label],
+                    size=_size_for_cardinality(0, base_size),
+                    color=color_values[idxs],
                     colorscale="Turbo",
                     cmin=cmin,
                     cmax=cmax,
@@ -723,35 +805,17 @@ def build_scatter_figure(
                     line=dict(width=0),
                 ),
                 text=[
-                    build_hover(entries[i], vectors[i], adjusted_vectors[i], is_proposal=is_proposal)
+                    build_hover(
+                        entries[i],
+                        vectors[i],
+                        adjusted_vectors[i],
+                        color_values[i],
+                        color_title,
+                        int(round(pair_counts[i])),
+                        int(round(type_counts[i])),
+                        is_proposal=is_proposal,
+                    )
                     for i in idxs
-                ],
-                hovertemplate="%{text}<extra></extra>",
-            )
-        )
-
-    if named_indices:
-        named_opacity = min(0.9, base_opacity + 0.25)
-        fig.add_trace(
-            go.Scatter(
-                x=x[named_indices],
-                y=y[named_indices],
-                mode="markers",
-                name=f"Nombrados ({len(named_indices)})",
-                marker=dict(
-                    symbol="cross",
-                    size=max(base_size + 3.0, 8.0),
-                    color=totals[named_indices],
-                    colorscale="Turbo",
-                    cmin=cmin,
-                    cmax=cmax,
-                    coloraxis="coloraxis",
-                    opacity=named_opacity,
-                    line=dict(width=2.0, color="rgba(30,30,30,0.85)"),
-                ),
-                text=[
-                    build_hover(entries[i], vectors[i], adjusted_vectors[i], is_proposal=is_proposal)
-                    for i in named_indices
                 ],
                 hovertemplate="%{text}<extra></extra>",
             )
@@ -786,44 +850,57 @@ def build_scatter_figure(
     return fig
 
 
-def _format_vec(vec: np.ndarray) -> str:
-    values = [f"{float(v):.2f}" for v in vec]
-    line1 = ", ".join(values[:6])
-    line2 = ", ".join(values[6:])
-    return f"[{line1}<br>&nbsp;&nbsp;{line2}]" if line2 else f"[{line1}]"
+def _format_vec(vec: np.ndarray, *, precision: int = 2, max_len: int = 12) -> str:
+    slice_vec = vec[:max_len]
+    values = ", ".join(f"{float(v):.{precision}f}" for v in slice_vec)
+    if len(vec) > max_len:
+        values += ", ..."
+    return f"[{values}]"
 
 
-def build_hover(entry: ChordEntry, vector_used: np.ndarray, vector_adjusted: np.ndarray, *, is_proposal: bool) -> str:
+def build_hover(
+    entry: ChordEntry,
+    vector_used: np.ndarray,
+    vector_adjusted: np.ndarray,
+    color_value: float,
+    color_title: str,
+    pair_count: int,
+    type_count: int,
+    *,
+    is_proposal: bool,
+) -> str:
     """Hover rich text.
 
-    - Proposals: show raw H and total, adjusted vector and its total, and the vector used.
-    - Baseline: show raw total and the vector used.
+    Incluye la rugosidad normalizada (según la pestaña de color activa) y,
+    para propuestas, también el total ajustado.
     """
     acorde = entry.acorde
     intervals = getattr(acorde, "intervals", [])
     tipo = getattr(acorde, "name", "Unknown")
     total = entry.total
     n = entry.n_notes
-    vec_used = _format_vec(vector_used)
     identity_label = entry.identity_name if entry.is_named else "Desconocido"
     alias_line = ""
     if entry.identity_aliases:
         alias_line = f"Alias: {', '.join(entry.identity_aliases)}<br>"
+    color_line = f"{color_title}: {float(color_value):.4f}<br>"
+    pair_line = f"Pares totales (P): {pair_count}<br>"
+    type_line = f"Tipos activos (PE): {type_count}<br>"
     if is_proposal:
-        vec_raw = _format_vec(entry.hist)
         total_adj = float(np.sum(vector_adjusted))
-        vec_adj = _format_vec(vector_adjusted)
         return (
             f"Acorde: {tipo}<br>"
             f"Notas: {n}<br>"
             f"Intervalos: {intervals}<br>"
-             f"Identidad: {identity_label}<br>"
-             f"{alias_line}"
+            f"Identidad: {identity_label}<br>"
+            f"{alias_line}"
             f"TotalRug (bruto): {total:.4f}<br>"
-            f"H bruto: {vec_raw}<br>"
             f"TotalRug (ajustado): {total_adj:.4f}<br>"
-            f"Vector ajustado: {vec_adj}<br>"
-            f"Usado p/dist: {vec_used}"
+            f"H bruto: {_format_vec(entry.hist)}<br>"
+            f"H ajustado: {_format_vec(vector_adjusted)}<br>"
+            f"{color_line}"
+            f"{pair_line}"
+            f"{type_line}"
         )
     else:
         return (
@@ -833,7 +910,10 @@ def build_hover(entry: ChordEntry, vector_used: np.ndarray, vector_adjusted: np.
             f"Identidad: {identity_label}<br>"
             f"{alias_line}"
             f"TotalRug: {total:.4f}<br>"
-            f"Usado p/dist: {vec_used}"
+            f"{color_line}"
+            f"{pair_line}"
+            f"{type_line}"
+            f"H bruto: {_format_vec(entry.hist)}<br>"
         )
 
 def format_rate(value: Optional[float]) -> str:
@@ -953,18 +1033,11 @@ def build_report_html_v2(
         # Vistas por modo de color
         # Pestañas de color disponibles para cada escenario. Para añadir/quitar
         # modos, modifica esta lista y la función _apply_color_mode más arriba.
-        modes = [
-            ("total", "Total bruto"),
-            ("log_total", "log(1+Total bruto)"),
-            ("per_pair", "Total/Pares"),
-            ("log_per_pair", "log(1+Total/Pares)"),
-            ("per_note", "Total/Notas"),
-            ("log_per_note", "log(1+Total/Notas)"),
-            ("adj_total", "Total ajustado"),
-            ("log_adj_total", "log(1+Total ajustado)"),
-            ("per_existing", "Total aj./Tipos"),
-            ("log_per_existing", "log(1+Total aj./Tipos)"),
-        ]
+        modes: List[Tuple[str, str]] = []
+        for exp in COLOR_EXPONENTS:
+            code_val = int(round(exp * 100))
+            modes.append((f"pair_exp_{code_val:03d}", f"Total/Pares^{_format_exp(exp)}"))
+            modes.append((f"types_exp_{code_val:03d}", f"Total aj./Tipos^{_format_exp(exp)}"))
         panels_html: List[str] = []
         headers_html: List[str] = []
         subtab_counter += 1
@@ -1434,76 +1507,46 @@ def main() -> None:
                 axis=1,
             ).astype(float)
 
+            def _format_exp(val: float) -> str:
+                return f"{val:.2f}".rstrip("0").rstrip(".")
+
             def _apply_color_mode(
                 mode: str,
                 totals_raw: np.ndarray,
                 totals_adjusted: np.ndarray,
                 pairs_arr: np.ndarray,
-                notes_arr: np.ndarray,
-                existing_arr: np.ndarray,
+                types_arr: np.ndarray,
             ) -> Tuple[np.ndarray, str]:
                 """Devuelve (valores normalizados, título de la barra)."""
                 m = mode.lower()
-                use_adjusted = m.startswith("adj") or "existing" in m
-                vals = (totals_adjusted if use_adjusted else totals_raw).astype(float)
-                title = "Total bruto"
-                if use_adjusted:
-                    title = "Total ajustado"
+                if m.startswith("pair_exp_"):
+                    exp = int(m.split("_")[-1]) / 100.0
+                    denom = _safe_denominator(pairs_arr, subtract=COLOR_PER_PAIR_SUBTRACT)
+                    denom = np.power(denom, exp)
+                    if not np.isclose(COLOR_DEN_EXPONENT, 1.0):
+                        denom = np.power(denom, COLOR_DEN_EXPONENT)
+                    vals = totals_raw / denom
+                    title = f"Total/Pares^{_format_exp(exp)}"
+                elif m.startswith("types_exp_"):
+                    exp = int(m.split("_")[-1]) / 100.0
+                    denom = _safe_denominator(types_arr, subtract=COLOR_PER_EXISTING_SUBTRACT)
+                    denom = np.power(denom, exp)
+                    if not np.isclose(COLOR_DEN_EXPONENT, 1.0):
+                        denom = np.power(denom, COLOR_DEN_EXPONENT)
+                    vals = totals_adjusted / denom
+                    title = f"Total ajustado/Tipos^{_format_exp(exp)}"
+                else:
+                    raise ValueError(f"Modo de color no soportado: {mode}")
 
                 if not np.isclose(COLOR_OUTPUT_EXPONENT, 1.0):
                     vals = np.power(np.clip(vals, 0.0, None), COLOR_OUTPUT_EXPONENT)
-
-                if m in {"per_pair", "log_per_pair", "per_pair_pow"}:
-                    denom = _safe_denominator(pairs_arr, subtract=COLOR_PER_PAIR_SUBTRACT)
-                    if not np.isclose(COLOR_DEN_EXPONENT, 1.0):
-                        denom = np.power(denom, COLOR_DEN_EXPONENT)
-                    vals = vals / denom
-                    title = "Total/Pares" if not use_adjusted else "Total ajustado/Pares"
-
-                if m in {"per_note", "log_per_note", "per_note_pow"}:
-                    denom = _safe_denominator(notes_arr, subtract=COLOR_PER_NOTE_SUBTRACT)
-                    if not np.isclose(COLOR_DEN_EXPONENT, 1.0):
-                        denom = np.power(denom, COLOR_DEN_EXPONENT)
-                    vals = vals / denom
-                    title = "Total/Notas" if not use_adjusted else "Total ajustado/Notas"
-
-                if m in {"per_existing", "log_per_existing"}:
-                    denom = _safe_denominator(existing_arr, subtract=COLOR_PER_EXISTING_SUBTRACT)
-                    if not np.isclose(COLOR_DEN_EXPONENT, 1.0):
-                        denom = np.power(denom, COLOR_DEN_EXPONENT)
-                    vals = vals / denom
-                    title = "Total ajustado/Tipos"
-
-                if m in {"log_total"}:
-                    vals = np.log1p(np.clip(vals, 0.0, None))
-                    title = "log(1+Total bruto)"
-                if m in {"log_per_pair"}:
-                    vals = np.log1p(np.clip(vals, 0.0, None))
-                    title = "log(1+Total/Pares)"
-                if m in {"log_per_note"}:
-                    vals = np.log1p(np.clip(vals, 0.0, None))
-                    title = "log(1+Total/Notas)"
-                if m in {"log_adj_total"}:
-                    vals = np.log1p(np.clip(vals, 0.0, None))
-                    title = "log(1+Total ajustado)"
-                if m in {"log_per_existing"}:
-                    vals = np.log1p(np.clip(vals, 0.0, None))
-                    title = "log(1+Total ajustado/Tipos)"
-
                 return vals, title
 
-            color_modes = [
-                "total",
-                "log_total",
-                "per_pair",
-                "log_per_pair",
-                "per_note",
-                "log_per_note",
-                "adj_total",
-                "log_adj_total",
-                "per_existing",
-                "log_per_existing",
-            ]
+            color_modes: List[str] = []
+            for exp in COLOR_EXPONENTS:
+                code = int(round(exp * 100))
+                color_modes.append(f"pair_exp_{code:03d}")
+                color_modes.append(f"types_exp_{code:03d}")
             fig_title = f"{scenario_name} (seed {figure_seed})"
             for cm in color_modes:
                 vals, ctitle = _apply_color_mode(
@@ -1511,13 +1554,14 @@ def main() -> None:
                     totals,
                     totals_adj,
                     pairs,
-                    notes,
                     existing_counts,
                 )
                 fig = build_scatter_figure(
                     embedding=figure_embedding,
                     entries=entries,
-                    totals=vals,
+                    color_values=vals,
+                    pair_counts=pairs,
+                    type_counts=existing_counts,
                     vectors=base_matrix,
                     adjusted_vectors=preproc_cache[preproc_id],
                     title=fig_title,

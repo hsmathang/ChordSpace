@@ -274,6 +274,87 @@ WHERE array_length(notes, 1) = 3
 ORDER BY id
 LIMIT 60;
 """
+
+# --- Nuevas consultas para experimentos por cardinalidad --------------------
+
+QUERY_CHORDS_3_NOTES_ALL = """
+SELECT id, n, interval, notes, bass, octave, frequencies, chroma, tag, code
+FROM chords
+WHERE n = 3
+ORDER BY id;
+"""
+
+QUERY_CHORDS_4_NOTES_SAMPLE_25 = """
+WITH subset AS (
+    SELECT id, n, interval, notes, bass, octave, frequencies, chroma, tag, code
+    FROM chords
+    WHERE n = 4
+    ORDER BY RANDOM()
+)
+SELECT *
+FROM subset
+LIMIT (SELECT CEIL(COUNT(*) * 0.25) FROM chords WHERE n = 4);
+"""
+
+QUERY_CHORDS_4_NOTES_SAMPLE_50 = """
+WITH subset AS (
+    SELECT id, n, interval, notes, bass, octave, frequencies, chroma, tag, code
+    FROM chords
+    WHERE n = 4
+    ORDER BY RANDOM()
+)
+SELECT *
+FROM subset
+LIMIT (SELECT CEIL(COUNT(*) * 0.50) FROM chords WHERE n = 4);
+"""
+
+QUERY_CHORDS_4_NOTES_SAMPLE_75 = """
+WITH subset AS (
+    SELECT id, n, interval, notes, bass, octave, frequencies, chroma, tag, code
+    FROM chords
+    WHERE n = 4
+    ORDER BY RANDOM()
+)
+SELECT *
+FROM subset
+LIMIT (SELECT CEIL(COUNT(*) * 0.75) FROM chords WHERE n = 4);
+"""
+
+QUERY_CHORDS_5_NOTES_SAMPLE_25 = """
+WITH subset AS (
+    SELECT id, n, interval, notes, bass, octave, frequencies, chroma, tag, code
+    FROM chords
+    WHERE n = 5
+    ORDER BY RANDOM()
+)
+SELECT *
+FROM subset
+LIMIT (SELECT CEIL(COUNT(*) * 0.25) FROM chords WHERE n = 5);
+"""
+
+QUERY_CHORDS_5_NOTES_SAMPLE_50 = """
+WITH subset AS (
+    SELECT id, n, interval, notes, bass, octave, frequencies, chroma, tag, code
+    FROM chords
+    WHERE n = 5
+    ORDER BY RANDOM()
+)
+SELECT *
+FROM subset
+LIMIT (SELECT CEIL(COUNT(*) * 0.50) FROM chords WHERE n = 5);
+"""
+
+QUERY_CHORDS_5_NOTES_SAMPLE_75 = """
+WITH subset AS (
+    SELECT id, n, interval, notes, bass, octave, frequencies, chroma, tag, code
+    FROM chords
+    WHERE n = 5
+    ORDER BY RANDOM()
+)
+SELECT *
+FROM subset
+LIMIT (SELECT CEIL(COUNT(*) * 0.75) FROM chords WHERE n = 5);
+"""
 QUERY_CHORDS_WITH_NAME = """
 SELECT *
 FROM chords
@@ -332,6 +413,42 @@ WHERE n = 3
   )
   AND notes <@ ARRAY['0','2','4','5','7','9','B']::varchar[]
 ORDER BY notes, id;
+"""
+
+QUERY_CHORDS_3_NOTES_SAMPLE_25 = """
+WITH subset AS (
+    SELECT id, n, interval, notes, bass, octave, frequencies, chroma, tag, code
+    FROM chords
+    WHERE n = 3
+    ORDER BY RANDOM()
+)
+SELECT *
+FROM subset
+LIMIT (SELECT CEIL(COUNT(*) * 0.25) FROM chords WHERE n = 3);
+"""
+
+QUERY_CHORDS_3_NOTES_SAMPLE_50 = """
+WITH subset AS (
+    SELECT id, n, interval, notes, bass, octave, frequencies, chroma, tag, code
+    FROM chords
+    WHERE n = 3
+    ORDER BY RANDOM()
+)
+SELECT *
+FROM subset
+LIMIT (SELECT CEIL(COUNT(*) * 0.50) FROM chords WHERE n = 3);
+"""
+
+QUERY_CHORDS_3_NOTES_SAMPLE_75 = """
+WITH subset AS (
+    SELECT id, n, interval, notes, bass, octave, frequencies, chroma, tag, code
+    FROM chords
+    WHERE n = 3
+    ORDER BY RANDOM()
+)
+SELECT *
+FROM subset
+LIMIT (SELECT CEIL(COUNT(*) * 0.75) FROM chords WHERE n = 3);
 """
 
 # Aleatorio con n > 2
