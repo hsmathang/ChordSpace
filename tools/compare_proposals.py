@@ -25,6 +25,23 @@ from plotly.io import to_html
 from scipy.ndimage import gaussian_filter1d
 from scipy.spatial.distance import pdist, squareform, jensenshannon
 from sklearn.manifold import MDS
+try:
+    import umap  # type: ignore
+except Exception:  # pragma: no cover
+    umap = None  # UMAP opcional
+
+# Proveer shim para 'dotenv' si el entorno trae un paquete incompatible
+try:  # pragma: no cover
+    import dotenv as _dotenv  # type: ignore
+    if not hasattr(_dotenv, "load_dotenv"):
+        import types as _types, sys as _sys
+        _shim = _types.ModuleType("dotenv")
+        def _ld(*_a, **_k):
+            return False
+        _shim.load_dotenv = _ld  # type: ignore[attr-defined]
+        _sys.modules["dotenv"] = _shim
+except Exception:
+    pass
 
 from config import (
     QUERY_DYADS_REFERENCE,
@@ -90,7 +107,8 @@ COLOR_DEN_EXPONENT: float = 1.0      # aplica a todos los denominadores.
 COLOR_OUTPUT_EXPONENT: float = 1.0   # potencia antes de aplicar logs.
 
 # Lista de exponentes a explorar en las pestañas de color (aplicados al denominador).
-COLOR_EXPONENTS: List[float] = [0.25, 0.50, 0.75, 1.00]
+# Exponentes de 0.00 a 1.00 en pasos de 0.05
+COLOR_EXPONENTS: List[float] = [i/20.0 for i in range(0, 21)]
 
 def _safe_denominator(raw: np.ndarray, subtract: float = 0.0) -> np.ndarray:
     """Construye un denominador seguro: max(raw - subtract, 1.0).
@@ -186,6 +204,18 @@ PROPOSAL_INFO = {
         "casual": "Reduce el peso de las repeticiones sin eliminarlas por completo.",
         "technical": "Usa \(H'_k = H_k / m_k^{0.5}\) como descuento sublineal para controlar redundancias fuertes.",
     },
+
+    "perclass_alpha0_75": {
+        "title": "Media por clase (α=0.75)",
+        "casual": "Descuento sublineal moderado sobre repeticiones de díadas.",
+        "technical": "Usa \(H'_k = H_k / m_k^{0.75}\) para atenuar la multiplicidad sin colapsarla como α=1.",
+    },
+
+    "perclass_alpha0_25": {
+        "title": "Media por clase (α=0.25)",
+        "casual": "Descuento leve, mantiene más la contribución de repeticiones.",
+        "technical": "Usa \(H'_k = H_k / m_k^{0.25}\), apropiado cuando se desea penalización mínima por duplicidad.",
+    },
     "global_pairs": {
         "title": "Media global por pares",
         "casual": "Escala el vector por el número total de díadas; conserva la forma pero reduce la magnitud.",
@@ -275,11 +305,17 @@ def parse_args() -> argparse.Namespace:
         default="cosine,js,hellinger,euclidean",
         help="Comma separated metrics to evaluate for compatible proposals.",
     )
+    # Reducciones: permitir múltiples métodos (p.ej. MDS,UMAP)
+    parser.add_argument(
+        "--reductions",
+        default="MDS",
+        help="Lista separada por comas de métodos de reducción (p.ej. MDS,UMAP).",
+    )
+    # Compatibilidad hacia atrás
     parser.add_argument(
         "--reduction",
-        choices=["MDS"],
-        default="MDS",
-        help="Dimensionality reduction method (currently only MDS).",
+        default=None,
+        help=argparse.SUPPRESS,
     )
     parser.add_argument(
         "--output",
@@ -509,7 +545,11 @@ def metric_distance(metric: str, X: np.ndarray, dist_simplex: np.ndarray) -> np.
     raise ValueError(f"Métrica no soportada: {metric}")
 
 
+AVAILABLE_REDUCTIONS = ("MDS", "UMAP")
+
+
 def compute_embeddings(dist_condensed: np.ndarray, reduction: str, seed: int) -> np.ndarray:
+    reduction = (reduction or "MDS").upper()
     if reduction == "MDS":
         dist_matrix = squareform(dist_condensed)
         reducer = MDS(
@@ -519,6 +559,21 @@ def compute_embeddings(dist_condensed: np.ndarray, reduction: str, seed: int) ->
             normalized_stress=False,
         )
         embedding = reducer.fit_transform(dist_matrix)
+        return embedding
+    if reduction == "UMAP":
+        if umap is None:
+            raise ValueError("UMAP no está instalado. Añade 'umap-learn' al entorno.")
+        # UMAP sobre matriz de distancias (precomputed) requiere transformar a afinidad
+        # Estrategia: usar 1/(1+d) para similitud aproximada.
+        dmat = squareform(dist_condensed)
+        sim = 1.0 / (1.0 + np.asarray(dmat, dtype=float))
+        reducer = umap.UMAP(
+            n_components=2,
+            metric="precomputed",
+            random_state=seed,
+        )
+        # Para 'precomputed', umap espera distancias, no similitudes. Pasamos dmat directamente.
+        embedding = reducer.fit_transform(dmat)
         return embedding
     raise ValueError(f"Reducción no soportada: {reduction}")
 
@@ -1006,53 +1061,124 @@ def build_report_html_v2(
     table_html = display_df.to_html(index=False, float_format=lambda x: f"{x:.4f}")
 
     figure_map = {title: fig for title, fig in figures}
-    # Orden deseado de pestañas: euclidean primero, luego otras
+
+    # Order metrics in a friendly order
     preferred_order = ["euclidean", "cosine", "js", "hellinger", "l1", "cityblock", "manhattan"]
-    present_metrics = list(dict.fromkeys(ranked_df["metric"].tolist()))
     def _metric_key(m: str) -> Tuple[int, str]:
         return (preferred_order.index(m) if m in preferred_order else len(preferred_order), m)
-    metrics_sorted = sorted(present_metrics, key=_metric_key)
 
-    grouped = []
-    for metric in metrics_sorted:
-        group = ranked_df[ranked_df["metric"] == metric]
-        group_sorted = group.sort_values("rank")
-        baseline_df = group_sorted[group_sorted["preproc_id"] == "identity"]
-        baseline_row = baseline_df.iloc[0].to_dict() if not baseline_df.empty else None
-        proposal_rows = [row._asdict() if hasattr(row, "_asdict") else row for row in group_sorted[group_sorted["preproc_id"] != "identity"].to_dict("records")]
-        metric_info = METRIC_INFO.get(metric, {"title": metric.upper(), "casual": "", "technical": ""})
-        grouped.append((metric, metric_info, baseline_row, proposal_rows))
+    # Top-level tabs by reduction method
+    reductions_present = list(dict.fromkeys(ranked_df.get("reduction", pd.Series(["MDS"])) .tolist()))
 
     include_js = True
     subtab_counter = 0
+
     def render_card(row: Dict[str, object], *, is_baseline: bool) -> str:
         nonlocal include_js, subtab_counter
         if row is None:
             return ""
         scenario = row.get("scenario", "")
-        # Vistas por modo de color
-        # Pestañas de color disponibles para cada escenario. Para añadir/quitar
-        # modos, modifica esta lista y la función _apply_color_mode más arriba.
-        modes: List[Tuple[str, str]] = []
-        for exp in COLOR_EXPONENTS:
-            code_val = int(round(exp * 100))
-            modes.append((f"pair_exp_{code_val:03d}", f"Total/Pares^{_format_exp(exp)}"))
-            modes.append((f"types_exp_{code_val:03d}", f"Total aj./Tipos^{_format_exp(exp)}"))
-        panels_html: List[str] = []
-        headers_html: List[str] = []
-        subtab_counter += 1
-        sid = f"sub{subtab_counter}"
-        first_done = False
-        for key, label in modes:
-            fig = figure_map.get(f"{scenario}||{key}")
+        scenario_prefix = f"{scenario}||"
+
+        panel_entries: List[Tuple[Tuple[int, float], str, Optional[float], str, str]] = []
+        for key, fig in figure_map.items():
+            if not key.startswith(scenario_prefix):
+                continue
+            suffix = key[len(scenario_prefix):]
+            if suffix == "raw_total":
+                mode = "raw_total"
+                exponent = None
+                order = (0, 0.0)
+            elif suffix.startswith("pair_exp_"):
+                try:
+                    exponent = int(suffix.rsplit("_", 1)[-1]) / 100.0
+                except Exception:
+                    continue
+                mode = "pair_exp"
+                order = (1, float(exponent))
+            elif suffix.startswith("types_exp_"):
+                try:
+                    exponent = int(suffix.rsplit("_", 1)[-1]) / 100.0
+                except Exception:
+                    continue
+                mode = "types_exp"
+                order = (2, float(exponent))
+            else:
+                continue
+
             if fig is not None:
-                html = to_html(fig, include_plotlyjs="cdn" if include_js else False, full_html=False)
+                inner_html = to_html(fig, include_plotlyjs="cdn" if include_js else False, full_html=False)
                 include_js = False
             else:
-                html = "<p>Figura no disponible.</p>"
-            headers_html.append(f"<li class='subtab{' active' if not first_done else ''}' data-target='{sid}-{key}'>Color: {label}</li>")
-            panels_html.append(f"<div id='{sid}-{key}' class='subtab-panel{' active' if not first_done else ''}'>{html}</div>")
-            first_done = True
+                inner_html = "<p>Figura no disponible.</p>"
+            panel_entries.append((order, mode, exponent, suffix, inner_html))
+
+        if not panel_entries:
+            return ""
+
+        panel_entries.sort(key=lambda item: item[0])
+
+        subtab_counter += 1
+        sid = f"sub{subtab_counter}"
+
+        mode_defaults: Dict[str, float] = {}
+        for _, mode, exponent, _, _ in panel_entries:
+            if exponent is None:
+                mode_defaults.setdefault(mode, 0.0)
+            else:
+                if mode not in mode_defaults or abs(exponent - 1.0) < 1e-9:
+                    mode_defaults[mode] = exponent
+
+        if any(mode == "raw_total" for _, mode, _, _, _ in panel_entries):
+            default_mode = "raw_total"
+            default_exponent: Optional[float] = None
+        else:
+            default_mode = "pair_exp"
+            default_exponent = 1.0
+            found = False
+            for _, mode, exponent, _, _ in panel_entries:
+                if mode == "pair_exp" and exponent is not None and abs(exponent - 1.0) < 1e-9:
+                    default_exponent = exponent
+                    found = True
+                    break
+            if not found:
+                _, default_mode, default_exponent, _, _ = panel_entries[0]
+
+        MODE_LABELS = {
+            "raw_total": "Rugosidad bruta",
+            "pair_exp": "Normalización por pares",
+            "types_exp": "Normalización por tipos",
+        }
+
+        mode_order: List[str] = []
+        for _, mode, _, _, _ in panel_entries:
+            if mode not in mode_order:
+                mode_order.append(mode)
+
+        options_html: List[str] = []
+        for mode in mode_order:
+            label = MODE_LABELS.get(mode, mode)
+            selected_attr = " selected" if mode == default_mode else ""
+            default_exp_val = mode_defaults.get(mode, 0.0)
+            options_html.append(
+                f"<option value='{mode}' data-default-exp='{default_exp_val:.2f}'{selected_attr}>{label}</option>"
+            )
+
+        panels_html: List[str] = []
+        for _, mode, exponent, suffix, inner_html in panel_entries:
+            target_id = f"{sid}-{suffix}"
+            is_active = (mode == default_mode and (
+                (exponent is None and default_exponent is None) or
+                (exponent is not None and default_exponent is not None and abs(exponent - default_exponent) < 1e-9)
+            ))
+            exp_str = f"{exponent:.2f}" if exponent is not None else ""
+            style_attr = " style='display:block;'" if is_active else " style='display:none;'"
+            panels_html.append(
+                f"<div id='{target_id}' class='subtab-panel{' active' if is_active else ''}' data-mode='{mode}' data-exp='{exp_str}'{style_attr}>"
+                f"{inner_html}"
+                "</div>"
+            )
+
         stress = format_value_with_std(row.get("stress_mean"), row.get("stress_std"))
         trust = format_value_with_std(row.get("trustworthiness_mean"), row.get("trustworthiness_std"))
         mixture = format_value_with_std(row.get("mixture_l1_mean_mean"), row.get("mixture_l1_mean_std"))
@@ -1060,53 +1186,189 @@ def build_report_html_v2(
         badge = "<span class='badge'>Base</span>" if is_baseline else ""
         header = f"<div class='card-header'><strong>{scenario}</strong> {badge}</div>"
         metrics_line = f"<div class='metrics-line'>Stress: {stress} · Trust: {trust} · Mixture L1: {mixture} · Semillas: {seeds_text}</div>"
-        # Subpestañas por modo de color
-        subtabs = (
-            f"<div class='subtabs'>"
-            f"  <ul class='subtab-headers'>{''.join(headers_html)}</ul>"
-            f"  <div class='subtab-panels'>{''.join(panels_html)}</div>"
+
+        default_exp_str = f"{default_exponent:.2f}" if default_exponent is not None else "0.00"
+        default_exp_display = f"{default_exponent:.2f}" if default_exponent is not None else "--"
+        slider_disabled_attr = "" if default_mode in {"pair_exp", "types_exp"} else " disabled"
+
+        controls = (
+            f"<div class='color-controls' data-default-mode='{default_mode}' data-default-exp='{default_exp_str}'>"
+            f"  <label>Color por:"
+            f"    <select id='{sid}-mode'>"
+            f"      {''.join(options_html)}"
+            f"    </select>"
+            f"  </label>"
+            f"  <label> Exponente:"
+            f"    <input id='{sid}-exp' type='range' min='0' max='1' step='0.05' value='{default_exp_str}'{slider_disabled_attr}/>"
+            f"    <span id='{sid}-exp-val'>{default_exp_display}</span>"
+            f"  </label>"
             f"</div>"
         )
-        return f"<div class='plot-card'>{header}{metrics_line}{subtabs}</div>"
+        panels = f"<div class='subtab-panels'>{''.join(panels_html)}</div>"
+        return f"<div class='plot-card' data-sid='{sid}'>{header}{metrics_line}{controls}{panels}</div>"
 
-    tabs_headers: List[str] = []
-    tabs_bodies: List[str] = []
-    for idx, (metric, metric_info, baseline_row, proposal_rows) in enumerate(grouped):
-        tabs_headers.append(f"<li class='tab{' active' if idx==0 else ''}' data-target='tab-{metric}'>{metric_info['title']}</li>")
-        body: List[str] = [
-            f"<div id='tab-{metric}' class='tab-panel{' active' if idx==0 else ''}'>",
-            f"<div class='metric-intro'><p>{metric_info['casual']}</p><p><em>Detalle técnico:</em> {metric_info['technical']}</p></div>",
-        ]
-        if baseline_row is None and not proposal_rows:
-            body.append("<p>No se registraron resultados para esta métrica.</p>")
-        elif not proposal_rows:
-            base = render_card(baseline_row, is_baseline=True)
-            body.append(f"<div class='plot-grid'>{base}</div>")
-        else:
-            for pr in proposal_rows:
-                cards = []
-                base = render_card(baseline_row, is_baseline=True)
-                if base:
-                    cards.append(base)
-                cards.append(render_card(pr, is_baseline=False))
-                body.append(f"<div class='plot-grid'>{''.join(cards)}</div>")
-        body.append("</div>")
-        tabs_bodies.append("".join(body))
-
-    # Se elimina la sección de notación/métodos para evitar problemas
-    # de renderizado matemático en ciertos entornos y mantener el
-    # reporte más liviano y directo.
+    # Build nested tabs: first by reduction, then by metric
+    outer_headers: List[str] = []
+    outer_bodies: List[str] = []
+    for ridx, reduction in enumerate(reductions_present):
+        outer_headers.append(f"<li class='tab{' active' if ridx==0 else ''}' data-target='tab-red-{ridx}'>{reduction}</li>")
+        red_group = ranked_df[ranked_df.get("reduction").fillna("MDS") == reduction]
+        # metric-level tabs inside
+        metrics_present = list(dict.fromkeys(red_group["metric"].tolist()))
+        metrics_sorted = sorted(metrics_present, key=_metric_key)
+        inner_headers: List[str] = []
+        inner_bodies: List[str] = []
+        for midx, metric in enumerate(metrics_sorted):
+            metric_info = METRIC_INFO.get(metric, {"title": metric.upper(), "casual": "", "technical": ""})
+            inner_headers.append(f"<li class='subtab{' active' if midx==0 else ''}' data-target='tab-{ridx}-{metric}'>" + metric_info['title'] + "</li>")
+            group = red_group[red_group["metric"] == metric].sort_values("rank")
+            baseline_df = group[group["preproc_id"] == "identity"]
+            baseline_row = baseline_df.iloc[0].to_dict() if not baseline_df.empty else None
+            proposal_rows = [row._asdict() if hasattr(row, "_asdict") else row for row in group[group["preproc_id"] != "identity"].to_dict("records")]
+            body_parts: List[str] = [
+                f"<div id='tab-{ridx}-{metric}' class='tab-panel{' active' if midx==0 else ''}'>",
+                f"<div class='metric-intro'><p>{metric_info['casual']}</p><p><em>Detalle técnico:</em> {metric_info['technical']}</p></div>",
+            ]
+            if baseline_row is None and not proposal_rows:
+                body_parts.append("<p>No se registraron resultados para esta métrica.</p>")
+            elif not proposal_rows:
+                base_card = render_card(baseline_row, is_baseline=True)
+                body_parts.append(f"<div class='plot-grid'>{base_card}</div>")
+            else:
+                for pr in proposal_rows:
+                    cards = []
+                    base_card = render_card(baseline_row, is_baseline=True)
+                    if base_card:
+                        cards.append(base_card)
+                    cards.append(render_card(pr, is_baseline=False))
+                    body_parts.append(f"<div class='plot-grid'>{''.join(cards)}</div>")
+            body_parts.append("</div>")
+            inner_bodies.append("".join(body_parts))
+        # assemble inner tabs
+        inner_tabs = (
+            f"<div class='subtabs'>"
+            f"  <ul class='subtab-headers'>{''.join(inner_headers)}</ul>"
+            f"  <div class='tab-panels'>{''.join(inner_bodies)}</div>"
+            f"</div>"
+        )
+        outer_bodies.append(
+            f"<div id='tab-red-{ridx}' class='tab-panel{' active' if ridx==0 else ''}'>" + inner_tabs + "</div>"
+        )
 
     tabs_html = f"""
     <div class='tabs'>
       <ul class='tab-headers'>
-        {''.join(tabs_headers)}
+        {''.join(outer_headers)}
       </ul>
       <div class='tab-panels'>
-        {''.join(tabs_bodies)}
+        {''.join(outer_bodies)}
       </div>
     </div>
     """
+
+    script_js = """
+  <script>
+    (function() {
+      const outerHeaders = document.querySelectorAll('.tab-headers li');
+      const outerPanels = document.querySelectorAll('.tabs > .tab-panels > .tab-panel');
+
+      // Inner tab switches
+      document.querySelectorAll('.subtabs').forEach(block => {
+        const sheaders = block.querySelectorAll('.subtab-headers .subtab');
+        const spans = block.querySelectorAll('.tab-panels > .tab-panel');
+        function sactivate(targetId) {
+          sheaders.forEach(h => h.classList.toggle('active', h.dataset.target === targetId));
+          spans.forEach(p => {
+            const isMatch = p.id === targetId;
+            p.classList.toggle('active', isMatch);
+            p.style.display = isMatch ? 'block' : 'none';
+          });
+        }
+        sheaders.forEach(h => h.addEventListener('click', () => sactivate(h.dataset.target)));
+        if (sheaders.length) sactivate(sheaders[0].dataset.target);
+      });
+
+      function activateOuter(idx) {
+        outerHeaders.forEach((h,i)=>h.classList.toggle('active', i===idx));
+        outerPanels.forEach((p,i)=> {
+          const isActive = i===idx;
+          p.classList.toggle('active', isActive);
+          p.style.display = isActive ? 'block' : 'none';
+          if (isActive) {
+            const firstSub = p.querySelector('.subtab-headers .subtab');
+            if (firstSub) firstSub.click();
+          }
+        });
+      }
+
+      outerHeaders.forEach((h,i)=>h.addEventListener('click', ()=>activateOuter(i)));
+      if (outerHeaders.length) {
+        activateOuter(0);
+      } else {
+        outerPanels.forEach(p => {
+          p.classList.add('active');
+          p.style.display = 'block';
+        });
+      }
+
+      // Color control por tarjeta
+      document.querySelectorAll('.plot-card').forEach(card => {
+        const sid = card.dataset.sid || '';
+        const controls = card.querySelector('.color-controls');
+        const panels = card.querySelectorAll('.subtab-panels .subtab-panel');
+        const modeSel = card.querySelector(`#${sid}-mode`);
+        const expSlider = card.querySelector(`#${sid}-exp`);
+        const expVal = card.querySelector(`#${sid}-exp-val`);
+        const defaultMode = controls ? controls.dataset.defaultMode || 'pair_exp' : 'pair_exp';
+        const defaultExp = controls ? parseFloat(controls.dataset.defaultExp || '1') : 1;
+        if (modeSel && !modeSel.value) modeSel.value = defaultMode;
+        if (expSlider && !expSlider.value) expSlider.value = defaultExp.toFixed(2);
+
+        function showPanel() {
+          const mode = modeSel ? modeSel.value : defaultMode;
+          let optionDefaultExp = defaultExp;
+          if (modeSel) {
+            const opt = modeSel.options[modeSel.selectedIndex];
+            if (opt && opt.dataset.defaultExp) {
+              const candidate = parseFloat(opt.dataset.defaultExp);
+              if (Number.isFinite(candidate)) optionDefaultExp = candidate;
+            }
+          }
+          const needsExp = (mode === 'pair_exp' || mode === 'types_exp');
+          let exp = needsExp ? (expSlider ? parseFloat(expSlider.value) : optionDefaultExp) : optionDefaultExp;
+          if (!Number.isFinite(exp)) exp = optionDefaultExp;
+          const code = String(Math.round(exp * 100)).padStart(3, '0');
+          const target = needsExp ? `${sid}-${mode}_${code}` : `${sid}-${mode}`;
+          panels.forEach(p => {
+            const isTarget = p.id === target;
+            p.classList.toggle('active', isTarget);
+            p.style.display = isTarget ? 'block' : 'none';
+          });
+          if (expSlider) {
+            if (needsExp) {
+              expSlider.removeAttribute('disabled');
+              expSlider.value = exp.toFixed(2);
+              if (expVal) expVal.textContent = exp.toFixed(2);
+            } else {
+              expSlider.setAttribute('disabled', 'disabled');
+              expSlider.value = optionDefaultExp.toFixed(2);
+              if (expVal) expVal.textContent = '--';
+            }
+          } else if (expVal) {
+            expVal.textContent = needsExp ? exp.toFixed(2) : '--';
+          }
+        }
+
+        if (modeSel) modeSel.addEventListener('change', () => showPanel());
+        if (expSlider) {
+          expSlider.addEventListener('input', () => showPanel());
+          expSlider.addEventListener('change', () => showPanel());
+        }
+        showPanel();
+      });
+    })();
+  </script>
+"""
 
     html_content = f"""
 <!DOCTYPE html>
@@ -1138,6 +1400,9 @@ def build_report_html_v2(
     .subtab-headers .subtab.active {{ background: #fff; border: 1px solid #ddd; }}
     .subtab-panels .subtab-panel {{ display: none; }}
     .subtab-panels .subtab-panel.active {{ display: block; }}
+    .color-controls {{ margin: 8px 0 10px 0; display: flex; gap: 16px; align-items: center; }}
+    .color-controls label {{ font-size: 0.9rem; color: #333; }}
+    .color-controls input[disabled] {{ opacity: 0.5; cursor: not-allowed; }}
   </style>
 </head>
 <body>
@@ -1145,28 +1410,7 @@ def build_report_html_v2(
   <h3>Resumen global</h3>
   {table_html}
   {tabs_html}
-  <script>
-    (function() {{
-      const headers = document.querySelectorAll('.tab-headers li');
-      const panels = document.querySelectorAll('.tab-panel');
-      function activate(idx) {{
-        headers.forEach((h,i)=>h.classList.toggle('active', i===idx));
-        panels.forEach((p,i)=>p.classList.toggle('active', i===idx));
-      }}
-      headers.forEach((h,i)=>h.addEventListener('click', ()=>activate(i)));
-      activate(0);
-      // Subtabs per card
-      document.querySelectorAll('.plot-card').forEach(card => {{
-        const sheaders = card.querySelectorAll('.subtab-headers .subtab');
-        const spans = card.querySelectorAll('.subtab-panels .subtab-panel');
-        function sactivate(targetId) {{
-          sheaders.forEach(h => h.classList.toggle('active', h.dataset.target === targetId));
-          spans.forEach(p => p.classList.toggle('active', p.id === targetId));
-        }}
-        sheaders.forEach(h => h.addEventListener('click', () => sactivate(h.dataset.target)));
-      }});
-    }})();
-  </script>
+  {script_js}
 </body>
 </html>
 """
@@ -1418,6 +1662,15 @@ def main() -> None:
     metrics_requested = [m.strip().lower() for m in args.metrics.split(",") if m.strip()]
 
     scenarios = build_scenarios(proposals_requested, metrics_requested)
+    # Reducciones solicitadas (compatibilidad: --reduction gana si se pasa)
+    if args.reduction:
+        reductions = [args.reduction]
+    else:
+        reductions = [r.strip() for r in (args.reductions or "MDS").split(',') if r.strip()]
+    reductions = [r.upper() for r in reductions if r.strip()]
+    reductions = [r for r in reductions if r in AVAILABLE_REDUCTIONS]
+    if not reductions:
+        reductions = ["MDS"]
     results: List[Dict[str, object]] = []
     figures: List[Tuple[str, go.Figure]] = []
 
@@ -1433,7 +1686,7 @@ def main() -> None:
     for scenario in scenarios:
         preproc_id = scenario["preproc_id"]
         metric = scenario["metric"]
-        scenario_name = scenario["name"]
+        scenario_name_base = scenario["name"]
         description = scenario["description"]
 
         if preproc_id not in dist_simplex_cache:
@@ -1451,90 +1704,98 @@ def main() -> None:
             print(f"[skip] {scenario_name}: {exc}")
             continue
 
-        dist_matrix = squareform(dist_condensed)
-        base_matrix = X if metric in {"cosine", "euclidean", "l1", "l2", "cityblock", "manhattan"} else simplex
+        for reduction in reductions:
+            dist_matrix = squareform(dist_condensed)
+            base_matrix = X if metric in {"cosine", "euclidean", "l1", "l2", "cityblock", "manhattan"} else simplex
 
-        seed_rows: List[Dict[str, Optional[float]]] = []
-        figure_embedding: Optional[np.ndarray] = None
-        figure_seed: Optional[int] = None
+            seed_rows: List[Dict[str, Optional[float]]] = []
+            figure_embedding: Optional[np.ndarray] = None
+            figure_seed: Optional[int] = None
 
-        for seed in seed_list:
-            embedding = compute_embeddings(dist_condensed, args.reduction, seed)
+            for seed in seed_list:
+                embedding = compute_embeddings(dist_condensed, reduction, seed)
 
-            nn_top1, nn_top2 = evaluate_nn_hits(dist_matrix, entries, simplex)
-            mix_mean, mix_max = evaluate_mixture_error(simplex, entries)
-            metrics_summary = summarise_embedding_metrics(base_matrix, embedding, dist_matrix)
+                nn_top1, nn_top2 = evaluate_nn_hits(dist_matrix, entries, simplex)
+                mix_mean, mix_max = evaluate_mixture_error(simplex, entries)
+                metrics_summary = summarise_embedding_metrics(base_matrix, embedding, dist_matrix)
 
-            row: Dict[str, Optional[float]] = {
-                "scenario": scenario_name,
-                "description": description,
-                "metric": metric,
-                "preproc_id": preproc_id,
-                "seed": seed,
-                "nn_hit_top1": nn_top1,
-                "nn_hit_top2": nn_top2,
-                "mixture_l1_mean": mix_mean,
-                "mixture_l1_max": mix_max,
-                **metrics_summary,
-            }
-            seed_rows.append(row)
-            per_seed_records.append(row)
+                row: Dict[str, Optional[float]] = {
+                    "scenario": f"{reduction}:{scenario_name_base}",
+                    "description": description,
+                    "metric": metric,
+                    "preproc_id": preproc_id,
+                    "seed": seed,
+                    "reduction": reduction,
+                    "nn_hit_top1": nn_top1,
+                    "nn_hit_top2": nn_top2,
+                    "mixture_l1_mean": mix_mean,
+                    "mixture_l1_max": mix_max,
+                    **metrics_summary,
+                }
+                seed_rows.append(row)
+                per_seed_records.append(row)
 
-            if figure_embedding is None:
-                figure_embedding = embedding
-                figure_seed = seed
+                if figure_embedding is None:
+                    figure_embedding = embedding
+                    figure_seed = seed
 
-        if not seed_rows:
-            continue
+            if not seed_rows:
+                continue
 
-        summary = aggregate_seed_results(seed_rows, seed_list)
-        summary.update(
-            {
-                "scenario": scenario_name,
-                "description": description,
-                "metric": metric,
-                "preproc_id": preproc_id,
-                "figure_seed": figure_seed,
-            }
-        )
-        results.append(summary)
+            scenario_name = f"{reduction}:{scenario_name_base}"
+            summary = aggregate_seed_results(seed_rows, seed_list)
+            summary.update(
+                {
+                    "scenario": scenario_name,
+                    "description": description,
+                    "metric": metric,
+                    "preproc_id": preproc_id,
+                    "figure_seed": figure_seed,
+                    "reduction": reduction,
+                }
+            )
+            results.append(summary)
 
-        if figure_embedding is not None:
-            vectors_adjusted = preproc_cache[preproc_id]
-            totals_adj = np.sum(np.asarray(vectors_adjusted, dtype=float), axis=1)
-            existing_counts = np.sum(
-                np.asarray(vectors_adjusted, dtype=float) > COLOR_EXISTING_THRESHOLD,
-                axis=1,
-            ).astype(float)
+            if figure_embedding is not None:
+                vectors_adjusted = preproc_cache[preproc_id]
+                totals_adj = np.sum(np.asarray(vectors_adjusted, dtype=float), axis=1)
+                existing_counts = np.sum(
+                    np.asarray(vectors_adjusted, dtype=float) > COLOR_EXISTING_THRESHOLD,
+                    axis=1,
+                ).astype(float)
 
-            def _format_exp(val: float) -> str:
-                return f"{val:.2f}".rstrip("0").rstrip(".")
+                def _format_exp(val: float) -> str:
+                    return f"{val:.2f}".rstrip("0").rstrip(".")
 
             def _apply_color_mode(
                 mode: str,
+                exponent: Optional[float],
                 totals_raw: np.ndarray,
                 totals_adjusted: np.ndarray,
                 pairs_arr: np.ndarray,
                 types_arr: np.ndarray,
             ) -> Tuple[np.ndarray, str]:
                 """Devuelve (valores normalizados, título de la barra)."""
-                m = mode.lower()
-                if m.startswith("pair_exp_"):
-                    exp = int(m.split("_")[-1]) / 100.0
+                mode = mode.lower()
+                if mode == "pair_exp":
+                    exp = exponent if exponent is not None else 1.0
                     denom = _safe_denominator(pairs_arr, subtract=COLOR_PER_PAIR_SUBTRACT)
                     denom = np.power(denom, exp)
                     if not np.isclose(COLOR_DEN_EXPONENT, 1.0):
                         denom = np.power(denom, COLOR_DEN_EXPONENT)
                     vals = totals_raw / denom
                     title = f"Total/Pares^{_format_exp(exp)}"
-                elif m.startswith("types_exp_"):
-                    exp = int(m.split("_")[-1]) / 100.0
+                elif mode == "types_exp":
+                    exp = exponent if exponent is not None else 1.0
                     denom = _safe_denominator(types_arr, subtract=COLOR_PER_EXISTING_SUBTRACT)
                     denom = np.power(denom, exp)
                     if not np.isclose(COLOR_DEN_EXPONENT, 1.0):
                         denom = np.power(denom, COLOR_DEN_EXPONENT)
                     vals = totals_adjusted / denom
                     title = f"Total ajustado/Tipos^{_format_exp(exp)}"
+                elif mode == "raw_total":
+                    vals = totals_raw.copy()
+                    title = "Total bruto"
                 else:
                     raise ValueError(f"Modo de color no soportado: {mode}")
 
@@ -1542,20 +1803,23 @@ def main() -> None:
                     vals = np.power(np.clip(vals, 0.0, None), COLOR_OUTPUT_EXPONENT)
                 return vals, title
 
-            color_modes: List[str] = []
+            color_modes: List[Tuple[str, Optional[float]]] = []
+            if preproc_id == "identity":
+                color_modes.append(("raw_total", None))
             for exp in COLOR_EXPONENTS:
-                code = int(round(exp * 100))
-                color_modes.append(f"pair_exp_{code:03d}")
-                color_modes.append(f"types_exp_{code:03d}")
+                color_modes.append(("pair_exp", exp))
+                color_modes.append(("types_exp", exp))
             fig_title = f"{scenario_name} (seed {figure_seed})"
-            for cm in color_modes:
+            for mode, exponent in color_modes:
                 vals, ctitle = _apply_color_mode(
-                    cm,
+                    mode,
+                    exponent,
                     totals,
                     totals_adj,
                     pairs,
                     existing_counts,
                 )
+                key = mode if exponent is None else f"{mode}_{int(round(exponent * 100)):03d}"
                 fig = build_scatter_figure(
                     embedding=figure_embedding,
                     entries=entries,
@@ -1568,7 +1832,7 @@ def main() -> None:
                     is_proposal=(preproc_id != "identity"),
                     color_title=ctitle,
                 )
-                figures.append((f"{scenario_name}||{cm}", fig))
+                figures.append((f"{scenario_name}||{key}", fig))
 
     if not results:
         raise SystemExit("No se generaron resultados. Revisa propuestas y métricas.")

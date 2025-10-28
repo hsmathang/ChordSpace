@@ -20,6 +20,7 @@ from tkinter.scrolledtext import ScrolledText
 
 from tools import experiment_inversions
 from tools.query_registry import add_custom_query, get_all_queries, resolve_query_sql
+from tools.compare_proposals import PROPOSAL_INFO, METRIC_INFO, AVAILABLE_REDUCTIONS, PREPROCESSORS
 from tools.population_utils import dedupe_population
 from config import config_db
 from config import CHORD_TEMPLATES_METADATA
@@ -103,6 +104,33 @@ class ExperimentLauncher(tk.Tk):
         self.metric_var = tk.StringVar(value=list(self.metric_label_to_value.keys())[0])
         self.ponder_var = tk.StringVar(value=list(self.ponder_label_to_value.keys())[0])
         self.base_query_var.trace_add("write", lambda *_: self._mark_population_dirty())
+
+        self._init_compare_vars()
+
+    def _init_compare_vars(self) -> None:
+        # Proposals: combinación de definidos en PROPOSAL_INFO y PREPROCESSORS
+        all_props = sorted(set(PREPROCESSORS.keys()) | set(PROPOSAL_INFO.keys()))
+        default_props = {"baseline_identity", "simplex", "perclass_alpha1"}
+        self.proposals_order: list[str] = all_props
+        self.proposal_vars: dict[str, tk.BooleanVar] = {
+            name: tk.BooleanVar(value=(name in default_props))
+            for name in all_props
+        }
+
+        # Métricas disponibles
+        metric_keys = sorted(METRIC_INFO.keys())
+        default_metrics = {"euclidean"}
+        self.metrics_order: list[str] = metric_keys
+        self.metric_vars: dict[str, tk.BooleanVar] = {
+            name: tk.BooleanVar(value=(name in default_metrics))
+            for name in metric_keys
+        }
+
+        # Reducciones soportadas (todas seleccionadas por defecto)
+        self.reductions_order: list[str] = list(AVAILABLE_REDUCTIONS)
+        self.reduction_vars: dict[str, tk.BooleanVar] = {
+            name: tk.BooleanVar(value=True) for name in self.reductions_order
+        }
 
     def _create_layout(self) -> None:
         main = ttk.Frame(self, padding=14)
@@ -296,29 +324,58 @@ class ExperimentLauncher(tk.Tk):
 
     # ------------------------ comparison report UI
     def _build_compare_frame(self, frame: ttk.Frame) -> None:
-        # Solo parámetros de comparación (sin población)
         params = ttk.Frame(frame)
-        params.pack(fill=tk.X, padx=6, pady=(0,6))
-        ttk.Label(params, text="Proposals:").grid(row=0, column=0, sticky="w")
-        default_props = ("baseline_identity, simplex, perclass_alpha1")
-        self.compare_props_var = tk.StringVar(value=default_props)
-        ttk.Entry(params, textvariable=self.compare_props_var, width=78).grid(row=0, column=1, columnspan=3, sticky="we", padx=(4,0))
+        params.pack(fill=tk.BOTH, expand=True, padx=6, pady=(0,6))
 
-        ttk.Label(params, text="Metrics:").grid(row=1, column=0, sticky="w", pady=(6,0))
-        self.compare_metrics_var = tk.StringVar(value="euclidean")
-        ttk.Entry(params, textvariable=self.compare_metrics_var, width=56).grid(row=1, column=1, sticky="w", padx=(4,16), pady=(6,0))
+        # Proposals
+        prop_frame = ttk.LabelFrame(params, text="Proposals")
+        prop_frame.grid(row=0, column=0, sticky="nwe", padx=(0, 12), pady=(0, 8))
+        for idx, name in enumerate(self.proposals_order):
+            title = PROPOSAL_INFO.get(name, {}).get("title", name)
+            label_text = f"{title} ({name})"
+            ttk.Checkbutton(
+                prop_frame,
+                text=label_text,
+                variable=self.proposal_vars[name],
+            ).grid(row=idx // 2, column=idx % 2, sticky="w", padx=6, pady=3)
+        prop_frame.columnconfigure(0, weight=1)
+        prop_frame.columnconfigure(1, weight=1)
 
-        ttk.Label(params, text="Seeds:").grid(row=1, column=2, sticky="w", pady=(6,0))
+        # Métricas
+        metric_frame = ttk.LabelFrame(params, text="Métricas")
+        metric_frame.grid(row=0, column=1, sticky="nwe", pady=(0, 8))
+        for idx, name in enumerate(self.metrics_order):
+            title = METRIC_INFO.get(name, {}).get("title", name.title())
+            label_text = f"{title} ({name})"
+            ttk.Checkbutton(
+                metric_frame,
+                text=label_text,
+                variable=self.metric_vars[name],
+            ).grid(row=idx, column=0, sticky="w", padx=6, pady=3)
+        metric_frame.columnconfigure(0, weight=1)
+
+        # Reducciones
+        reduction_frame = ttk.LabelFrame(params, text="Reducciones")
+        reduction_frame.grid(row=1, column=0, columnspan=2, sticky="we", pady=(0, 8))
+        for idx, name in enumerate(self.reductions_order):
+            ttk.Checkbutton(
+                reduction_frame,
+                text=name,
+                variable=self.reduction_vars[name],
+            ).grid(row=0, column=idx, sticky="w", padx=6, pady=3)
+            reduction_frame.columnconfigure(idx, weight=1)
+
+        # Semillas
+        seed_row = ttk.Frame(params)
+        seed_row.grid(row=2, column=0, columnspan=2, sticky="w")
+        ttk.Label(seed_row, text="Seeds:").pack(side=tk.LEFT)
         self.compare_seeds_var = tk.StringVar(value="42")
-        ttk.Entry(params, textvariable=self.compare_seeds_var, width=18).grid(row=1, column=3, sticky="w", padx=(4,0), pady=(6,0))
+        ttk.Entry(seed_row, textvariable=self.compare_seeds_var, width=18).pack(side=tk.LEFT, padx=(6,0))
 
-        ttk.Label(params, text="Color:").grid(row=2, column=0, sticky="w", pady=(6,0))
-        self.compare_color_var = tk.StringVar(value="log_per_pair")
-        ttk.Combobox(params, textvariable=self.compare_color_var, values=["total","per_pair","log_total","log_per_pair"], state="readonly", width=14).grid(row=2, column=1, sticky="w", padx=(4,0), pady=(6,0))
-
+        params.columnconfigure(0, weight=1)
         params.columnconfigure(1, weight=1)
 
-        # Row 7: run/open
+        # Row: run/open
         actions = ttk.Frame(frame)
         actions.pack(fill=tk.X, padx=6, pady=(4,6))
         self.compare_run_button = ttk.Button(actions, text="Ejecutar comparación", command=self._on_compare_run_clicked)
@@ -564,11 +621,20 @@ class ExperimentLauncher(tk.Tk):
             f"({len(row_indices)} filas en tabla). "
             f"Salida: {sub}\n"
         )
+        props_sel = self._selected_proposals()
+        metrics_sel = self._selected_metrics()
+        reds_sel = self._selected_reductions()
+        props_arg = ",".join(props_sel) if props_sel else "baseline_identity"
+        metrics_arg = ",".join(metrics_sel) if metrics_sel else "euclidean"
+        reductions_arg = ",".join(reds_sel) if reds_sel else "MDS"
+        prop_titles = ", ".join(
+            f"{PROPOSAL_INFO.get(name, {}).get('title', name)} ({name})" for name in props_sel
+        ) if props_sel else "baseline_identity"
+        metric_titles = ", ".join(
+            f"{METRIC_INFO.get(name, {}).get('title', name)} ({name})" for name in metrics_sel
+        ) if metrics_sel else "Euclidean"
         self._append_compare_log(
-            f"Propuestas: {self.compare_props_var.get().strip()} | "
-            f"Métricas: {self.compare_metrics_var.get().strip()} | "
-            f"Semillas: {self.compare_seeds_var.get().strip()} | "
-            f"Color: {self.compare_color_var.get().strip()}\n"
+            f"Propuestas: {prop_titles} | Métricas: {metric_titles} | Reducciones: {reductions_arg} | Semillas: {self.compare_seeds_var.get().strip()}\n"
         )
         try:
             self.compare_open_button.configure(state=tk.DISABLED)
@@ -579,10 +645,10 @@ class ExperimentLauncher(tk.Tk):
             "--dyads-query", sql,
             "--triads-query", "",
             "--sevenths-query", "",
-            "--proposals", self.compare_props_var.get().strip(),
-            "--metrics", self.compare_metrics_var.get().strip(),
+            "--proposals", props_arg,
+            "--metrics", metrics_arg,
+            "--reductions", reductions_arg,
             "--seeds", self.compare_seeds_var.get().strip(),
-            "--color-mode", self.compare_color_var.get().strip(),
             "--output", str(sub),
         ]
         self._append_log("\n--- Ejecutando reporte de comparación ---\n")
@@ -913,6 +979,15 @@ class ExperimentLauncher(tk.Tk):
             except Exception:
                 continue
         return sorted(set(ids))
+
+    def _selected_proposals(self) -> list[str]:
+        return [name for name in self.proposals_order if self.proposal_vars[name].get()]
+
+    def _selected_metrics(self) -> list[str]:
+        return [name for name in self.metrics_order if self.metric_vars[name].get()]
+
+    def _selected_reductions(self) -> list[str]:
+        return [name for name in self.reductions_order if self.reduction_vars[name].get()]
 
     def _process_log_queue(self) -> None:
         while True:

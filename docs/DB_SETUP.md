@@ -35,26 +35,17 @@ DB_NAME=ChordCodex
 
 ---
 
-## 3. Opciones de PostgreSQL
-### Opcion A. Servidor nativo (recomendada)
-1. Instala PostgreSQL 16 y asegurate de que `psql` esta en el PATH.
-2. Crea la base y aplica el esquema canonico:
+## 3. Instalar y preparar PostgreSQL (modo nativo)
+1. Instala PostgreSQL 16 en tu sistema (Postgres.app en macOS, instalador oficial en Windows, paquetes de la distro en Linux) y confirma que `psql` está disponible.
+2. Crea la base y aplica el esquema canónico:
    ```bash
    createdb ChordCodex
    psql -d ChordCodex -f db/init/01-schema.sql
    ```
-   Si `createdb` no esta disponible:
+   Si `createdb` no está en el PATH, puedes lanzar directamente la instrucción SQL:
    ```bash
    psql -U postgres -h 127.0.0.1 -c "CREATE DATABASE \"ChordCodex\";"
-   ```
-
-### Opcion B. Docker Compose
-1. `cp db/.env.db.example db/.env.db`
-2. `docker compose -f docker-compose.db.yml up -d`
-3. Revisa `docker compose -f docker-compose.db.yml logs -f db` hasta ver `database system is ready to accept connections`.
-4. Para reprocesar el esquema (por ejemplo, tras actualizar el repositorio):
-   ```bash
-   docker compose -f docker-compose.db.yml exec db psql -d "$env:POSTGRES_DB" -f /docker-entrypoint-initdb.d/01-schema.sql
+   psql -d ChordCodex -f db/init/01-schema.sql
    ```
 
 ---
@@ -116,7 +107,6 @@ Espera:
 
 ## 8. Mantenimiento
 - Respaldos: `pg_dump -d ChordCodex > backups/chordcodex_$(date +%Y%m%d).sql`.
-- Restauracion rapida: `psql -d ChordCodex < backups/archivo.sql`.
-- Reset de docker: `docker compose -f docker-compose.db.yml down -v` y repite la configuracion.
+- Restauración rápida: `psql -d ChordCodex < backups/archivo.sql`.
 
 Documenta en issues cualquier variacion adicional que encuentres para mantener el flujo actualizado entre plataformas.

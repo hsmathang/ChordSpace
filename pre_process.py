@@ -12,7 +12,11 @@ import logging
 from dataclasses import dataclass
 from abc import ABC, abstractmethod
 
-from chordcodex.model import QueryExecutor
+try:
+    from chordcodex.model import QueryExecutor  # type: ignore
+except Exception:  # pragma: no cover
+    # Fallback local executor (usa psycopg2 directamente)
+    from synth_tools import QueryExecutor  # type: ignore
 # Importar constantes globales desde config.py
 from config import (
     PONDERACION_IMPORTANCIA_BAJO_WEIGHT_DEFAULT,

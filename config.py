@@ -18,11 +18,63 @@ El objetivo es centralizar todas las configuraciones en un solo lugar para evita
 """
 
 import os
+import sys
+import types
 from pathlib import Path
-from dotenv import load_dotenv
+try:
+    # Preferir python-dotenv si está disponible
+    from dotenv import load_dotenv as _load_dotenv  # type: ignore
+except Exception:  # pragma: no cover
+    _load_dotenv = None
 
 _BASE_DIR = Path(__file__).resolve().parent
-load_dotenv(_BASE_DIR / '.env')
+
+def _fallback_load_env(env_path: Path) -> None:
+    try:
+        text = env_path.read_text(encoding='utf-8')
+    except Exception:
+        return
+    for line in text.splitlines():
+        s = line.strip()
+        if not s or s.startswith('#') or '=' not in s:
+            continue
+        k, v = s.split('=', 1)
+        k = k.strip()
+        v = v.strip()
+        if (v.startswith('"') and v.endswith('"')) or (v.startswith("'") and v.endswith("'")):
+            v = v[1:-1]
+        if k and (os.getenv(k) is None):
+            os.environ[k] = v
+
+# Cargar .env con python-dotenv si existe; si no, usar fallback ligero
+_env_file = _BASE_DIR / '.env'
+
+
+def _shim_load_dotenv(path=None, **_kwargs) -> bool:
+    target = Path(path) if path is not None else _env_file
+    _fallback_load_env(target)
+    return True
+
+
+if _load_dotenv is None:
+    module = sys.modules.get('dotenv')
+    if module is None:
+        module = types.ModuleType('dotenv')
+        sys.modules['dotenv'] = module
+    module.load_dotenv = _shim_load_dotenv  # type: ignore[attr-defined]
+    _load_dotenv = module.load_dotenv  # type: ignore[assignment]
+else:
+    module = sys.modules.get('dotenv')
+    if module is not None and not hasattr(module, 'load_dotenv'):
+        module.load_dotenv = _load_dotenv  # type: ignore[attr-defined]
+
+if _load_dotenv is not None:
+    try:
+        _load_dotenv(_env_file)
+    except Exception:
+        _fallback_load_env(_env_file)
+else:
+    _fallback_load_env(_env_file)
 
 def _get_env(key, default=None):
     # Retrieve configuration from environment variables or fall back to defaults.
@@ -281,6 +333,21 @@ QUERY_CHORDS_3_NOTES_ALL = """
 SELECT id, n, interval, notes, bass, octave, frequencies, chroma, tag, code
 FROM chords
 WHERE n = 3
+ORDER BY id;
+"""
+
+# Conjuntos completos por cardinalidad (para selección de población en la GUI)
+QUERY_CHORDS_4_NOTES_ALL = """
+SELECT id, n, interval, notes, bass, octave, frequencies, chroma, tag, code
+FROM chords
+WHERE n = 4
+ORDER BY id;
+"""
+
+QUERY_CHORDS_5_NOTES_ALL = """
+SELECT id, n, interval, notes, bass, octave, frequencies, chroma, tag, code
+FROM chords
+WHERE n = 5
 ORDER BY id;
 """
 
