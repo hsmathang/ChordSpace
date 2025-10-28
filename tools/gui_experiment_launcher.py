@@ -116,6 +116,11 @@ class ExperimentLauncher(tk.Tk):
             name: tk.BooleanVar(value=(name in default_props))
             for name in all_props
         }
+        self.proposal_display_map = {
+            name: f"{PROPOSAL_INFO.get(name, {}).get('title', name)} ({name})"
+            for name in self.proposals_order
+        }
+        self.proposal_display_inverse = {display: name for name, display in self.proposal_display_map.items()}
 
         # Métricas disponibles
         metric_keys = sorted(METRIC_INFO.keys())
@@ -132,6 +137,18 @@ class ExperimentLauncher(tk.Tk):
             name: tk.BooleanVar(value=True) for name in self.reductions_order
         }
 
+        # Estado para comparación de reducciones (propuesta única)
+        default_prop_display = self.proposal_display_map.get(self.proposals_order[0], "") if self.proposals_order else ""
+        self.reduction_compare_prop_var = tk.StringVar(value=default_prop_display)
+        self.reduction_compare_metric_vars: dict[str, tk.BooleanVar] = {
+            name: tk.BooleanVar(value=(name in default_metrics))
+            for name in metric_keys
+        }
+        self.reduction_compare_reduction_vars: dict[str, tk.BooleanVar] = {
+            name: tk.BooleanVar(value=True) for name in self.reductions_order
+        }
+        self.reduction_compare_seeds_var = tk.StringVar(value="42")
+
     def _create_layout(self) -> None:
         main = ttk.Frame(self, padding=14)
         main.pack(fill=tk.BOTH, expand=True)
@@ -143,9 +160,11 @@ class ExperimentLauncher(tk.Tk):
         tab_population = ttk.Frame(nb)
         tab_experiment = ttk.Frame(nb)
         tab_compare = ttk.Frame(nb)
+        tab_compare_reduction = ttk.Frame(nb)
         nb.add(tab_population, text="Elegir población")
         nb.add(tab_experiment, text="Parámetros de experimento")
         nb.add(tab_compare, text="Parámetros de comparación")
+        nb.add(tab_compare_reduction, text="Comparar reducciones")
 
         # Tab: Población
         pop_container = ttk.Frame(tab_population, padding=6)
@@ -225,6 +244,18 @@ class ExperimentLauncher(tk.Tk):
         compare_log_frame.pack(fill=tk.BOTH, expand=True, pady=(8, 0))
         self.compare_log = ScrolledText(compare_log_frame, height=8, state=tk.DISABLED, font=("Consolas", 10))
         self.compare_log.pack(fill=tk.BOTH, expand=True, padx=4, pady=4)
+
+        # Tab: Comparación de reducciones
+        red_container = ttk.Frame(tab_compare_reduction, padding=6)
+        red_container.pack(fill=tk.BOTH, expand=True)
+        red_frame = ttk.LabelFrame(red_container, text="Comparación de reducciones dimensionales")
+        red_frame.pack(fill=tk.BOTH, expand=True)
+        self._build_reduction_compare_frame(red_frame)
+
+        red_log_frame = ttk.LabelFrame(red_container, text="Registro comparación reducciones")
+        red_log_frame.pack(fill=tk.BOTH, expand=True, pady=(8, 0))
+        self.reduction_log = ScrolledText(red_log_frame, height=8, state=tk.DISABLED, font=("Consolas", 10))
+        self.reduction_log.pack(fill=tk.BOTH, expand=True, padx=4, pady=4)
 
         # Log global
         log_frame = ttk.LabelFrame(main, text="Registro de ejecución")
@@ -387,6 +418,71 @@ class ExperimentLauncher(tk.Tk):
 
         # State holders (población se gestiona en la primera pestaña)
         self.compare_last_report: Path | None = None
+
+    def _build_reduction_compare_frame(self, frame: ttk.Frame) -> None:
+        params = ttk.Frame(frame)
+        params.pack(fill=tk.BOTH, expand=True, padx=6, pady=(0,6))
+
+        # Propuesta (única)
+        prop_row = ttk.Frame(params)
+        prop_row.grid(row=0, column=0, columnspan=2, sticky="we", pady=(0,8))
+        ttk.Label(prop_row, text="Propuesta:").pack(side=tk.LEFT)
+        prop_values = [self.proposal_display_map[name] for name in self.proposals_order]
+        self.reduction_prop_combo = ttk.Combobox(
+            prop_row,
+            textvariable=self.reduction_compare_prop_var,
+            values=prop_values,
+            state="readonly",
+            width=44,
+        )
+        if prop_values:
+            self.reduction_prop_combo.set(prop_values[0])
+        self.reduction_prop_combo.pack(side=tk.LEFT, padx=(8,0))
+
+        # Métricas
+        metric_frame = ttk.LabelFrame(params, text="Métricas")
+        metric_frame.grid(row=1, column=0, sticky="nwe", pady=(0, 8))
+        for idx, name in enumerate(self.metrics_order):
+            title = METRIC_INFO.get(name, {}).get("title", name.title())
+            label_text = f"{title} ({name})"
+            ttk.Checkbutton(
+                metric_frame,
+                text=label_text,
+                variable=self.reduction_compare_metric_vars[name],
+            ).grid(row=idx, column=0, sticky="w", padx=6, pady=3)
+        metric_frame.columnconfigure(0, weight=1)
+
+        # Reducciones
+        reduction_frame = ttk.LabelFrame(params, text="Reducciones")
+        reduction_frame.grid(row=1, column=1, sticky="nwe", pady=(0,8))
+        for idx, name in enumerate(self.reductions_order):
+            ttk.Checkbutton(
+                reduction_frame,
+                text=name,
+                variable=self.reduction_compare_reduction_vars[name],
+            ).grid(row=0, column=idx, sticky="w", padx=6, pady=3)
+            reduction_frame.columnconfigure(idx, weight=1)
+
+        # Semillas
+        seed_row = ttk.Frame(params)
+        seed_row.grid(row=2, column=0, columnspan=2, sticky="w")
+        ttk.Label(seed_row, text="Seeds:").pack(side=tk.LEFT)
+        ttk.Entry(seed_row, textvariable=self.reduction_compare_seeds_var, width=18).pack(side=tk.LEFT, padx=(6,0))
+
+        params.columnconfigure(0, weight=1)
+        params.columnconfigure(1, weight=1)
+
+        # Botones
+        actions = ttk.Frame(frame)
+        actions.pack(fill=tk.X, padx=6, pady=(4,6))
+        self.reduction_run_button = ttk.Button(actions, text="Comparar reducciones", command=self._on_reduction_run_clicked)
+        self.reduction_run_button.pack(side=tk.LEFT)
+        self.reduction_open_button = ttk.Button(actions, text="Abrir reporte", command=self._on_reduction_open_clicked, state=tk.DISABLED)
+        self.reduction_open_button.pack(side=tk.LEFT, padx=(8,0))
+        self.reduction_status_var = tk.StringVar(value="—")
+        ttk.Label(actions, textvariable=self.reduction_status_var, foreground="#555").pack(side=tk.RIGHT)
+
+        self.reduction_last_report: Path | None = None
 
     # ------------------------ comparison logic
     def _on_population_preview_clicked(self) -> None:
@@ -700,6 +796,124 @@ class ExperimentLauncher(tk.Tk):
         except Exception as exc:  # pylint: disable=broad-except
             messagebox.showerror("No se pudo abrir", str(exc))
 
+    def _on_reduction_run_clicked(self) -> None:
+        if self.running_thread and self.running_thread.is_alive():
+            return
+        if self.population_df is None or self.population_df.empty:
+            self._on_population_preview_clicked()
+            if self.population_df is None or self.population_df.empty:
+                messagebox.showwarning("Sin población", "Carga una población en la pestaña anterior antes de ejecutar la comparación.")
+                return
+        row_indices = self._selected_population_rows()
+        if not row_indices:
+            messagebox.showwarning("Sin selección", "Selecciona al menos un acorde en la lista.")
+            return
+        ids = self._selected_population_ids(row_indices)
+        if not ids:
+            messagebox.showwarning(
+                "Población sin IDs",
+                "La población seleccionada no contiene IDs válidos para ejecutar la comparación.\n"
+                "Elige una fuente basada en la base de datos."
+            )
+            return
+
+        id_list = ",".join(str(i) for i in ids)
+        sql = f"SELECT * FROM chords WHERE id IN ({id_list}) ORDER BY id;"
+        out_dir = Path(self.output_var.get().strip()).resolve()
+        out_dir.mkdir(parents=True, exist_ok=True)
+        sub = out_dir / f"compare_reductions_{_dt.datetime.now().strftime('%Y%m%d_%H%M%S')}"
+        self.reduction_last_report = None
+        self.reduction_expected_report = sub / "report.html"
+
+        proposal_display = self.reduction_compare_prop_var.get().strip()
+        proposal_id = self.proposal_display_inverse.get(proposal_display, proposal_display.split('(')[-1].split(')')[0].strip())
+        metrics_sel = [name for name, var in self.reduction_compare_metric_vars.items() if var.get()]
+        reductions_sel = [name for name, var in self.reduction_compare_reduction_vars.items() if var.get()]
+        metrics_arg = ",".join(metrics_sel) if metrics_sel else "euclidean"
+        reductions_arg = ",".join(reductions_sel) if reductions_sel else "MDS"
+
+        prop_log = self.proposal_display_map.get(proposal_id, proposal_id)
+        metric_log = ", ".join(
+            f"{METRIC_INFO.get(name, {}).get('title', name.title())} ({name})" for name in metrics_sel
+        ) if metrics_sel else "Euclidiana"
+        self._append_log(
+            f"\n--- Comparación de reducciones ---\n[población] {len(ids)} acordes seleccionados\n"
+        )
+        self._append_tab_log(self.reduction_log, f"[reducciones] {len(ids)} acordes seleccionados. Salida: {sub}\n")
+        self._append_tab_log(
+            self.reduction_log,
+            f"Propuesta: {prop_log} | Métricas: {metric_log} | Reducciones: {reductions_arg} | Semillas: {self.reduction_compare_seeds_var.get().strip()}\n"
+        )
+        try:
+            self.reduction_open_button.configure(state=tk.DISABLED)
+        except Exception:
+            pass
+
+        args = [
+            sys.executable,
+            "-m",
+            "tools.compare_reductions",
+            "--proposal",
+            proposal_id,
+            "--metrics",
+            metrics_arg,
+            "--reductions",
+            reductions_arg,
+            "--seeds",
+            self.reduction_compare_seeds_var.get().strip(),
+            "--dyads-query",
+            sql,
+            "--triads-query",
+            "",
+            "--sevenths-query",
+            "",
+            "--output",
+            str(sub),
+        ]
+        self.reduction_status_var.set("Ejecutando…")
+        self.status_var.set("Ejecutando comparación…")
+        self._set_controls_state(tk.DISABLED)
+        self.running_thread = threading.Thread(target=self._run_reduction_thread, args=(args,), daemon=True)
+        self.running_thread.start()
+
+    def _run_reduction_thread(self, proc_args: list[str]) -> None:
+        report_re = re.compile(r"Reporte generado en:\s*(.*)")
+        t0 = time.perf_counter()
+        try:
+            with subprocess.Popen(proc_args, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True) as proc:
+                assert proc.stdout is not None
+                for line in proc.stdout:
+                    self.log_queue.put(("reduction_log", line))
+                    m = report_re.search(line)
+                    if m:
+                        path = m.group(1).strip()
+                        try:
+                            self.reduction_last_report = Path(path)
+                        except Exception:
+                            self.reduction_last_report = None
+            expected = getattr(self, "reduction_expected_report", None)
+            if self.reduction_last_report is None and expected and expected.exists():
+                self.reduction_last_report = expected
+            t1 = time.perf_counter()
+            self.log_queue.put(("reduction_status", f"Comparación completada en {(t1 - t0):.2f}s."))
+        except Exception as exc:  # pylint: disable=broad-except
+            self.log_queue.put(("reduction_error", str(exc)))
+            self.log_queue.put(("error", str(exc)))
+        finally:
+            self.log_queue.put(("done", None))
+
+    def _on_reduction_open_clicked(self) -> None:
+        if not self.reduction_last_report:
+            messagebox.showwarning("Nada que abrir", "Aún no hay reporte disponible.")
+            return
+        if not self.reduction_last_report.exists():
+            messagebox.showerror("Reporte no encontrado", f"No se encontró el archivo:\n{self.reduction_last_report}")
+            return
+        try:
+            webbrowser.open_new_tab(str(self.reduction_last_report))
+        except Exception as exc:  # pylint: disable=broad-except
+            messagebox.showerror("No se pudo abrir", str(exc))
+
     # ---------------------------------------------------------------- actions
     def _default_output_dir(self) -> Path:
         timestamp = dt.datetime.now().strftime("%Y%m%d_%H%M%S")
@@ -915,6 +1129,7 @@ class ExperimentLauncher(tk.Tk):
             "metric_combo",
             "ponder_combo",
             "compare_run_button",
+            "reduction_run_button",
         ]
         for name in names:
             widget = getattr(self, name, None)
@@ -946,6 +1161,9 @@ class ExperimentLauncher(tk.Tk):
 
     def _append_compare_log(self, text: str) -> None:
         self._append_tab_log(getattr(self, "compare_log", None), text)
+
+    def _append_reduction_log(self, text: str) -> None:
+        self._append_tab_log(getattr(self, "reduction_log", None), text)
 
     def _mark_population_dirty(self, *_args) -> None:
         self.population_df = None
@@ -1003,6 +1221,9 @@ class ExperimentLauncher(tk.Tk):
             elif kind == "compare_log":
                 self._append_log(payload)
                 self._append_compare_log(payload)
+            elif kind == "reduction_log":
+                self._append_log(payload)
+                self._append_reduction_log(payload)
             elif kind == "exp_status":
                 self._append_log(f"{payload}\n")
                 self.status_var.set(payload)
@@ -1012,11 +1233,19 @@ class ExperimentLauncher(tk.Tk):
                 self.status_var.set(payload)
                 self.compare_status_var.set(payload)
                 self._append_compare_log(f"{payload}\n")
+            elif kind == "reduction_status":
+                self._append_log(f"{payload}\n")
+                self.status_var.set(payload)
+                self.reduction_status_var.set(payload)
+                self._append_reduction_log(f"{payload}\n")
             elif kind == "exp_error":
                 self._append_exp_log(f"Error: {payload}\n")
             elif kind == "compare_error":
                 self._append_compare_log(f"Error: {payload}\n")
                 self.compare_status_var.set("Error")
+            elif kind == "reduction_error":
+                self._append_reduction_log(f"Error: {payload}\n")
+                self.reduction_status_var.set("Error")
             elif kind == "status":
                 self._append_log(f"{payload}\n")
                 self.status_var.set(payload)
@@ -1038,6 +1267,18 @@ class ExperimentLauncher(tk.Tk):
                             self.compare_open_button.configure(state=tk.DISABLED)
                             if self.compare_status_var.get() != "Error":
                                 self.compare_status_var.set("Reporte no encontrado")
+                    except Exception:
+                        pass
+                if getattr(self, "reduction_last_report", None):
+                    try:
+                        if self.reduction_last_report.exists():
+                            self.reduction_open_button.configure(state=tk.NORMAL)
+                            if self.reduction_status_var.get() == "Ejecutando…":
+                                self.reduction_status_var.set("Listo.")
+                        else:
+                            self.reduction_open_button.configure(state=tk.DISABLED)
+                            if self.reduction_status_var.get() != "Error":
+                                self.reduction_status_var.set("Reporte no encontrado")
                     except Exception:
                         pass
         self.after(120, self._process_log_queue)
