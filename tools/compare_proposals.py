@@ -590,7 +590,7 @@ def compute_embeddings(
             perplexity=perplexity,
             random_state=seed,
             init="random",
-            n_iter=1000,
+            max_iter=1000,
         )
         embedding = reducer.fit_transform(dist_matrix)
         return embedding
