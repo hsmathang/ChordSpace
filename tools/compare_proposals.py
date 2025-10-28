@@ -24,7 +24,7 @@ import plotly.graph_objects as go
 from plotly.io import to_html
 from scipy.ndimage import gaussian_filter1d
 from scipy.spatial.distance import pdist, squareform, jensenshannon
-from sklearn.manifold import MDS
+from sklearn.manifold import MDS, TSNE, Isomap
 try:
     import umap  # type: ignore
 except Exception:  # pragma: no cover
@@ -545,10 +545,15 @@ def metric_distance(metric: str, X: np.ndarray, dist_simplex: np.ndarray) -> np.
     raise ValueError(f"Métrica no soportada: {metric}")
 
 
-AVAILABLE_REDUCTIONS = ("MDS", "UMAP")
+AVAILABLE_REDUCTIONS = ("MDS", "UMAP", "TSNE", "ISOMAP")
 
 
-def compute_embeddings(dist_condensed: np.ndarray, reduction: str, seed: int) -> np.ndarray:
+def compute_embeddings(
+    dist_condensed: np.ndarray,
+    reduction: str,
+    seed: int,
+    base_matrix: Optional[np.ndarray] = None,
+) -> np.ndarray:
     reduction = (reduction or "MDS").upper()
     if reduction == "MDS":
         dist_matrix = squareform(dist_condensed)
@@ -574,6 +579,28 @@ def compute_embeddings(dist_condensed: np.ndarray, reduction: str, seed: int) ->
         )
         # Para 'precomputed', umap espera distancias, no similitudes. Pasamos dmat directamente.
         embedding = reducer.fit_transform(dmat)
+        return embedding
+    if reduction == "TSNE":
+        dist_matrix = squareform(dist_condensed)
+        n = dist_matrix.shape[0]
+        perplexity = max(5, min(30, (n - 1)))
+        reducer = TSNE(
+            n_components=2,
+            metric="precomputed",
+            perplexity=perplexity,
+            random_state=seed,
+            init="random",
+            n_iter=1000,
+        )
+        embedding = reducer.fit_transform(dist_matrix)
+        return embedding
+    if reduction == "ISOMAP":
+        if base_matrix is None:
+            raise ValueError("ISOMAP requiere la matriz base de características.")
+        X = np.asarray(base_matrix, dtype=float)
+        n_neighbors = min(10, max(3, X.shape[0] - 1))
+        reducer = Isomap(n_neighbors=n_neighbors, n_components=2)
+        embedding = reducer.fit_transform(X)
         return embedding
     raise ValueError(f"Reducción no soportada: {reduction}")
 
@@ -1713,7 +1740,7 @@ def main() -> None:
             figure_seed: Optional[int] = None
 
             for seed in seed_list:
-                embedding = compute_embeddings(dist_condensed, reduction, seed)
+                embedding = compute_embeddings(dist_condensed, reduction, seed, base_matrix=base_matrix)
 
                 nn_top1, nn_top2 = evaluate_nn_hits(dist_matrix, entries, simplex)
                 mix_mean, mix_max = evaluate_mixture_error(simplex, entries)

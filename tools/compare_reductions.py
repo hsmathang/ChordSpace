@@ -475,7 +475,7 @@ def main() -> None:
         for reduction in reductions_requested:
             reduction_upper = reduction.upper()
             try:
-                embedding = cp.compute_embeddings(dist_condensed, reduction_upper, seed_list[0])
+                embedding = cp.compute_embeddings(dist_condensed, reduction_upper, seed_list[0], base_matrix=base_matrix)
             except ValueError as exc:
                 print(f"[skip] {preproc_id} / {metric} / {reduction_upper}: {exc}")
                 continue
@@ -487,7 +487,7 @@ def main() -> None:
         for reduction_upper, embedding in embeddings_by_reduction.items():
             per_seed: List[Dict[str, Optional[float]]] = []
             for seed in seed_list:
-                embedding_seed = cp.compute_embeddings(dist_condensed, reduction_upper, seed)
+                embedding_seed = cp.compute_embeddings(dist_condensed, reduction_upper, seed, base_matrix=base_matrix)
                 nn_top1, nn_top2 = cp.evaluate_nn_hits(dist_matrix, entries, simplex)
                 mix_mean, mix_max = cp.evaluate_mixture_error(simplex, entries)
                 metrics_summary = cp.summarise_embedding_metrics(base_matrix, embedding_seed, dist_matrix)
@@ -544,12 +544,11 @@ def main() -> None:
                 base_matrix,
                 preproc_cache[preproc_id],
                 entries,
-                seed_list,
                 reduction_upper,
-            figures,
-            embedding_fig,
-            color_modes,
-        )
+                figures,
+                embedding_fig,
+                color_modes,
+            )
 
     output_dir = cp.ensure_output_dir(args.output)
     report_path = output_dir / "report.html"
