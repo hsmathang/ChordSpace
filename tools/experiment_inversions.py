@@ -119,6 +119,7 @@ def build_inversions_anchored_db(df_src: pd.DataFrame, include_original: bool = 
       - Si include_original: concatenar originales.
     """
     masks = []
+    mask_meta: dict[int, dict[str, Optional[int]]] = {}
     n_gen = 0
     n_oob = 0
     show_first_oob = True
@@ -139,6 +140,12 @@ def build_inversions_anchored_db(df_src: pd.DataFrame, include_original: bool = 
                 # Indices segÃºn fallback: (..., abs_mask_int, abs_mask_hex, notes_abs_json)
                 abs_mask_int = int(res[-3])
                 masks.append(abs_mask_int)
+                source_id = row.get("id")
+                try:
+                    source_id = int(source_id) if source_id is not None else None
+                except Exception:
+                    source_id = None
+                mask_meta.setdefault(abs_mask_int, {"source_id": source_id, "rotation": k})
                 n_gen += 1
             except Exception:
                 continue
@@ -152,12 +159,180 @@ def build_inversions_anchored_db(df_src: pd.DataFrame, include_original: bool = 
     else:
         df_inv_db = pd.DataFrame()
 
+    # Rehidratar filas base con todos los campos de la tabla chords
+    base_rows: list[dict[str, object]] = []
+    id_to_row: dict[int, dict[str, object]] = {}
+    base_ids: list[int] = []
+    base_columns_union: set[str] = set(df_src.columns)
     if include_original:
-        cols = df_inv_db.columns.tolist() if not df_inv_db.empty else df_src.columns.tolist()
-        base = df_src[cols] if all(c in df_src.columns for c in cols) else df_src
-        out = pd.concat([base, df_inv_db], ignore_index=True)
+        if "id" in df_src.columns:
+            for raw_id in df_src["id"].tolist():
+                if pd.isna(raw_id):
+                    continue
+                try:
+                    base_ids.append(int(raw_id))
+                except Exception:
+                    continue
+        base_ids_unique = sorted(set(base_ids))
+        base_full_map: dict[int, dict[str, object]] = {}
+        if base_ids_unique:
+            try:
+                df_base_full = qe.as_pandas("SELECT * FROM chords WHERE id = ANY(%s)", (base_ids_unique,))
+            except Exception:
+                df_base_full = pd.DataFrame()
+            if not df_base_full.empty and "id" in df_base_full.columns:
+                for item in df_base_full.to_dict(orient="records"):
+                    rid = item.get("id")
+                    if rid is None or pd.isna(rid):
+                        continue
+                    try:
+                        base_full_map[int(rid)] = item
+                    except Exception:
+                        continue
+        for _, row in df_src.iterrows():
+            row_dict = row.to_dict()
+            raw_id = row_dict.get("id")
+            base_record: dict[str, object] = {}
+            rid_int: Optional[int] = None
+            if raw_id is not None and not pd.isna(raw_id):
+                try:
+                    rid_int = int(raw_id)
+                    base_record = dict(base_full_map.get(rid_int, {}))
+                except Exception:
+                    rid_int = None
+            combined: dict[str, object] = {}
+            combined.update(base_record)
+            combined.update(row_dict)
+            if "__inv_flag" not in combined or pd.isna(combined.get("__inv_flag")):
+                combined["__inv_flag"] = False
+            if "__inv_rotation" not in combined:
+                combined["__inv_rotation"] = np.nan
+            if "__inv_source_id" not in combined:
+                combined["__inv_source_id"] = rid_int if rid_int is not None else np.nan
+            if rid_int is not None:
+                id_to_row.setdefault(rid_int, combined)
+            base_rows.append(combined)
+            base_columns_union.update(combined.keys())
+
+    # Procesar inversiones y mapear familias
+    union_records: list[dict[str, object]] = list(base_rows)
+    id_edges: list[tuple[int, int]] = []
+    for rec in df_inv_db.to_dict(orient="records"):
+        mask_val = rec.get("abs_mask_int")
+        if mask_val is None or pd.isna(mask_val):
+            continue
+        try:
+            mask_int = int(mask_val)
+        except Exception:
+            continue
+        meta = mask_meta.get(mask_int, {})
+        source_id = meta.get("source_id")
+        rotation = meta.get("rotation")
+        try:
+            source_int = int(source_id) if source_id is not None else None
+        except Exception:
+            source_int = None
+        target_id = rec.get("id")
+        if target_id is None or pd.isna(target_id):
+            continue
+        try:
+            target_int = int(target_id)
+        except Exception:
+            continue
+        if source_int is not None:
+            id_edges.append((source_int, target_int))
+        rec_copy = dict(rec)
+        rec_copy["__inv_flag"] = True
+        rec_copy["__inv_rotation"] = rotation if rotation is not None else np.nan
+        rec_copy["__inv_source_id"] = source_int if source_int is not None else target_int
+        if "__source__" not in rec_copy:
+            rec_copy["__source__"] = "B:generated"
+        if target_int in id_to_row:
+            target_row = id_to_row[target_int]
+            prev_flag = bool(target_row.get("__inv_flag", False))
+            target_row["__inv_flag"] = True or prev_flag
+            if "__inv_rotation" not in target_row or pd.isna(target_row.get("__inv_rotation")):
+                target_row["__inv_rotation"] = rec_copy.get("__inv_rotation", np.nan)
+            if "__inv_source_id" not in target_row or pd.isna(target_row.get("__inv_source_id")):
+                target_row["__inv_source_id"] = rec_copy["__inv_source_id"]
+            target_links = target_row.get("__inv_links")
+            if not isinstance(target_links, list):
+                target_links = []
+            target_links.append({"source": source_int, "rotation": rotation})
+            target_row["__inv_links"] = target_links
+        else:
+            union_records.append(rec_copy)
+            id_to_row[target_int] = rec_copy
+        base_columns_union.update(rec_copy.keys())
+
+    # Union-Find para agrupar familias
+    from collections import defaultdict
+
+    parent: dict[int, int] = {}
+
+    def find(x: int) -> int:
+        parent.setdefault(x, x)
+        if parent[x] != x:
+            parent[x] = find(parent[x])
+        return parent[x]
+
+    def union(a: Optional[int], b: Optional[int]) -> None:
+        if a is None or b is None:
+            return
+        ra = find(a)
+        rb = find(b)
+        if ra == rb:
+            return
+        if ra < rb:
+            parent[rb] = ra
+        else:
+            parent[ra] = rb
+
+    for src_id, tgt_id in id_edges:
+        if src_id in id_to_row and tgt_id in id_to_row:
+            union(src_id, tgt_id)
+
+    # Asegurar que cada id con información propia esté registrado
+    for chord_id in id_to_row:
+        find(chord_id)
+
+    family_counts: dict[int, int] = defaultdict(int)
+    for chord_id in id_to_row:
+        root = find(chord_id)
+        family_counts[root] += 1
+
+    for chord_id, row_data in id_to_row.items():
+        root = find(chord_id)
+        row_data["__family_id"] = root
+        row_data["__family_size"] = family_counts[root]
+
+    columns_all = list(base_columns_union.union({"__family_id", "__family_size"}))
+    out_df = pd.DataFrame(union_records, columns=columns_all)
+    if "__inv_links" in out_df.columns:
+        out_df.drop(columns=["__inv_links"], inplace=True)
+    if "__inv_flag" in out_df.columns:
+        out_df["__inv_flag"] = out_df["__inv_flag"].apply(lambda v: bool(v) if not pd.isna(v) else False)
+    if "__inv_source_id" in out_df.columns:
+        out_df["__inv_source_id"] = out_df["__inv_source_id"].apply(
+            lambda v: int(v) if pd.notna(v) and str(v).strip() != "" else np.nan
+        )
+    if "__inv_rotation" in out_df.columns:
+        out_df["__inv_rotation"] = out_df["__inv_rotation"].apply(
+            lambda v: int(v) if pd.notna(v) else np.nan
+        )
+    if "__family_id" in out_df.columns:
+        out_df["__family_id"] = out_df["__family_id"].apply(
+            lambda v: int(v) if pd.notna(v) else np.nan
+        )
+    if "__family_size" in out_df.columns:
+        out_df["__family_size"] = out_df["__family_size"].apply(
+            lambda v: int(v) if pd.notna(v) else np.nan
+        )
+
+    if include_original:
+        out = out_df.reset_index(drop=True)
     else:
-        out = df_inv_db
+        out = out_df[out_df["__inv_flag"]].reset_index(drop=True)
 
     # Reporte breve
     print(f"Inversiones generadas(anchored): {n_gen}, fuera de rango descartadas: {n_oob}, en_DB: {len(df_inv_db)}")

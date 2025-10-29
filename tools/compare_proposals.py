@@ -110,6 +110,12 @@ COLOR_OUTPUT_EXPONENT: float = 1.0   # potencia antes de aplicar logs.
 # Exponentes de 0.00 a 1.00 en pasos de 0.05
 COLOR_EXPONENTS: List[float] = [i/20.0 for i in range(0, 21)]
 
+FAMILY_HIGHLIGHT_THRESHOLD: int = 2000
+FAMILY_HIGHLIGHT_SIZE_SCALE: float = 1.35
+FAMILY_HIGHLIGHT_SIZE_DELTA: float = 3.0
+FAMILY_HIGHLIGHT_SELECTED_OPACITY: float = 0.95
+FAMILY_HIGHLIGHT_UNSELECTED_OPACITY_FACTOR: float = 0.25
+
 def _safe_denominator(raw: np.ndarray, subtract: float = 0.0) -> np.ndarray:
     """Construye un denominador seguro: max(raw - subtract, 1.0).
 
@@ -175,6 +181,9 @@ class ChordEntry:
     identity_name: str
     identity_aliases: Tuple[str, ...]
     is_named: bool
+    is_inversion: bool = False
+    family_id: Optional[object] = None
+    inversion_rotation: Optional[int] = None
 
 
 
@@ -292,6 +301,11 @@ def parse_args() -> argparse.Namespace:
         help="Config constant or SQL for seventh chords (default: built-in catalog).",
     )
     parser.add_argument(
+        "--population-json",
+        default=None,
+        help="Ruta a un archivo JSON (registros) con la población ya preparada. Si se especifica, se ignoran las consultas individuales.",
+    )
+    parser.add_argument(
         "--proposals",
         default=(
             "simplex, simplexsqrt, simplexsmooth, "
@@ -360,15 +374,31 @@ def parse_seed_list(seeds_arg: str) -> List[int]:
     return seeds
 
 
-def load_chords(dyads_query: str, triads_query: str, sevenths_query: Optional[str] = None) -> List[ChordEntry]:
-    executor = QueryExecutor(**config_db)
-    frames: List[pd.DataFrame] = []
-    for query in (dyads_query, triads_query, sevenths_query):
-        if not query:
-            continue
-        sql = resolve_query_sql(query) if query.upper().startswith("QUERY_") else query
-        frames.append(executor.as_pandas(sql))
-    df_all = pd.concat(frames, ignore_index=True)
+def load_chords(
+    dyads_query: str,
+    triads_query: str,
+    sevenths_query: Optional[str] = None,
+    df_override: Optional[pd.DataFrame] = None,
+) -> List[ChordEntry]:
+    if df_override is not None:
+        df_all = df_override.copy()
+    else:
+        executor = QueryExecutor(**config_db)
+        frames: List[pd.DataFrame] = []
+        for query in (dyads_query, triads_query, sevenths_query):
+            if not query:
+                continue
+            sql = resolve_query_sql(query) if query.upper().startswith("QUERY_") else query
+            frames.append(executor.as_pandas(sql))
+        if not frames:
+            raise SystemExit("No se proporcionaron consultas válidas ni población precombinada.")
+        df_all = pd.concat(frames, ignore_index=True)
+
+    has_family = "__family_id" in df_all.columns
+    has_family_size = "__family_size" in df_all.columns
+    has_inv_flag = "__inv_flag" in df_all.columns
+    has_inv_source = "__inv_source_id" in df_all.columns
+    has_inv_rotation = "__inv_rotation" in df_all.columns
 
     modelo = ModeloSetharesVec(config={})
     entries: List[ChordEntry] = []
@@ -385,6 +415,46 @@ def load_chords(dyads_query: str, triads_query: str, sevenths_query: Optional[st
         total_pairs = float(np.sum(counts))
         n_notes = len(acorde.intervals) + 1
         dyad_bin = determine_dyad_bin(acorde.intervals) if n_notes == 2 else None
+        inv_flag = False
+        family_id: Optional[object] = None
+        inv_rotation: Optional[int] = None
+
+        if has_family:
+            raw_family = row.get("__family_id")
+            if pd.notna(raw_family):
+                try:
+                    family_id = int(raw_family)
+                except (TypeError, ValueError):
+                    family_id = str(raw_family)
+
+        if has_inv_flag:
+            raw_flag = row.get("__inv_flag")
+            inv_flag = bool(raw_flag) if pd.notna(raw_flag) else False
+
+        if has_inv_source and family_id is None:
+            raw_family = row.get("__inv_source_id")
+            if pd.notna(raw_family):
+                try:
+                    family_id = int(raw_family)
+                except (TypeError, ValueError):
+                    family_id = str(raw_family)
+
+        if family_id is None:
+            raw_id = row.get("id")
+            if pd.notna(raw_id):
+                try:
+                    family_id = int(raw_id)
+                except (TypeError, ValueError):
+                    family_id = str(raw_id)
+
+        if has_inv_rotation:
+            raw_rot = row.get("__inv_rotation")
+            if pd.notna(raw_rot):
+                try:
+                    inv_rotation = int(raw_rot)
+                except (TypeError, ValueError):
+                    inv_rotation = None
+
         entries.append(
             ChordEntry(
                 acorde=acorde,
@@ -397,6 +467,9 @@ def load_chords(dyads_query: str, triads_query: str, sevenths_query: Optional[st
                 identity_name=identity_name,
                 identity_aliases=identity_aliases,
                 is_named=is_named,
+                is_inversion=inv_flag,
+                family_id=family_id,
+                inversion_rotation=inv_rotation,
             )
         )
     return entries
@@ -744,6 +817,84 @@ def build_scatter_figure(
     fig = go.Figure()
     total_points = len(entries)
 
+    family_tags: List[str] = []
+    family_counts: Dict[str, int] = {}
+    highlight_summary: Dict[str, object] = {
+        "enabled": False,
+        "threshold": FAMILY_HIGHLIGHT_THRESHOLD,
+        "total_points": total_points,
+        "families": 0,
+        "size_scale": FAMILY_HIGHLIGHT_SIZE_SCALE,
+        "size_delta": FAMILY_HIGHLIGHT_SIZE_DELTA,
+        "selected_opacity": FAMILY_HIGHLIGHT_SELECTED_OPACITY,
+        "fade_factor": FAMILY_HIGHLIGHT_UNSELECTED_OPACITY_FACTOR,
+        "has_inversions": any(e.is_inversion for e in entries),
+    }
+    customdata_all: List[List[object]] = []
+
+    if total_points:
+        def _normalize_family(raw_value: Optional[object], idx: int) -> str:
+            if raw_value is None:
+                return f"__solo_{idx}"
+            if isinstance(raw_value, float) and np.isnan(raw_value):
+                return f"__solo_{idx}"
+            return str(raw_value)
+
+        for idx, entry in enumerate(entries):
+            tag = _normalize_family(entry.family_id, idx)
+            family_tags.append(tag)
+            family_counts[tag] = family_counts.get(tag, 0) + 1
+
+        families_with_links = sum(1 for count in family_counts.values() if count > 1)
+        highlight_enabled = (
+            total_points <= FAMILY_HIGHLIGHT_THRESHOLD and families_with_links > 0
+        )
+        highlight_summary.update(
+            {
+                "enabled": highlight_enabled,
+                "families": int(families_with_links),
+            }
+        )
+    else:
+        highlight_enabled = False
+
+    detail_texts: List[str] = []
+    summary_texts: List[str] = []
+    for idx in range(total_points):
+        fam_size = family_counts.get(family_tags[idx], 1)
+        detail_texts.append(
+            build_hover(
+                entries[idx],
+                vectors[idx],
+                adjusted_vectors[idx],
+                color_values[idx],
+                color_title,
+                int(round(pair_counts[idx])),
+                int(round(type_counts[idx])),
+                is_proposal=is_proposal,
+                family_size=fam_size,
+            )
+        )
+        summary_texts.append(
+            build_hover_summary(
+                entries[idx],
+                fam_size,
+                color_values[idx],
+                color_title,
+            )
+        )
+
+    customdata_all = [
+        [
+            family_tags[i],
+            1 if entries[i].is_inversion else 0,
+            family_counts.get(family_tags[i], 1),
+            summary_texts[i],
+            detail_texts[i],
+        ]
+        for i in range(total_points)
+    ]
+
     def _base_marker_params(count: int) -> Tuple[float, float]:
         # Tamaño máximo para datasets pequeños y mínimo para muy grandes.
         if count <= 40:
@@ -755,6 +906,19 @@ def build_scatter_figure(
         size = 20.0 - frac * (20.0 - 6.0)
         opacity = 0.5 - frac * (0.5 - 0.2)
         return max(size, 4.0), max(min(opacity, 0.5), 0.2)
+
+    def _highlight_markers(base_size: float, base_opacity: float) -> Tuple[Dict[str, object], Dict[str, object]]:
+        selected_size = max(base_size * FAMILY_HIGHLIGHT_SIZE_SCALE, base_size + FAMILY_HIGHLIGHT_SIZE_DELTA)
+        selected_opacity = min(1.0, max(FAMILY_HIGHLIGHT_SELECTED_OPACITY, base_opacity + 0.35))
+        unselected_opacity = max(0.05, base_opacity * FAMILY_HIGHLIGHT_UNSELECTED_OPACITY_FACTOR)
+        selected_marker: Dict[str, object] = {
+            "size": selected_size,
+            "opacity": selected_opacity,
+        }
+        unselected_marker: Dict[str, object] = {
+            "opacity": unselected_opacity,
+        }
+        return selected_marker, unselected_marker
 
     def _symbol_for_cardinality(n: int) -> str:
         if n == 3:
@@ -824,39 +988,32 @@ def build_scatter_figure(
         idxs = named_groups[label]
         if not idxs:
             continue
-        fig.add_trace(
-            go.Scatter(
-                x=x[idxs],
-                y=y[idxs],
-                mode="markers",
-                name=f"{label} ({len(idxs)})",
-                marker=dict(
-                    symbol=named_symbol_map[label],
-                    size=named_size,
-                    color=color_values[idxs],
-                    colorscale="Turbo",
-                    cmin=cmin,
-                    cmax=cmax,
-                    coloraxis="coloraxis",
-                    opacity=named_opacity,
-                    line=dict(width=0),
-                ),
-                text=[
-                    build_hover(
-                        entries[i],
-                        vectors[i],
-                        adjusted_vectors[i],
-                        color_values[i],
-                        color_title,
-                        int(round(pair_counts[i])),
-                        int(round(type_counts[i])),
-                        is_proposal=is_proposal,
-                    )
-                    for i in idxs
-                ],
-                hovertemplate="%{text}<extra></extra>",
-            )
+        base_marker = dict(
+            symbol=named_symbol_map[label],
+            size=named_size,
+            color=color_values[idxs],
+            colorscale="Turbo",
+            cmin=cmin,
+            cmax=cmax,
+            coloraxis="coloraxis",
+            opacity=named_opacity,
+            line=dict(width=0),
         )
+        trace_kwargs: Dict[str, object] = {
+            "x": x[idxs],
+            "y": y[idxs],
+            "mode": "markers",
+            "name": f"{label} ({len(idxs)})",
+            "marker": base_marker,
+            "text": [summary_texts[i] for i in idxs],
+            "customdata": [customdata_all[i] for i in idxs],
+            "hovertemplate": "%{text}<extra></extra>",
+        }
+        if highlight_enabled:
+            selected_marker, unselected_marker = _highlight_markers(named_size, named_opacity)
+            trace_kwargs["selected"] = {"marker": selected_marker}
+            trace_kwargs["unselected"] = {"marker": unselected_marker}
+        fig.add_trace(go.Scatter(**trace_kwargs))
 
     unnamed_symbol_map = {
         "3 notas": "triangle-up",
@@ -869,39 +1026,33 @@ def build_scatter_figure(
         idxs = unnamed_groups[label]
         if not idxs:
             continue
-        fig.add_trace(
-            go.Scatter(
-                x=x[idxs],
-                y=y[idxs],
-                mode="markers",
-                name=f"{label} ({len(idxs)})",
-                marker=dict(
-                    symbol=unnamed_symbol_map[label],
-                    size=_size_for_cardinality(0, base_size),
-                    color=color_values[idxs],
-                    colorscale="Turbo",
-                    cmin=cmin,
-                    cmax=cmax,
-                    coloraxis="coloraxis",
-                    opacity=base_opacity,
-                    line=dict(width=0),
-                ),
-                text=[
-                    build_hover(
-                        entries[i],
-                        vectors[i],
-                        adjusted_vectors[i],
-                        color_values[i],
-                        color_title,
-                        int(round(pair_counts[i])),
-                        int(round(type_counts[i])),
-                        is_proposal=is_proposal,
-                    )
-                    for i in idxs
-                ],
-                hovertemplate="%{text}<extra></extra>",
-            )
+        unnamed_size = _size_for_cardinality(0, base_size)
+        base_marker = dict(
+            symbol=unnamed_symbol_map[label],
+            size=unnamed_size,
+            color=color_values[idxs],
+            colorscale="Turbo",
+            cmin=cmin,
+            cmax=cmax,
+            coloraxis="coloraxis",
+            opacity=base_opacity,
+            line=dict(width=0),
         )
+        trace_kwargs = {
+            "x": x[idxs],
+            "y": y[idxs],
+            "mode": "markers",
+            "name": f"{label} ({len(idxs)})",
+            "marker": base_marker,
+            "text": [summary_texts[i] for i in idxs],
+            "customdata": [customdata_all[i] for i in idxs],
+            "hovertemplate": "%{text}<extra></extra>",
+        }
+        if highlight_enabled:
+            selected_marker, unselected_marker = _highlight_markers(unnamed_size, base_opacity)
+            trace_kwargs["selected"] = {"marker": selected_marker}
+            trace_kwargs["unselected"] = {"marker": unselected_marker}
+        fig.add_trace(go.Scatter(**trace_kwargs))
 
     fig.update_layout(
         title=title,
@@ -928,6 +1079,7 @@ def build_scatter_figure(
             cmax=cmax,
             colorbar=dict(title=color_title, thickness=14, len=0.75, x=1.08),
         ),
+        meta={"familyHighlight": highlight_summary},
     )
     return fig
 
@@ -950,6 +1102,7 @@ def build_hover(
     type_count: int,
     *,
     is_proposal: bool,
+    family_size: Optional[int] = None,
 ) -> str:
     """Hover rich text.
 
@@ -968,6 +1121,18 @@ def build_hover(
     color_line = f"{color_title}: {float(color_value):.4f}<br>"
     pair_line = f"Pares totales (P): {pair_count}<br>"
     type_line = f"Tipos activos (PE): {type_count}<br>"
+    family_line = ""
+    has_family_id = entry.family_id is not None
+    if has_family_id or entry.is_inversion:
+        family_label = str(entry.family_id) if has_family_id else "—"
+        role = "Inversión" if entry.is_inversion else "Acorde base"
+        details: List[str] = []
+        if family_size is not None and family_size > 0:
+            details.append(f"miembros: {family_size}")
+        if entry.is_inversion and entry.inversion_rotation is not None:
+            details.append(f"rotación: {entry.inversion_rotation}")
+        details_text = f" ({role}{', ' + ', '.join(details) if details else ''})" if role or details else ""
+        family_line = f"Familia: {family_label}{details_text}<br>"
     if is_proposal:
         total_adj = float(np.sum(vector_adjusted))
         return (
@@ -976,6 +1141,7 @@ def build_hover(
             f"Intervalos: {intervals}<br>"
             f"Identidad: {identity_label}<br>"
             f"{alias_line}"
+            f"{family_line}"
             f"TotalRug (bruto): {total:.4f}<br>"
             f"TotalRug (ajustado): {total_adj:.4f}<br>"
             f"H bruto: {_format_vec(entry.hist)}<br>"
@@ -991,12 +1157,37 @@ def build_hover(
             f"Intervalos: {intervals}<br>"
             f"Identidad: {identity_label}<br>"
             f"{alias_line}"
+            f"{family_line}"
             f"TotalRug: {total:.4f}<br>"
             f"{color_line}"
             f"{pair_line}"
             f"{type_line}"
             f"H bruto: {_format_vec(entry.hist)}<br>"
         )
+
+
+def build_hover_summary(
+    entry: ChordEntry,
+    family_size: Optional[int],
+    color_value: float,
+    color_title: str,
+) -> str:
+    acorde = entry.acorde
+    name = getattr(acorde, "name", None)
+    if not name or name == "Unknown":
+        name = entry.identity_name or "Acorde"
+    intervals = getattr(acorde, "intervals", [])
+    interval_label = ""
+    try:
+        if intervals:
+            interval_label = " " + "[" + ",".join(str(int(i)) for i in intervals) + "]"
+    except Exception:
+        interval_label = ""
+    fam_label = family_size if family_size and family_size > 0 else 1
+    return (
+        f"{name}{interval_label} · {color_title}: {float(color_value):.2f} · "
+        f"Familia: {fam_label}"
+    )
 
 def format_rate(value: Optional[float]) -> str:
     if value is None:
@@ -1107,6 +1298,7 @@ def build_report_html_v2(
         scenario = row.get("scenario", "")
         scenario_prefix = f"{scenario}||"
 
+        card_highlight_info: Optional[Dict[str, object]] = None
         panel_entries: List[Tuple[Tuple[int, float], str, Optional[float], str, str]] = []
         for key, fig in figure_map.items():
             if not key.startswith(scenario_prefix):
@@ -1134,6 +1326,15 @@ def build_report_html_v2(
                 continue
 
             if fig is not None:
+                if card_highlight_info is None or not bool(card_highlight_info.get("enabled")):
+                    meta_obj = getattr(fig, "layout", None)
+                    meta_dict = getattr(meta_obj, "meta", None) if meta_obj is not None else None
+                    if isinstance(meta_dict, dict):
+                        fh = meta_dict.get("familyHighlight")
+                        if isinstance(fh, dict):
+                            candidate_info = dict(fh)
+                            if card_highlight_info is None or candidate_info.get("enabled"):
+                                card_highlight_info = candidate_info
                 inner_html = to_html(fig, include_plotlyjs="cdn" if include_js else False, full_html=False)
                 include_js = False
             else:
@@ -1231,8 +1432,41 @@ def build_report_html_v2(
             f"  </label>"
             f"</div>"
         )
+        highlight_note_html = ""
+        highlight_enabled_flag = bool(card_highlight_info and card_highlight_info.get("enabled"))
+        card_attrs = [f"data-sid='{sid}'", f"data-family-highlight='{'1' if highlight_enabled_flag else '0'}'"]
+        if card_highlight_info:
+            families_detected = int(card_highlight_info.get("families", 0) or 0)
+            threshold_limit = int(card_highlight_info.get("threshold", FAMILY_HIGHLIGHT_THRESHOLD) or FAMILY_HIGHLIGHT_THRESHOLD)
+            card_attrs.append(f"data-highlight-threshold='{threshold_limit}'")
+            card_attrs.append(f"data-highlight-families='{families_detected}'")
+            if highlight_enabled_flag:
+                if families_detected > 0:
+                    highlight_note_html = (
+                        f"<div class='highlight-note'>Resaltado de familias activo · {families_detected} familias detectadas (≤{threshold_limit} acordes).</div>"
+                    )
+                else:
+                    highlight_note_html = (
+                        f"<div class='highlight-note'>Resaltado de familias activo (≤{threshold_limit} acordes).</div>"
+                    )
+            elif families_detected > 0:
+                highlight_note_html = (
+                    f"<div class='highlight-note muted'>Se detectaron {families_detected} familias, pero el resaltado se desactiva para poblaciones mayores a {threshold_limit} acordes.</div>"
+                )
+        else:
+            card_attrs.append(f"data-highlight-threshold='{FAMILY_HIGHLIGHT_THRESHOLD}'")
+            card_attrs.append("data-highlight-families='0'")
         panels = f"<div class='subtab-panels'>{''.join(panels_html)}</div>"
-        return f"<div class='plot-card' data-sid='{sid}'>{header}{metrics_line}{controls}{panels}</div>"
+        detail_panel = (
+            "<div class='detail-panel' data-default-msg='Haz clic en un punto para ver el detalle completo.'>"
+            "Haz clic en un punto para ver el detalle completo."
+            "</div>"
+        )
+        card_attrs_str = " ".join(card_attrs)
+        return (
+            f"<div class='plot-card' {card_attrs_str}>{header}{metrics_line}{controls}"
+            f"{highlight_note_html}{detail_panel}{panels}</div>"
+        )
 
     # Build nested tabs: first by reduction, then by metric
     outer_headers: List[str] = []
@@ -1393,6 +1627,104 @@ def build_report_html_v2(
         }
         showPanel();
       });
+
+      function setupFamilyHighlight(gd) {
+        if (!gd || gd.__familyHighlightBound) return;
+        const info = gd.layout && gd.layout.meta && gd.layout.meta.familyHighlight;
+        if (!info || !info.enabled) return;
+        gd.__familyHighlightBound = true;
+        let activeTag = null;
+
+        function applySelection(tag) {
+          if (tag === activeTag) return;
+          activeTag = tag;
+          gd.data.forEach((trace, traceIndex) => {
+            const custom = trace.customdata || [];
+            if (!custom.length) {
+              Plotly.restyle(gd, {selectedpoints: [null]}, [traceIndex]);
+              return;
+            }
+            const matches = [];
+            if (tag) {
+              const tagStr = String(tag);
+              for (let i = 0; i < custom.length; i++) {
+                const row = custom[i];
+                if (!row) continue;
+                if (String(row[0]) === tagStr) {
+                  matches.push(i);
+                }
+              }
+            }
+            Plotly.restyle(gd, {selectedpoints: [matches.length ? matches : null]}, [traceIndex]);
+          });
+        }
+
+        gd.on('plotly_hover', ev => {
+          const pt = ev.points && ev.points[0];
+          if (!pt || !pt.customdata) {
+            applySelection(null);
+            return;
+          }
+          const familySize = parseInt(pt.customdata[2], 10) || 0;
+          if (familySize < 2) {
+            applySelection(null);
+            return;
+          }
+          applySelection(String(pt.customdata[0]));
+        });
+
+        gd.on('plotly_unhover', () => applySelection(null));
+        gd.on('plotly_click', () => applySelection(null));
+        applySelection(null);
+      }
+
+      function registerCardHighlight(card) {
+        if (!card || card.dataset.familyHighlight !== '1') return;
+        const figures = card.querySelectorAll('.js-plotly-plot');
+        figures.forEach(gd => {
+          const attach = () => {
+            const info = gd.layout && gd.layout.meta && gd.layout.meta.familyHighlight;
+            if (!info || !info.enabled) return;
+            setupFamilyHighlight(gd);
+          };
+          if (gd.layout && gd.layout.meta) {
+            attach();
+          } else {
+            const handler = () => {
+              gd.removeListener('plotly_afterplot', handler);
+              attach();
+            };
+            gd.on('plotly_afterplot', handler);
+          }
+        });
+      }
+
+      function registerCardDetail(card) {
+        const detailPanel = card.querySelector('.detail-panel');
+        if (!detailPanel) return;
+        const defaultMsg = detailPanel.dataset.defaultMsg || 'Haz clic en un punto para ver el detalle completo.';
+        detailPanel.innerHTML = defaultMsg;
+        const figures = card.querySelectorAll('.js-plotly-plot');
+        figures.forEach(gd => {
+          const updatePanel = content => {
+            detailPanel.innerHTML = content || defaultMsg;
+          };
+          gd.on('plotly_click', ev => {
+            const pt = ev.points && ev.points[0];
+            if (!pt || !pt.customdata || pt.customdata.length < 5) {
+              updatePanel(defaultMsg);
+              return;
+            }
+            updatePanel(pt.customdata[4]);
+          });
+          gd.on('plotly_doubleclick', () => updatePanel(defaultMsg));
+        });
+      }
+
+      document.querySelectorAll('.plot-card').forEach(card => {
+        registerCardHighlight(card);
+        registerCardDetail(card);
+      });
     })();
   </script>
 """
@@ -1430,6 +1762,9 @@ def build_report_html_v2(
     .color-controls {{ margin: 8px 0 10px 0; display: flex; gap: 16px; align-items: center; }}
     .color-controls label {{ font-size: 0.9rem; color: #333; }}
     .color-controls input[disabled] {{ opacity: 0.5; cursor: not-allowed; }}
+    .highlight-note {{ font-size: 0.82rem; color: #1f4c5c; margin: 6px 0 10px 0; }}
+    .highlight-note.muted {{ color: #6a6f7a; font-style: italic; }}
+    .detail-panel {{ margin: 8px 0 10px 0; padding: 10px 12px; background: #fffbe6; border: 1px solid #f0d98c; border-radius: 8px; font-size: 0.88rem; min-height: 56px; line-height: 1.35; }}
   </style>
 </head>
 <body>
@@ -1682,7 +2017,16 @@ def build_sections(ranked_df: pd.DataFrame) -> List[Dict[str, object]]:
 
 def main() -> None:
     args = parse_args()
-    entries = load_chords(args.dyads_query, args.triads_query, args.sevenths_query)
+    df_override: Optional[pd.DataFrame] = None
+    if getattr(args, "population_json", None):
+        df_override = pd.read_json(args.population_json, orient="records", lines=True)
+        print(f"[input] Población cargada desde JSON: {args.population_json} ({len(df_override)} filas)")
+    entries = load_chords(
+        args.dyads_query,
+        args.triads_query,
+        args.sevenths_query,
+        df_override=df_override,
+    )
     hist, totals, counts, pairs, notes = stack_hist(entries)
 
     proposals_requested = [p.strip().lower() for p in args.proposals.split(",") if p.strip()]
@@ -1728,7 +2072,7 @@ def main() -> None:
         try:
             dist_condensed = metric_distance(metric, X, simplex)
         except ValueError as exc:
-            print(f"[skip] {scenario_name}: {exc}")
+            print(f"[skip] {scenario_name_base}: {exc}")
             continue
 
         for reduction in reductions:

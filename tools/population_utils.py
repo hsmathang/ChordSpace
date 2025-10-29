@@ -38,7 +38,7 @@ def _fallback_key(df: pd.DataFrame) -> pd.Series:
 
 
 def dedupe_population(df: pd.DataFrame) -> Tuple[pd.DataFrame, str]:
-    """Drop duplicates while keeping rows with missing abs_mask_int distinct."""
+    """Elimina duplicados conservando inversiones marcadas."""
 
     def _priority(src: str) -> int:
         if isinstance(src, str):
@@ -70,6 +70,43 @@ def dedupe_population(df: pd.DataFrame) -> Tuple[pd.DataFrame, str]:
             key_series[missing] = _fallback_key(work.loc[missing]).apply(
                 lambda s: f"fallback:{s}"
             )
+
+        if "__inv_flag" in work.columns:
+            inv_flag_series = work["__inv_flag"]
+            inv_mask = inv_flag_series.apply(lambda v: bool(v) if pd.notnull(v) else False)
+
+            def _inv_suffix(row: pd.Series) -> str:
+                parts: list[str] = []
+                src = row.get("__inv_source_id")
+                if pd.notnull(src):
+                    try:
+                        parts.append(f"src:{int(src)}")
+                    except Exception:  # pragma: no cover - defensive
+                        parts.append(f"src:{src}")
+                else:
+                    base_id = row.get("id")
+                    if pd.notnull(base_id):
+                        parts.append(f"srcid:{base_id}")
+                rot = row.get("__inv_rotation")
+                if pd.notnull(rot):
+                    try:
+                        parts.append(f"rot:{int(rot)}")
+                    except Exception:  # pragma: no cover - defensive
+                        parts.append(f"rot:{rot}")
+                mask_val = row.get("abs_mask_int")
+                if pd.notnull(mask_val):
+                    try:
+                        parts.append(f"mask:{int(mask_val)}")
+                    except Exception:  # pragma: no cover - defensive
+                        parts.append(f"mask:{mask_val}")
+                if not parts:
+                    parts.append(f"idx:{row.name}")
+                return "inv|" + "|".join(parts)
+
+            if inv_mask.any():
+                inv_suffix = work.loc[inv_mask].apply(_inv_suffix, axis=1)
+                key_series.loc[inv_mask] = key_series.loc[inv_mask].astype(str) + "|" + inv_suffix
+
         work["__dedupe_key__"] = key_series
         dedup = work.drop_duplicates(subset="__dedupe_key__", keep="first").copy()
         dedup.drop(columns=["__dedupe_key__"], inplace=True)

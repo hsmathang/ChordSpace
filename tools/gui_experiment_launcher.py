@@ -11,6 +11,7 @@ import argparse
 import datetime as dt
 import io
 import queue
+import tempfile
 import threading
 import tkinter as tk
 from pathlib import Path
@@ -73,6 +74,7 @@ class ExperimentLauncher(tk.Tk):
         self.population_df: pd.DataFrame | None = None
         self.population_selected_rows: set[int] = set()
         self.population_row_ids: dict[int, int | None] = {}
+        self._temp_payloads: list[Path] = []
         self._create_layout()
 
         self.after(100, self._process_log_queue)
@@ -693,17 +695,24 @@ class ExperimentLauncher(tk.Tk):
         if not row_indices:
             messagebox.showwarning("Sin selección", "Selecciona al menos un acorde en la lista.")
             return
+        df_selected = self.population_df.iloc[row_indices].reset_index(drop=True)
+        population_json = None
+        if self._needs_population_payload(df_selected):
+            population_json = self._write_population_json(df_selected)
         ids = self._selected_population_ids(row_indices)
-        if not ids:
+        if not ids and population_json is None:
             messagebox.showwarning(
                 "Población sin IDs",
                 "La población seleccionada no contiene IDs válidos para ejecutar la comparación.\n"
                 "Elige una fuente basada en la base de datos."
             )
             return
-        # Compose SQL: single query carrying the full population
-        id_list = ",".join(str(i) for i in ids)
-        sql = f"SELECT * FROM chords WHERE id IN ({id_list}) ORDER BY id;"
+        # Compose SQL only if needed
+        if ids:
+            id_list = ",".join(str(i) for i in ids)
+            sql = f"SELECT * FROM chords WHERE id IN ({id_list}) ORDER BY id;"
+        else:
+            sql = ""
         out_dir = Path(self.output_var.get().strip()).resolve()
         out_dir.mkdir(parents=True, exist_ok=True)
         sub = out_dir / f"compare_{_dt.datetime.now().strftime('%Y%m%d_%H%M%S')}"
@@ -711,9 +720,9 @@ class ExperimentLauncher(tk.Tk):
         self.compare_last_report = None
         self.compare_expected_report = sub / "report.html"
         # Build process args
-        self._append_log(f"\n--- Ejecutando comparación ---\n[población] {len(ids)} acordes seleccionados\n")
+        self._append_log(f"\n--- Ejecutando comparación ---\n[población] {len(df_selected)} acordes seleccionados\n")
         self._append_compare_log(
-            f"[comparación] Ejecutando con {len(ids)} acordes seleccionados "
+            f"[comparación] Ejecutando con {len(df_selected)} acordes seleccionados "
             f"({len(row_indices)} filas en tabla). "
             f"Salida: {sub}\n"
         )
@@ -747,6 +756,9 @@ class ExperimentLauncher(tk.Tk):
             "--seeds", self.compare_seeds_var.get().strip(),
             "--output", str(sub),
         ]
+        if population_json:
+            args.extend(["--population-json", population_json])
+            self._append_compare_log(f"Usando población precalculada: {population_json}\n")
         self._append_log("\n--- Ejecutando reporte de comparación ---\n")
         self.status_var.set("Ejecutando comparación…")
         self.compare_status_var.set("Ejecutando…")
@@ -808,8 +820,12 @@ class ExperimentLauncher(tk.Tk):
         if not row_indices:
             messagebox.showwarning("Sin selección", "Selecciona al menos un acorde en la lista.")
             return
+        df_selected = self.population_df.iloc[row_indices].reset_index(drop=True)
+        population_json = None
+        if self._needs_population_payload(df_selected):
+            population_json = self._write_population_json(df_selected)
         ids = self._selected_population_ids(row_indices)
-        if not ids:
+        if not ids and population_json is None:
             messagebox.showwarning(
                 "Población sin IDs",
                 "La población seleccionada no contiene IDs válidos para ejecutar la comparación.\n"
@@ -817,8 +833,11 @@ class ExperimentLauncher(tk.Tk):
             )
             return
 
-        id_list = ",".join(str(i) for i in ids)
-        sql = f"SELECT * FROM chords WHERE id IN ({id_list}) ORDER BY id;"
+        if ids:
+            id_list = ",".join(str(i) for i in ids)
+            sql = f"SELECT * FROM chords WHERE id IN ({id_list}) ORDER BY id;"
+        else:
+            sql = ""
         out_dir = Path(self.output_var.get().strip()).resolve()
         out_dir.mkdir(parents=True, exist_ok=True)
         sub = out_dir / f"compare_reductions_{_dt.datetime.now().strftime('%Y%m%d_%H%M%S')}"
@@ -837,9 +856,9 @@ class ExperimentLauncher(tk.Tk):
             f"{METRIC_INFO.get(name, {}).get('title', name.title())} ({name})" for name in metrics_sel
         ) if metrics_sel else "Euclidiana"
         self._append_log(
-            f"\n--- Comparación de reducciones ---\n[población] {len(ids)} acordes seleccionados\n"
+            f"\n--- Comparación de reducciones ---\n[población] {len(df_selected)} acordes seleccionados\n"
         )
-        self._append_tab_log(self.reduction_log, f"[reducciones] {len(ids)} acordes seleccionados. Salida: {sub}\n")
+        self._append_tab_log(self.reduction_log, f"[reducciones] {len(df_selected)} acordes seleccionados. Salida: {sub}\n")
         self._append_tab_log(
             self.reduction_log,
             f"Propuesta: {prop_log} | Métricas: {metric_log} | Reducciones: {reductions_arg} | Semillas: {self.reduction_compare_seeds_var.get().strip()}\n"
@@ -870,6 +889,9 @@ class ExperimentLauncher(tk.Tk):
             "--output",
             str(sub),
         ]
+        if population_json:
+            args.extend(["--population-json", population_json])
+            self._append_tab_log(self.reduction_log, f"Usando población precalculada: {population_json}\n")
         self.reduction_status_var.set("Ejecutando…")
         self.status_var.set("Ejecutando comparación…")
         self._set_controls_state(tk.DISABLED)
@@ -1198,6 +1220,59 @@ class ExperimentLauncher(tk.Tk):
                 continue
         return sorted(set(ids))
 
+    def _needs_population_payload(self, df: pd.DataFrame) -> bool:
+        if df is None or df.empty:
+            return False
+        if "id" not in df.columns or df["id"].isna().any():
+            return True
+        if "__family_size" in df.columns:
+            try:
+                if df["__family_size"].fillna(0).astype(float).max() > 1:
+                    return True
+            except Exception:
+                pass
+        if "__family_id" in df.columns:
+            try:
+                fam_counts = df["__family_id"].dropna().value_counts()
+                if not fam_counts.empty and fam_counts.max() > 1:
+                    return True
+            except Exception:
+                pass
+        if "__inv_flag" in df.columns:
+            try:
+                if df["__inv_flag"].apply(lambda v: bool(v) if pd.notnull(v) else False).any():
+                    return True
+            except Exception:
+                return True
+        try:
+            id_counts = df["id"].dropna().astype(int).value_counts()
+            if (id_counts > 1).any():
+                return True
+        except Exception:
+            return True
+        return False
+
+    def _write_population_json(self, df: pd.DataFrame) -> str:
+        tmp = tempfile.NamedTemporaryFile(prefix="chordspace_population_", suffix=".jsonl", delete=False)
+        try:
+            df.to_json(tmp.name, orient="records", lines=True, date_format="iso")
+        finally:
+            tmp.close()
+        path = Path(tmp.name)
+        self._temp_payloads.append(path)
+        return str(path)
+
+    def _cleanup_temp_payloads(self) -> None:
+        if not getattr(self, "_temp_payloads", None):
+            return
+        to_remove = list(self._temp_payloads)
+        self._temp_payloads.clear()
+        for path in to_remove:
+            try:
+                path.unlink(missing_ok=True)
+            except Exception:
+                continue
+
     def _selected_proposals(self) -> list[str]:
         return [name for name in self.proposals_order if self.proposal_vars[name].get()]
 
@@ -1256,6 +1331,7 @@ class ExperimentLauncher(tk.Tk):
                 messagebox.showerror("Error en el experimento", payload)
             elif kind == "done":
                 self._set_controls_state(tk.NORMAL)
+                self._cleanup_temp_payloads()
                 # Como salvaguarda, habilitar abrir si hay reporte
                 if getattr(self, "compare_last_report", None):
                     try:

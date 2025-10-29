@@ -53,6 +53,11 @@ def parse_args() -> argparse.Namespace:
         help="Consulta opcional para séptimas (se concatena si se proporciona).",
     )
     parser.add_argument(
+        "--population-json",
+        default=None,
+        help="Ruta a un JSON (records/lines) con la población preprocesada. Si se especifica, se ignoran las consultas individuales.",
+    )
+    parser.add_argument(
         "--seed",
         type=int,
         default=42,
@@ -250,6 +255,9 @@ def build_reduction_report(
     .color-controls {{ margin: 8px 0 10px 0; display: flex; gap: 16px; align-items: center; }}
     .color-controls label {{ font-size: 0.9rem; color: #333; }}
     .color-controls input[disabled] {{ opacity: 0.5; cursor: not-allowed; }}
+    .highlight-note {{ font-size: 0.82rem; color: #1f4c5c; margin: 6px 0 10px 0; }}
+    .highlight-note.muted {{ color: #6a6f7a; font-style: italic; }}
+    .detail-panel {{ margin: 8px 0 10px 0; padding: 10px 12px; background: #fffbe6; border: 1px solid #f0d98c; border-radius: 8px; font-size: 0.88rem; min-height: 56px; line-height: 1.35; }}
   </style>
 </head>
 <body>
@@ -314,6 +322,104 @@ def build_reduction_report(
         }}
         showPanel();
       }});
+
+      function setupFamilyHighlight(gd) {{
+        if (!gd || gd.__familyHighlightBound) return;
+        const info = gd.layout && gd.layout.meta && gd.layout.meta.familyHighlight;
+        if (!info || !info.enabled) return;
+        gd.__familyHighlightBound = true;
+        let activeTag = null;
+
+        function applySelection(tag) {{
+          if (tag === activeTag) return;
+          activeTag = tag;
+          gd.data.forEach((trace, traceIndex) => {{
+            const custom = trace.customdata || [];
+            if (!custom.length) {{
+              Plotly.restyle(gd, {{selectedpoints: [null]}}, [traceIndex]);
+              return;
+            }}
+            const matches = [];
+            if (tag) {{
+              const tagStr = String(tag);
+              for (let i = 0; i < custom.length; i++) {{
+                const row = custom[i];
+                if (!row) continue;
+                if (String(row[0]) === tagStr) {{
+                  matches.push(i);
+                }}
+              }}
+            }}
+            Plotly.restyle(gd, {{selectedpoints: [matches.length ? matches : null]}}, [traceIndex]);
+          }});
+        }}
+
+        gd.on('plotly_hover', ev => {{
+          const pt = ev.points && ev.points[0];
+          if (!pt || !pt.customdata) {{
+            applySelection(null);
+            return;
+          }}
+          const familySize = parseInt(pt.customdata[2], 10) || 0;
+          if (familySize < 2) {{
+            applySelection(null);
+            return;
+          }}
+          applySelection(String(pt.customdata[0]));
+        }});
+
+        gd.on('plotly_unhover', () => applySelection(null));
+        gd.on('plotly_click', () => applySelection(null));
+        applySelection(null);
+      }}
+
+      function registerCardHighlight(card) {{
+        if (!card || card.dataset.familyHighlight !== '1') return;
+        const figures = card.querySelectorAll('.js-plotly-plot');
+        figures.forEach(gd => {{
+          const attach = () => {{
+            const info = gd.layout && gd.layout.meta && gd.layout.meta.familyHighlight;
+            if (!info || !info.enabled) return;
+            setupFamilyHighlight(gd);
+          }};
+          if (gd.layout && gd.layout.meta) {{
+            attach();
+          }} else {{
+            const handler = () => {{
+              gd.removeListener('plotly_afterplot', handler);
+              attach();
+            }};
+            gd.on('plotly_afterplot', handler);
+          }}
+        }});
+      }}
+
+      function registerCardDetail(card) {{
+        const detailPanel = card.querySelector('.detail-panel');
+        if (!detailPanel) return;
+        const defaultMsg = detailPanel.dataset.defaultMsg || 'Haz clic en un punto para ver el detalle completo.';
+        detailPanel.innerHTML = defaultMsg;
+        const figures = card.querySelectorAll('.js-plotly-plot');
+        figures.forEach(gd => {{
+          const updatePanel = content => {{
+            detailPanel.innerHTML = content || defaultMsg;
+          }};
+          gd.on('plotly_click', ev => {{
+            const pt = ev.points && ev.points[0];
+            if (!pt || !pt.customdata || pt.customdata.length < 5) {{
+              updatePanel(defaultMsg);
+              return;
+            }}
+            updatePanel(pt.customdata[4]);
+          }});
+          gd.on('plotly_doubleclick', () => updatePanel(defaultMsg));
+        }});
+      }}
+
+      document.querySelectorAll('.plot-card').forEach(card => {{
+        registerCardHighlight(card);
+        registerCardDetail(card);
+      }});
     }})();
   </script>
 </body>
@@ -328,6 +434,7 @@ def render_reduction_card(row: Dict[str, object], figure_map: Dict[str, go.Figur
     scenario_name = row.get("scenario", f"{reduction} | {metric}")
     sid = f"red-{reduction.lower()}-{metric.lower()}-{int(row.get('figure_seed', 0))}"
 
+    card_highlight_info: Optional[Dict[str, object]] = None
     mode_entries: List[Tuple[str, Optional[float], go.Figure]] = []
     for key, fig in figure_map.items():
         if not key.startswith(f"{scenario_name}||{reduction}||"):
@@ -344,6 +451,15 @@ def render_reduction_card(row: Dict[str, object], figure_map: Dict[str, go.Figur
             mode = "types_exp"
         else:
             continue
+        if fig is not None and (card_highlight_info is None or not bool(card_highlight_info.get("enabled"))):
+            meta_obj = getattr(fig, "layout", None)
+            meta_dict = getattr(meta_obj, "meta", None) if meta_obj is not None else None
+            if isinstance(meta_dict, dict):
+                fh = meta_dict.get("familyHighlight")
+                if isinstance(fh, dict):
+                    candidate_info = dict(fh)
+                    if card_highlight_info is None or candidate_info.get("enabled"):
+                        card_highlight_info = candidate_info
         mode_entries.append(((0 if mode == "raw_total" else 1 if mode == "pair_exp" else 2, exponent or 0.0), mode, exponent, suffix, fig))
 
     mode_entries.sort(key=lambda item: item[0])
@@ -411,13 +527,46 @@ def render_reduction_card(row: Dict[str, object], figure_map: Dict[str, go.Figur
         f"  </label>"
         f"</div>"
     )
+    highlight_note_html = ""
+    highlight_enabled_flag = bool(card_highlight_info and card_highlight_info.get("enabled"))
+    card_attrs = [f"data-sid='{sid}'", f"data-family-highlight='{'1' if highlight_enabled_flag else '0'}'"]
+    if card_highlight_info:
+        families_detected = int(card_highlight_info.get("families", 0) or 0)
+        threshold_limit = int(card_highlight_info.get("threshold", cp.FAMILY_HIGHLIGHT_THRESHOLD) or cp.FAMILY_HIGHLIGHT_THRESHOLD)
+        card_attrs.append(f"data-highlight-threshold='{threshold_limit}'")
+        card_attrs.append(f"data-highlight-families='{families_detected}'")
+        if highlight_enabled_flag:
+            if families_detected > 0:
+                highlight_note_html = (
+                    f"<div class='highlight-note'>Resaltado de familias activo · {families_detected} familias detectadas (≤{threshold_limit} acordes).</div>"
+                )
+            else:
+                highlight_note_html = (
+                    f"<div class='highlight-note'>Resaltado de familias activo (≤{threshold_limit} acordes).</div>"
+                )
+        elif families_detected > 0:
+            highlight_note_html = (
+                f"<div class='highlight-note muted'>Se detectaron {families_detected} familias, pero el resaltado se desactiva para poblaciones mayores a {threshold_limit} acordes.</div>"
+            )
+    else:
+        card_attrs.append(f"data-highlight-threshold='{cp.FAMILY_HIGHLIGHT_THRESHOLD}'")
+        card_attrs.append("data-highlight-families='0'")
     panels_html = f"<div class='subtab-panels'>{''.join(panels)}</div>"
 
     header = f"<div class='card-header'><strong>{reduction}</strong></div>"
     metrics_line = (
         f"<div class='metrics-line'>Stress: {stress} · Trust: {trust} · Mixture L1: {mixture} · Semillas: {seeds_text}</div>"
     )
-    return f"<div class='plot-card' data-sid='{sid}'>{header}{metrics_line}{controls}{panels_html}</div>"
+    card_attrs_str = " ".join(card_attrs)
+    detail_panel = (
+        "<div class='detail-panel' data-default-msg='Haz clic en un punto para ver el detalle completo.'>"
+        "Haz clic en un punto para ver el detalle completo."
+        "</div>"
+    )
+    return (
+        f"<div class='plot-card' {card_attrs_str}>{header}{metrics_line}{controls}"
+        f"{highlight_note_html}{detail_panel}{panels_html}</div>"
+    )
 
 
 def main() -> None:
@@ -427,7 +576,16 @@ def main() -> None:
         metrics_requested = ["euclidean"]
     reductions_requested = [r.upper() for r in _normalise_list(args.reductions) or ["MDS"]]
 
-    entries = cp.load_chords(args.dyads_query, args.triads_query, args.sevenths_query)
+    df_override: Optional[pd.DataFrame] = None
+    if getattr(args, "population_json", None):
+        df_override = pd.read_json(args.population_json, orient="records", lines=True)
+        print(f"[input] Población cargada desde JSON: {args.population_json} ({len(df_override)} filas)")
+    entries = cp.load_chords(
+        args.dyads_query,
+        args.triads_query,
+        args.sevenths_query,
+        df_override=df_override,
+    )
     if not entries:
         raise SystemExit("La consulta no devolvió acordes para construir la comparación.")
     hist, totals, counts, pairs, notes = cp.stack_hist(entries)
