@@ -15,6 +15,7 @@ from datetime import datetime
 from pathlib import Path
 from typing import Callable, Dict, Iterable, List, Optional, Sequence, Tuple
 
+import os
 def _format_exp(val: float) -> str:
     return f"{val:.2f}".rstrip("0").rstrip(".")
 
@@ -304,6 +305,24 @@ def parse_args() -> argparse.Namespace:
         "--population-json",
         default=None,
         help="Ruta a un archivo JSON (registros) con la población ya preparada. Si se especifica, se ignoran las consultas individuales.",
+    )
+    parser.add_argument(
+        "--execution-mode",
+        choices=["deterministic", "parallel"],
+        default="deterministic",
+        help="Modo de ejecución: determinista (semillas fijas) o paralelo (sin semilla, usa múltiples núcleos).",
+    )
+    parser.add_argument(
+        "--n-jobs",
+        type=int,
+        default=None,
+        help="Número de procesos para las reducciones (usa -1 para todos los núcleos). Por defecto: 1 en modo determinista, -1 en paralelo.",
+    )
+    parser.add_argument(
+        "--mds-n-init",
+        type=int,
+        default=None,
+        help="Número de inicializaciones para MDS (default: 4 en modo determinista, 1 en paralelo).",
     )
     parser.add_argument(
         "--proposals",
@@ -626,15 +645,23 @@ def compute_embeddings(
     reduction: str,
     seed: int,
     base_matrix: Optional[np.ndarray] = None,
+    *,
+    n_jobs: Optional[int] = None,
+    deterministic: bool = True,
+    mds_n_init: Optional[int] = None,
 ) -> np.ndarray:
     reduction = (reduction or "MDS").upper()
+    jobs = n_jobs if n_jobs is not None else (1 if deterministic else -1)
+    rng = seed if deterministic else None
     if reduction == "MDS":
         dist_matrix = squareform(dist_condensed)
         reducer = MDS(
             n_components=2,
             dissimilarity="precomputed",
-            random_state=seed,
+            random_state=rng,
             normalized_stress=False,
+            n_jobs=jobs,
+            n_init=mds_n_init if mds_n_init is not None else (4 if deterministic else 1),
         )
         embedding = reducer.fit_transform(dist_matrix)
         return embedding
@@ -648,7 +675,8 @@ def compute_embeddings(
         reducer = umap.UMAP(
             n_components=2,
             metric="precomputed",
-            random_state=seed,
+            random_state=rng,
+            n_jobs=jobs if jobs is not None else 1,
         )
         # Para 'precomputed', umap espera distancias, no similitudes. Pasamos dmat directamente.
         embedding = reducer.fit_transform(dmat)
@@ -661,9 +689,10 @@ def compute_embeddings(
             n_components=2,
             metric="precomputed",
             perplexity=perplexity,
-            random_state=seed,
+            random_state=rng,
             init="random",
             max_iter=1000,
+            n_jobs=jobs if jobs is not None else None,
         )
         embedding = reducer.fit_transform(dist_matrix)
         return embedding
@@ -672,7 +701,11 @@ def compute_embeddings(
             raise ValueError("ISOMAP requiere la matriz base de características.")
         X = np.asarray(base_matrix, dtype=float)
         n_neighbors = min(10, max(3, X.shape[0] - 1))
-        reducer = Isomap(n_neighbors=n_neighbors, n_components=2)
+        reducer = Isomap(
+            n_neighbors=n_neighbors,
+            n_components=2,
+            n_jobs=jobs if jobs is not None else None,
+        )
         embedding = reducer.fit_transform(X)
         return embedding
     raise ValueError(f"Reducción no soportada: {reduction}")
@@ -2029,6 +2062,18 @@ def main() -> None:
     )
     hist, totals, counts, pairs, notes = stack_hist(entries)
 
+    cpu_count = os.cpu_count() or 1
+    deterministic = args.execution_mode != "parallel"
+    jobs = args.n_jobs if args.n_jobs is not None else (1 if deterministic else -1)
+    if deterministic and args.n_jobs not in (None, 1):
+        print("[aviso] Modo determinista requiere n_jobs=1 para reproducibilidad; se forzará a 1.")
+        jobs = 1
+    mds_n_init = args.mds_n_init if args.mds_n_init is not None else (4 if deterministic else 1)
+    mode_label = "determinista (semilla fija)" if deterministic else "paralelo (multi-núcleo)"
+    jobs_label = jobs if jobs is not None else ("auto" if deterministic else "-1")
+    print(f"[recursos] Núcleos detectados: {cpu_count}")
+    print(f"[recursos] Modo de ejecución: {mode_label} · n_jobs={jobs_label} · MDS n_init={mds_n_init}")
+
     proposals_requested = [p.strip().lower() for p in args.proposals.split(",") if p.strip()]
     metrics_requested = [m.strip().lower() for m in args.metrics.split(",") if m.strip()]
 
@@ -2084,7 +2129,15 @@ def main() -> None:
             figure_seed: Optional[int] = None
 
             for seed in seed_list:
-                embedding = compute_embeddings(dist_condensed, reduction, seed, base_matrix=base_matrix)
+                embedding = compute_embeddings(
+                    dist_condensed,
+                    reduction,
+                    seed,
+                    base_matrix=base_matrix,
+                    n_jobs=jobs,
+                    deterministic=deterministic,
+                    mds_n_init=mds_n_init,
+                )
 
                 nn_top1, nn_top2 = evaluate_nn_hits(dist_matrix, entries, simplex)
                 mix_mean, mix_max = evaluate_mixture_error(simplex, entries)

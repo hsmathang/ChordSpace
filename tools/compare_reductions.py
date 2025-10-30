@@ -7,6 +7,7 @@ paralelo (tarjetas) para las métricas elegidas.
 from __future__ import annotations
 
 import argparse
+import os
 from datetime import datetime
 from pathlib import Path
 from typing import Dict, List, Optional, Sequence, Tuple
@@ -56,6 +57,24 @@ def parse_args() -> argparse.Namespace:
         "--population-json",
         default=None,
         help="Ruta a un JSON (records/lines) con la población preprocesada. Si se especifica, se ignoran las consultas individuales.",
+    )
+    parser.add_argument(
+        "--execution-mode",
+        choices=["deterministic", "parallel"],
+        default="deterministic",
+        help="Modo de ejecución: determinista (semillas fijas) o paralelo (sin semilla, usa múltiples núcleos).",
+    )
+    parser.add_argument(
+        "--n-jobs",
+        type=int,
+        default=None,
+        help="Número de procesos para las reducciones (usa -1 para todos los núcleos). Por defecto: 1 en modo determinista, -1 en paralelo.",
+    )
+    parser.add_argument(
+        "--mds-n-init",
+        type=int,
+        default=None,
+        help="Número de inicializaciones para MDS (default: 4 en modo determinista, 1 en paralelo).",
     )
     parser.add_argument(
         "--seed",
@@ -590,6 +609,18 @@ def main() -> None:
         raise SystemExit("La consulta no devolvió acordes para construir la comparación.")
     hist, totals, counts, pairs, notes = cp.stack_hist(entries)
 
+    cpu_count = os.cpu_count() or 1
+    deterministic = args.execution_mode != "parallel"
+    jobs = args.n_jobs if args.n_jobs is not None else (1 if deterministic else -1)
+    if deterministic and args.n_jobs not in (None, 1):
+        print("[aviso] Modo determinista requiere n_jobs=1 para reproducibilidad; se forzará a 1.")
+        jobs = 1
+    mds_n_init = args.mds_n_init if args.mds_n_init is not None else (4 if deterministic else 1)
+    mode_label = "determinista (semilla fija)" if deterministic else "paralelo (multi-núcleo)"
+    jobs_label = jobs if jobs is not None else ("auto" if deterministic else "-1")
+    print(f"[recursos] Núcleos detectados: {cpu_count}")
+    print(f"[recursos] Modo de ejecución: {mode_label} · n_jobs={jobs_label} · MDS n_init={mds_n_init}")
+
     scenarios = cp.build_scenarios([args.proposal], metrics_requested)
     target_ids = _target_preproc_ids(args.proposal, scenarios)
     scenarios = [s for s in scenarios if s["preproc_id"] in target_ids]
@@ -633,7 +664,15 @@ def main() -> None:
         for reduction in reductions_requested:
             reduction_upper = reduction.upper()
             try:
-                embedding = cp.compute_embeddings(dist_condensed, reduction_upper, seed_list[0], base_matrix=base_matrix)
+                embedding = cp.compute_embeddings(
+                    dist_condensed,
+                    reduction_upper,
+                    seed_list[0],
+                    base_matrix=base_matrix,
+                    n_jobs=jobs,
+                    deterministic=deterministic,
+                    mds_n_init=mds_n_init,
+                )
             except ValueError as exc:
                 print(f"[skip] {preproc_id} / {metric} / {reduction_upper}: {exc}")
                 continue
@@ -645,7 +684,15 @@ def main() -> None:
         for reduction_upper, embedding in embeddings_by_reduction.items():
             per_seed: List[Dict[str, Optional[float]]] = []
             for seed in seed_list:
-                embedding_seed = cp.compute_embeddings(dist_condensed, reduction_upper, seed, base_matrix=base_matrix)
+                embedding_seed = cp.compute_embeddings(
+                    dist_condensed,
+                    reduction_upper,
+                    seed,
+                    base_matrix=base_matrix,
+                    n_jobs=jobs,
+                    deterministic=deterministic,
+                    mds_n_init=mds_n_init,
+                )
                 nn_top1, nn_top2 = cp.evaluate_nn_hits(dist_matrix, entries, simplex)
                 mix_mean, mix_max = cp.evaluate_mixture_error(simplex, entries)
                 metrics_summary = cp.summarise_embedding_metrics(base_matrix, embedding_seed, dist_matrix)

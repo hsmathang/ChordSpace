@@ -97,6 +97,14 @@ class ExperimentLauncher(tk.Tk):
 
         self.custom_name_var = tk.StringVar()
 
+        self.exec_mode_label_to_value = {
+            "Determinista (semilla fija)": "deterministic",
+            "Paralela (multi-núcleo)": "parallel",
+        }
+        exec_labels = list(self.exec_mode_label_to_value.keys())
+        self.exec_mode_var = tk.StringVar(value=exec_labels[0])
+        self.n_jobs_var = tk.StringVar(value="")
+
         # Model/Metric/Ponderation dictionaries (label -> value) and state vars (labels)
         self.model_label_to_value = {label: value for (label, value) in MODELO_OPTIONS_LIST}
         self.metric_label_to_value = {label: value for (label, value) in METRICA_OPTIONS_LIST}
@@ -303,6 +311,15 @@ class ExperimentLauncher(tk.Tk):
         ponder_labels = list(self.ponder_label_to_value.keys())
         self.ponder_combo = ttk.Combobox(frame, textvariable=self.ponder_var, values=ponder_labels, width=22, state="readonly")
         self.ponder_combo.grid(row=1, column=3, sticky="w", padx=(4, 16), pady=(6, 0))
+
+        ttk.Label(frame, text="Ejecución:").grid(row=2, column=0, sticky="w", pady=(6, 0))
+        exec_labels = list(self.exec_mode_label_to_value.keys())
+        self.exec_mode_combo = ttk.Combobox(frame, textvariable=self.exec_mode_var, values=exec_labels, width=26, state="readonly")
+        self.exec_mode_combo.grid(row=2, column=1, sticky="w", padx=(4, 16), pady=(6, 0))
+
+        ttk.Label(frame, text="n_jobs:").grid(row=2, column=2, sticky="w", pady=(6, 0))
+        self.n_jobs_entry = ttk.Entry(frame, textvariable=self.n_jobs_var, width=12)
+        self.n_jobs_entry.grid(row=2, column=3, sticky="w", padx=(4, 16), pady=(6, 0))
 
         frame.columnconfigure(1, weight=1)
         frame.columnconfigure(3, weight=1)
@@ -756,9 +773,17 @@ class ExperimentLauncher(tk.Tk):
             "--seeds", self.compare_seeds_var.get().strip(),
             "--output", str(sub),
         ]
+        exec_value = self.exec_mode_label_to_value.get(self.exec_mode_var.get(), "deterministic")
+        args.extend(["--execution-mode", exec_value])
+        jobs_value = self.n_jobs_var.get().strip()
+        if jobs_value:
+            args.extend(["--n-jobs", jobs_value])
         if population_json:
             args.extend(["--population-json", population_json])
             self._append_compare_log(f"Usando población precalculada: {population_json}\n")
+        mode_log = self.exec_mode_var.get()
+        jobs_log = jobs_value if jobs_value else ("1" if exec_value == "deterministic" else "auto")
+        self._append_compare_log(f"Modo: {mode_log} · n_jobs={jobs_log}\n")
         self._append_log("\n--- Ejecutando reporte de comparación ---\n")
         self.status_var.set("Ejecutando comparación…")
         self.compare_status_var.set("Ejecutando…")
@@ -889,9 +914,17 @@ class ExperimentLauncher(tk.Tk):
             "--output",
             str(sub),
         ]
+        exec_value = self.exec_mode_label_to_value.get(self.exec_mode_var.get(), "deterministic")
+        args.extend(["--execution-mode", exec_value])
+        jobs_value = self.n_jobs_var.get().strip()
+        if jobs_value:
+            args.extend(["--n-jobs", jobs_value])
         if population_json:
             args.extend(["--population-json", population_json])
             self._append_tab_log(self.reduction_log, f"Usando población precalculada: {population_json}\n")
+        mode_log = self.exec_mode_var.get()
+        jobs_log = jobs_value if jobs_value else ("1" if exec_value == "deterministic" else "auto")
+        self._append_tab_log(self.reduction_log, f"Modo: {mode_log} · n_jobs={jobs_log}\n")
         self.reduction_status_var.set("Ejecutando…")
         self.status_var.set("Ejecutando comparación…")
         self._set_controls_state(tk.DISABLED)
