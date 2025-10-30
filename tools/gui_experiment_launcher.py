@@ -39,6 +39,10 @@ from tools.experiment_inversions import _parse_pop_spec, _build_population
 import time
 from config import MODELO_OPTIONS_LIST, METRICA_OPTIONS_LIST, PONDERACION_OPTIONS_LIST
 
+# Umbral seguro para no superar el límite de longitud de línea de comandos en Windows.
+# (32 767 caracteres es el máximo; dejamos holgura por el resto de argumentos.)
+MAX_SQL_IDS_CHARS = 20000
+
 
 class QueueWriter(io.TextIOBase):
     """Redirects stdout/stderr writes into a queue for the GUI to consume."""
@@ -714,8 +718,11 @@ class ExperimentLauncher(tk.Tk):
             return
         df_selected = self.population_df.iloc[row_indices].reset_index(drop=True)
         population_json = None
-        if self._needs_population_payload(df_selected):
+        needs_payload, payload_reason = self._needs_population_payload(df_selected)
+        if needs_payload:
             population_json = self._write_population_json(df_selected)
+            if payload_reason:
+                self._append_compare_log(f"[info] {payload_reason}\n")
         ids = self._selected_population_ids(row_indices)
         if not ids and population_json is None:
             messagebox.showwarning(
@@ -847,8 +854,11 @@ class ExperimentLauncher(tk.Tk):
             return
         df_selected = self.population_df.iloc[row_indices].reset_index(drop=True)
         population_json = None
-        if self._needs_population_payload(df_selected):
+        needs_payload, payload_reason = self._needs_population_payload(df_selected)
+        if needs_payload:
             population_json = self._write_population_json(df_selected)
+            if payload_reason:
+                self._append_tab_log(self.reduction_log, f"[info] {payload_reason}\n")
         ids = self._selected_population_ids(row_indices)
         if not ids and population_json is None:
             messagebox.showwarning(
@@ -1253,37 +1263,57 @@ class ExperimentLauncher(tk.Tk):
                 continue
         return sorted(set(ids))
 
-    def _needs_population_payload(self, df: pd.DataFrame) -> bool:
+    def _estimate_sql_length(self, ids: pd.Series) -> int:
+        try:
+            ids_str = ids.dropna().astype(int).astype(str)
+        except Exception:
+            return MAX_SQL_IDS_CHARS + 1
+        if ids_str.empty:
+            return 0
+        total_digits = ids_str.str.len().sum()
+        separators = max(len(ids_str) - 1, 0)
+        sql_prefix = len("SELECT * FROM chords WHERE id IN (")
+        sql_suffix = len(") ORDER BY id;")
+        return sql_prefix + sql_suffix + total_digits + separators
+
+    def _needs_population_payload(self, df: pd.DataFrame) -> tuple[bool, str | None]:
         if df is None or df.empty:
-            return False
+            return False, None
         if "id" not in df.columns or df["id"].isna().any():
-            return True
+            return True, "La población carece de IDs válidos."
         if "__family_size" in df.columns:
             try:
                 if df["__family_size"].fillna(0).astype(float).max() > 1:
-                    return True
+                    return True, "Existen familias con múltiples inversiones; se envía como archivo."
             except Exception:
-                pass
+                return True, "No se pudo interpretar __family_size; se envía como archivo."
         if "__family_id" in df.columns:
             try:
                 fam_counts = df["__family_id"].dropna().value_counts()
                 if not fam_counts.empty and fam_counts.max() > 1:
-                    return True
+                    return True, "Se detectaron familias repetidas; se envía como archivo."
             except Exception:
-                pass
+                return True, "No se pudo interpretar __family_id; se envía como archivo."
         if "__inv_flag" in df.columns:
             try:
                 if df["__inv_flag"].apply(lambda v: bool(v) if pd.notnull(v) else False).any():
-                    return True
+                    return True, "Contiene inversiones marcadas; se envía como archivo."
             except Exception:
-                return True
+                return True, "No se pudo interpretar __inv_flag; se envía como archivo."
         try:
             id_counts = df["id"].dropna().astype(int).value_counts()
             if (id_counts > 1).any():
-                return True
+                return True, "Hay IDs repetidos en la selección; se envía como archivo."
         except Exception:
-            return True
-        return False
+            return True, "No se pudo interpretar los IDs; se envía como archivo."
+
+        estimated_sql_len = self._estimate_sql_length(df["id"])
+        if estimated_sql_len >= MAX_SQL_IDS_CHARS:
+            return True, (
+                "Selección grande ({} acordes) → comando de {} caracteres; se usa archivo para evitar límites"
+                .format(len(df), estimated_sql_len)
+            )
+        return False, None
 
     def _write_population_json(self, df: pd.DataFrame) -> str:
         tmp = tempfile.NamedTemporaryFile(prefix="chordspace_population_", suffix=".jsonl", delete=False)
