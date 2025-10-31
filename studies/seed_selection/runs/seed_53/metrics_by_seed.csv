@@ -1,0 +1,2 @@
+scenario,description,metric,preproc_id,seed,reduction,nn_hit_top1,nn_hit_top2,mixture_l1_mean,mixture_l1_max,trustworthiness,continuity,knn_recall,rank_corr,stress
+MDS:identity | euclidean,Histograma original (control),euclidean,identity,53,MDS,0.072464,0.072464,0.274425,0.636297,0.876544,0.876544,0.136592,0.840210,0.257965

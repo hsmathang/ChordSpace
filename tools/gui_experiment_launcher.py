@@ -723,7 +723,9 @@ class ExperimentLauncher(tk.Tk):
             population_json = self._write_population_json(df_selected)
             if payload_reason:
                 self._append_compare_log(f"[info] {payload_reason}\n")
-        ids = self._selected_population_ids(row_indices)
+        ids: list[int] = []
+        if population_json is None:
+            ids = self._selected_population_ids(row_indices)
         if not ids and population_json is None:
             messagebox.showwarning(
                 "Población sin IDs",
@@ -871,7 +873,9 @@ class ExperimentLauncher(tk.Tk):
             population_json = self._write_population_json(df_selected)
             if payload_reason:
                 self._append_tab_log(self.reduction_log, f"[info] {payload_reason}\n")
-        ids = self._selected_population_ids(row_indices)
+        ids: list[int] = []
+        if population_json is None:
+            ids = self._selected_population_ids(row_indices)
         if not ids and population_json is None:
             messagebox.showwarning(
                 "Población sin IDs",

@@ -1,0 +1,32 @@
+[
+  {
+    "seeds":[
+      23
+    ],
+    "nn_hit_top1_mean":0.0724637681,
+    "nn_hit_top1_std":0.0,
+    "nn_hit_top2_mean":0.0724637681,
+    "nn_hit_top2_std":0.0,
+    "mixture_l1_mean_mean":0.2744245811,
+    "mixture_l1_mean_std":0.0,
+    "mixture_l1_max_mean":0.6362969552,
+    "mixture_l1_max_std":0.0,
+    "trustworthiness_mean":0.8911019049,
+    "trustworthiness_std":0.0,
+    "continuity_mean":0.8911019049,
+    "continuity_std":0.0,
+    "knn_recall_mean":0.1335640138,
+    "knn_recall_std":0.0,
+    "rank_corr_mean":0.8366098167,
+    "rank_corr_std":0.0,
+    "stress_mean":0.2597250353,
+    "stress_std":0.0,
+    "scenario":"MDS:identity | euclidean",
+    "description":"Histograma original (control)",
+    "metric":"euclidean",
+    "preproc_id":"identity",
+    "figure_seed":23,
+    "reduction":"MDS",
+    "rank":1
+  }
+]
