@@ -436,7 +436,7 @@ WHERE interval IN (
     ARRAY[4,3,4,3,7], ARRAY[3,4,3,4,3,4]
 )
 AND ('x' || notes[1])::bit(32)::int = 0  -- Solo acordes que empiezan en la nota '0'
-ORDER BY id;  -- Ordenar por ID para facilitar la lectura
+ORDER BY id
 
 """
 
@@ -586,7 +586,7 @@ WITH octava AS (
   SELECT id, n, interval, notes, bass, octave, frequencies, chroma, tag, code
   FROM chords
   WHERE n = 2
-    AND notes = ARRAY['0', '0']
+    AND notes = ARRAY['0', '0']::varchar[]
     AND ('x' || notes[1])::bit(32)::int = 0
     LIMIT 1
 ),
@@ -595,7 +595,7 @@ all_dyads AS (
          interval[1] AS total_interval
   FROM chords
   WHERE n = 2
-    AND notes != ARRAY['0', '0']
+    AND notes != ARRAY['0', '0']::varchar[]
     AND ('x' || notes[1])::bit(32)::int = 0
     AND (SELECT SUM(i) FROM unnest(interval) AS i) BETWEEN 1 AND 11
 ),
