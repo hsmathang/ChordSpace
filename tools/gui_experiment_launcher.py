@@ -732,11 +732,16 @@ class ExperimentLauncher(tk.Tk):
             )
             return
         # Compose SQL only if needed
-        if ids:
+        payload_only = bool(population_json)
+        if ids and not payload_only:
             id_list = ",".join(str(i) for i in ids)
             sql = f"SELECT * FROM chords WHERE id IN ({id_list}) ORDER BY id;"
         else:
             sql = ""
+            if ids and payload_only:
+                self._append_compare_log("[info] SQL inline omitido (se usara payload JSON para los IDs seleccionados).\n")
+        if ids:
+            self._append_compare_log(f"[debug] IDs seleccionados: {len(ids)}\n")
         out_dir = Path(self.output_var.get().strip()).resolve()
         out_dir.mkdir(parents=True, exist_ok=True)
         sub = out_dir / f"compare_{_dt.datetime.now().strftime('%Y%m%d_%H%M%S')}"
@@ -790,8 +795,15 @@ class ExperimentLauncher(tk.Tk):
             self._append_compare_log(f"Usando población precalculada: {population_json}\n")
         mode_log = self.exec_mode_var.get()
         jobs_log = jobs_value if jobs_value else ("1" if exec_value == "deterministic" else "auto")
-        self._append_compare_log(f"Modo: {mode_log} · n_jobs={jobs_log}\n")
+        self._append_compare_log(f"Modo: {mode_log} \u00B7 n_jobs={jobs_log}\n")
         self._append_log("\n--- Ejecutando reporte de comparación ---\n")
+        try:
+            cmd_preview = subprocess.list2cmdline(args)
+            cmd_len = len(cmd_preview)
+            level = "[warn]" if cmd_len > 30000 else "[debug]"
+            self._append_compare_log(f"{level} Longitud comando: {cmd_len} caracteres\n")
+        except Exception:
+            pass
         self.status_var.set("Ejecutando comparación…")
         self.compare_status_var.set("Ejecutando…")
         self._set_controls_state(tk.DISABLED)
@@ -868,11 +880,16 @@ class ExperimentLauncher(tk.Tk):
             )
             return
 
-        if ids:
+        payload_only = bool(population_json)
+        if ids and not payload_only:
             id_list = ",".join(str(i) for i in ids)
             sql = f"SELECT * FROM chords WHERE id IN ({id_list}) ORDER BY id;"
         else:
             sql = ""
+            if ids and payload_only:
+                self._append_tab_log(self.reduction_log, "[info] SQL inline omitido (se usara payload JSON para los IDs seleccionados).\n")
+        if ids:
+            self._append_tab_log(self.reduction_log, f"[debug] IDs seleccionados: {len(ids)}\n")
         out_dir = Path(self.output_var.get().strip()).resolve()
         out_dir.mkdir(parents=True, exist_ok=True)
         sub = out_dir / f"compare_reductions_{_dt.datetime.now().strftime('%Y%m%d_%H%M%S')}"
@@ -934,9 +951,16 @@ class ExperimentLauncher(tk.Tk):
             self._append_tab_log(self.reduction_log, f"Usando población precalculada: {population_json}\n")
         mode_log = self.exec_mode_var.get()
         jobs_log = jobs_value if jobs_value else ("1" if exec_value == "deterministic" else "auto")
-        self._append_tab_log(self.reduction_log, f"Modo: {mode_log} · n_jobs={jobs_log}\n")
-        self.reduction_status_var.set("Ejecutando…")
-        self.status_var.set("Ejecutando comparación…")
+        self._append_tab_log(self.reduction_log, f"Modo: {mode_log} \u00B7 n_jobs={jobs_log}\n")
+        try:
+            cmd_preview = subprocess.list2cmdline(args)
+            cmd_len = len(cmd_preview)
+            level = "[warn]" if cmd_len > 30000 else "[debug]"
+            self._append_tab_log(self.reduction_log, f"{level} Longitud comando: {cmd_len} caracteres\n")
+        except Exception:
+            pass
+        self.reduction_status_var.set("Ejecutando\u2026")
+        self.status_var.set("Ejecutando comparaci\u00F3n\u2026")
         self._set_controls_state(tk.DISABLED)
         self.running_thread = threading.Thread(target=self._run_reduction_thread, args=(args,), daemon=True)
         self.running_thread.start()
