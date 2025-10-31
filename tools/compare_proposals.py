@@ -10,7 +10,8 @@ from __future__ import annotations
 
 import argparse
 import json
-from concurrent.futures import ProcessPoolExecutor, as_completed
+import time
+from concurrent.futures import ProcessPoolExecutor, ThreadPoolExecutor, as_completed
 from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path
@@ -641,6 +642,74 @@ def metric_distance(metric: str, X: np.ndarray, dist_simplex: np.ndarray) -> np.
 AVAILABLE_REDUCTIONS = ("MDS", "UMAP", "TSNE", "ISOMAP")
 
 _PARALLEL_CONTEXT: Dict[str, Any] | None = None
+BASE_VECTOR_METRICS = {"cosine", "euclidean", "l1", "l2", "cityblock", "manhattan"}
+
+
+class TimingRecorder:
+    """Acumula marcas de tiempo consecutivas para reportar duraciones amigables."""
+
+    def __init__(self) -> None:
+        self._marks: List[Tuple[str, float]] = [("start", time.perf_counter())]
+
+    def mark(self, label: str) -> None:
+        self._marks.append((label, time.perf_counter()))
+
+    def summary(self) -> List[Tuple[str, float]]:
+        """Devuelve pares (etapa, duración en segundos) excluyendo la marca inicial."""
+        if len(self._marks) < 2:
+            return []
+        out: List[Tuple[str, float]] = []
+        for idx in range(1, len(self._marks)):
+            label, stamp = self._marks[idx]
+            _, prev_stamp = self._marks[idx - 1]
+            out.append((label, stamp - prev_stamp))
+        return out
+
+    def total(self) -> float:
+        if len(self._marks) < 2:
+            return 0.0
+        return self._marks[-1][1] - self._marks[0][1]
+
+
+def _apply_color_mode(
+    mode: str,
+    exponent: Optional[float],
+    totals_raw: np.ndarray,
+    totals_adjusted: np.ndarray,
+    pairs_arr: np.ndarray,
+    types_arr: np.ndarray,
+) -> Tuple[np.ndarray, str]:
+    """Devuelve (valores normalizados, título de la barra)."""
+    mode_lower = mode.lower()
+
+    def _format_exp(val: float) -> str:
+        return f"{val:.2f}".rstrip("0").rstrip(".")
+
+    if mode_lower == "pair_exp":
+        exp = exponent if exponent is not None else 1.0
+        denom = _safe_denominator(pairs_arr, subtract=COLOR_PER_PAIR_SUBTRACT)
+        denom = np.power(denom, exp)
+        if not np.isclose(COLOR_DEN_EXPONENT, 1.0):
+            denom = np.power(denom, COLOR_DEN_EXPONENT)
+        vals = totals_raw / denom
+        title = f"Total/Pares^{_format_exp(exp)}"
+    elif mode_lower == "types_exp":
+        exp = exponent if exponent is not None else 1.0
+        denom = _safe_denominator(types_arr, subtract=COLOR_PER_EXISTING_SUBTRACT)
+        denom = np.power(denom, exp)
+        if not np.isclose(COLOR_DEN_EXPONENT, 1.0):
+            denom = np.power(denom, COLOR_DEN_EXPONENT)
+        vals = totals_adjusted / denom
+        title = f"Total ajustado/Tipos^{_format_exp(exp)}"
+    elif mode_lower == "raw_total":
+        vals = totals_raw.copy()
+        title = "Total bruto"
+    else:
+        raise ValueError(f"Modo de color no soportado: {mode}")
+
+    if not np.isclose(COLOR_OUTPUT_EXPONENT, 1.0):
+        vals = np.power(np.clip(vals, 0.0, None), COLOR_OUTPUT_EXPONENT)
+    return vals, title
 
 
 def _parallel_worker_setup(context: Dict[str, Any]) -> None:
@@ -678,8 +747,6 @@ def _run_scenario_task(task: Dict[str, Any]) -> Dict[str, Any]:
     per_seed_records: List[Dict[str, Any]] = []
     figure_payloads: List[Dict[str, Any]] = []
 
-    base_vector_metrics = {"cosine", "euclidean", "l1", "l2", "cityblock", "manhattan"}
-
     for reduction in reductions:
         try:
             dist_condensed = metric_distance(metric, X, simplex)
@@ -688,7 +755,7 @@ def _run_scenario_task(task: Dict[str, Any]) -> Dict[str, Any]:
             continue
 
         dist_matrix = squareform(dist_condensed)
-        base_matrix = X if metric in base_vector_metrics else simplex
+        base_matrix = X if metric in BASE_VECTOR_METRICS else simplex
 
         nn_top1, nn_top2 = evaluate_nn_hits(dist_matrix, entries, simplex)
         mix_mean, mix_max = evaluate_mixture_error(simplex, entries)
@@ -761,6 +828,86 @@ def _run_scenario_task(task: Dict[str, Any]) -> Dict[str, Any]:
         "per_seed_records": per_seed_records,
         "figure_payloads": figure_payloads,
     }
+
+
+def _generate_figures(
+    payloads: Sequence[Dict[str, Any]],
+    entries: List[ChordEntry],
+    totals: np.ndarray,
+    pairs: np.ndarray,
+    preproc_cache: Dict[str, np.ndarray],
+    dist_simplex_cache: Dict[str, np.ndarray],
+) -> List[Tuple[str, go.Figure]]:
+    """Construye las figuras a partir de los payloads aprovechando múltiples hilos."""
+
+    def _build_single(payload: Dict[str, Any]) -> List[Tuple[str, go.Figure]]:
+        scenario_name = payload["scenario"]
+        preproc_id = payload["preproc_id"]
+        metric = payload["metric"]
+        reduction = payload["reduction"]
+        figure_seed = payload["figure_seed"]
+        embedding = np.asarray(payload["embedding"], dtype=float)
+        base_matrix = (
+            np.asarray(preproc_cache[preproc_id], dtype=float)
+            if metric in BASE_VECTOR_METRICS
+            else np.asarray(dist_simplex_cache[preproc_id], dtype=float)
+        )
+        vectors_adjusted = np.asarray(preproc_cache[preproc_id], dtype=float)
+        totals_adj = np.sum(vectors_adjusted, axis=1)
+        existing_counts = np.sum(vectors_adjusted > COLOR_EXISTING_THRESHOLD, axis=1).astype(float)
+
+        color_modes: List[Tuple[str, Optional[float]]] = []
+        if preproc_id == "identity":
+            color_modes.append(("raw_total", None))
+        for exp in COLOR_EXPONENTS:
+            color_modes.append(("pair_exp", exp))
+            color_modes.append(("types_exp", exp))
+
+        fig_title = f"{scenario_name} (seed {figure_seed})"
+        figs: List[Tuple[str, go.Figure]] = []
+        for mode, exponent in color_modes:
+            vals, ctitle = _apply_color_mode(
+                mode,
+                exponent,
+                totals,
+                totals_adj,
+                pairs,
+                existing_counts,
+            )
+            key = mode if exponent is None else f"{mode}_{int(round(exponent * 100)):03d}"
+            fig = build_scatter_figure(
+                embedding=embedding,
+                entries=entries,
+                color_values=vals,
+                pair_counts=pairs,
+                type_counts=existing_counts,
+                vectors=base_matrix,
+                adjusted_vectors=vectors_adjusted,
+                title=fig_title,
+                is_proposal=(preproc_id != "identity"),
+                color_title=ctitle,
+            )
+            figs.append((f"{scenario_name}||{key}", fig))
+        return figs
+
+    if not payloads:
+        return []
+
+    max_workers = min(len(payloads), max(1, (os.cpu_count() or 1)))
+    results: Dict[int, List[Tuple[str, go.Figure]]] = {}
+
+    with ThreadPoolExecutor(max_workers=max_workers) as executor:
+        future_map = {
+            executor.submit(_build_single, payload): idx for idx, payload in enumerate(payloads)
+        }
+        for future in as_completed(future_map):
+            idx = future_map[future]
+            results[idx] = future.result()
+
+    ordered: List[Tuple[str, go.Figure]] = []
+    for idx in range(len(payloads)):
+        ordered.extend(results.get(idx, []))
+    return ordered
 
 
 def compute_embeddings(
@@ -2177,13 +2324,17 @@ def main() -> None:
     if getattr(args, "population_json", None):
         df_override = pd.read_json(args.population_json, orient="records", lines=True)
         print(f"[input] Población cargada desde JSON: {args.population_json} ({len(df_override)} filas)")
+    timer = TimingRecorder()
+
     entries = load_chords(
         args.dyads_query,
         args.triads_query,
         args.sevenths_query,
         df_override=df_override,
     )
+    timer.mark("load_chords")
     hist, totals, counts, pairs, notes = stack_hist(entries)
+    timer.mark("stack_hist")
 
     cpu_count = os.cpu_count() or 1
     deterministic = args.execution_mode != "parallel"
@@ -2278,6 +2429,7 @@ def main() -> None:
                 results.extend(res["results"])
                 per_seed_records.extend(res["per_seed_records"])
                 figure_payloads.extend(res["figure_payloads"])
+    timer.mark("scenarios")
 
     for msg in warnings:
         print(msg)
@@ -2302,95 +2454,15 @@ def main() -> None:
     )
     figure_payloads.sort(key=lambda payload: order_map.get(payload["scenario"], len(order_map)))
 
-    figures = []
-    base_vector_metrics = {"cosine", "euclidean", "l1", "l2", "cityblock", "manhattan"}
-
-    def _format_exp(val: float) -> str:
-        return f"{val:.2f}".rstrip("0").rstrip(".")
-
-    def _apply_color_mode(
-        mode: str,
-        exponent: Optional[float],
-        totals_raw: np.ndarray,
-        totals_adjusted: np.ndarray,
-        pairs_arr: np.ndarray,
-        types_arr: np.ndarray,
-    ) -> Tuple[np.ndarray, str]:
-        """Devuelve (valores normalizados, título de la barra)."""
-        mode_lower = mode.lower()
-        if mode_lower == "pair_exp":
-            exp = exponent if exponent is not None else 1.0
-            denom = _safe_denominator(pairs_arr, subtract=COLOR_PER_PAIR_SUBTRACT)
-            denom = np.power(denom, exp)
-            if not np.isclose(COLOR_DEN_EXPONENT, 1.0):
-                denom = np.power(denom, COLOR_DEN_EXPONENT)
-            vals = totals_raw / denom
-            title = f"Total/Pares^{_format_exp(exp)}"
-        elif mode_lower == "types_exp":
-            exp = exponent if exponent is not None else 1.0
-            denom = _safe_denominator(types_arr, subtract=COLOR_PER_EXISTING_SUBTRACT)
-            denom = np.power(denom, exp)
-            if not np.isclose(COLOR_DEN_EXPONENT, 1.0):
-                denom = np.power(denom, COLOR_DEN_EXPONENT)
-            vals = totals_adjusted / denom
-            title = f"Total ajustado/Tipos^{_format_exp(exp)}"
-        elif mode_lower == "raw_total":
-            vals = totals_raw.copy()
-            title = "Total bruto"
-        else:
-            raise ValueError(f"Modo de color no soportado: {mode}")
-
-        if not np.isclose(COLOR_OUTPUT_EXPONENT, 1.0):
-            vals = np.power(np.clip(vals, 0.0, None), COLOR_OUTPUT_EXPONENT)
-        return vals, title
-
-    for payload in figure_payloads:
-        scenario_name = payload["scenario"]
-        preproc_id = payload["preproc_id"]
-        metric = payload["metric"]
-        reduction = payload["reduction"]
-        figure_seed = payload["figure_seed"]
-        embedding = np.asarray(payload["embedding"], dtype=float)
-        base_matrix = (
-            np.asarray(preproc_cache[preproc_id], dtype=float)
-            if metric in base_vector_metrics
-            else np.asarray(dist_simplex_cache[preproc_id], dtype=float)
-        )
-        vectors_adjusted = np.asarray(preproc_cache[preproc_id], dtype=float)
-        totals_adj = np.sum(vectors_adjusted, axis=1)
-        existing_counts = np.sum(vectors_adjusted > COLOR_EXISTING_THRESHOLD, axis=1).astype(float)
-
-        color_modes: List[Tuple[str, Optional[float]]] = []
-        if preproc_id == "identity":
-            color_modes.append(("raw_total", None))
-        for exp in COLOR_EXPONENTS:
-            color_modes.append(("pair_exp", exp))
-            color_modes.append(("types_exp", exp))
-
-        fig_title = f"{scenario_name} (seed {figure_seed})"
-        for mode, exponent in color_modes:
-            vals, ctitle = _apply_color_mode(
-                mode,
-                exponent,
-                totals,
-                totals_adj,
-                pairs,
-                existing_counts,
-            )
-            key = mode if exponent is None else f"{mode}_{int(round(exponent * 100)):03d}"
-            fig = build_scatter_figure(
-                embedding=embedding,
-                entries=entries,
-                color_values=vals,
-                pair_counts=pairs,
-                type_counts=existing_counts,
-                vectors=base_matrix,
-                adjusted_vectors=vectors_adjusted,
-                title=fig_title,
-                is_proposal=(preproc_id != "identity"),
-                color_title=ctitle,
-            )
-            figures.append((f"{scenario_name}||{key}", fig))
+    figures = _generate_figures(
+        figure_payloads,
+        entries,
+        totals,
+        pairs,
+        preproc_cache,
+        dist_simplex_cache,
+    )
+    timer.mark("figures")
 
     if not results:
         raise SystemExit("No se generaron resultados. Revisa propuestas y métricas.")
@@ -2411,12 +2483,23 @@ def main() -> None:
     report_path = output_dir / "report.html"
     # New report layout (tabs + centralized methods)
     build_report_html_v2(metrics_df, figures, report_path, seed_list)
+    timer.mark("report")
 
     if per_seed_records:
         per_seed_df = pd.DataFrame(per_seed_records)
         per_seed_df.to_csv(output_dir / "metrics_by_seed.csv", index=False, float_format="%.6f")
+        timer.mark("metrics_by_seed")
 
     print(f"[ok] Reporte generado en: {report_path}")
+    # Emitir resumen temporal para consumo en la GUI/logs.
+    if args.seeds or args.seed:
+        total_time = timer.total()
+        print("[timing] resumen por etapas (s):")
+        elapsed = 0.0
+        for label, seconds in timer.summary():
+            elapsed += seconds
+            print(f"  - {label:<14}: {seconds:6.2f}")
+        print(f"  - total          : {total_time:6.2f}")
 
 
 def build_scenarios(proposals: Iterable[str], metrics: Iterable[str]) -> List[Dict[str, object]]:
