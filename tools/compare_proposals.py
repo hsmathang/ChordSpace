@@ -10,10 +10,11 @@ from __future__ import annotations
 
 import argparse
 import json
+from concurrent.futures import ProcessPoolExecutor, as_completed
 from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path
-from typing import Callable, Dict, Iterable, List, Optional, Sequence, Tuple
+from typing import Any, Callable, Dict, Iterable, List, Optional, Sequence, Tuple
 
 import os
 def _format_exp(val: float) -> str:
@@ -638,6 +639,128 @@ def metric_distance(metric: str, X: np.ndarray, dist_simplex: np.ndarray) -> np.
 
 
 AVAILABLE_REDUCTIONS = ("MDS", "UMAP", "TSNE", "ISOMAP")
+
+_PARALLEL_CONTEXT: Dict[str, Any] | None = None
+
+
+def _parallel_worker_setup(context: Dict[str, Any]) -> None:
+    """Initialise shared read-only context inside worker processes."""
+    global _PARALLEL_CONTEXT
+    _PARALLEL_CONTEXT = context
+
+
+def _run_scenario_task(task: Dict[str, Any]) -> Dict[str, Any]:
+    """Execute a scenario (preproc + metric) across all requested reductions."""
+    if _PARALLEL_CONTEXT is None:
+        raise RuntimeError("Parallel context not initialised.")
+
+    entries = _PARALLEL_CONTEXT["entries"]
+    preproc_cache: Dict[str, np.ndarray] = _PARALLEL_CONTEXT["preproc_cache"]
+    dist_simplex_cache: Dict[str, np.ndarray] = _PARALLEL_CONTEXT["dist_simplex_cache"]
+
+    scenario = task["scenario"]
+    reductions: Sequence[str] = task["reductions"]
+    seed_list: Sequence[int] = task["seed_list"]
+    deterministic: bool = task["deterministic"]
+    jobs = task["jobs"]
+    mds_n_init = task["mds_n_init"]
+
+    scenario_name_base: str = scenario["name"]
+    metric: str = scenario["metric"]
+    preproc_id: str = scenario["preproc_id"]
+    description: str = scenario["description"]
+
+    X = np.asarray(preproc_cache[preproc_id], dtype=float)
+    simplex = np.asarray(dist_simplex_cache[preproc_id], dtype=float)
+
+    warnings: List[str] = []
+    results: List[Dict[str, Any]] = []
+    per_seed_records: List[Dict[str, Any]] = []
+    figure_payloads: List[Dict[str, Any]] = []
+
+    base_vector_metrics = {"cosine", "euclidean", "l1", "l2", "cityblock", "manhattan"}
+
+    for reduction in reductions:
+        try:
+            dist_condensed = metric_distance(metric, X, simplex)
+        except ValueError as exc:
+            warnings.append(f"[skip] {scenario_name_base} · {reduction}: {exc}")
+            continue
+
+        dist_matrix = squareform(dist_condensed)
+        base_matrix = X if metric in base_vector_metrics else simplex
+
+        nn_top1, nn_top2 = evaluate_nn_hits(dist_matrix, entries, simplex)
+        mix_mean, mix_max = evaluate_mixture_error(simplex, entries)
+
+        seed_rows: List[Dict[str, Optional[float]]] = []
+        figure_embedding: Optional[np.ndarray] = None
+        figure_seed: Optional[int] = None
+
+        for seed in seed_list:
+            embedding = compute_embeddings(
+                dist_condensed,
+                reduction,
+                seed,
+                base_matrix=base_matrix,
+                n_jobs=jobs,
+                deterministic=deterministic,
+                mds_n_init=mds_n_init,
+            )
+            metrics_summary = summarise_embedding_metrics(base_matrix, embedding, dist_matrix)
+            row: Dict[str, Optional[float]] = {
+                "scenario": f"{reduction}:{scenario_name_base}",
+                "description": description,
+                "metric": metric,
+                "preproc_id": preproc_id,
+                "seed": seed,
+                "reduction": reduction,
+                "nn_hit_top1": nn_top1,
+                "nn_hit_top2": nn_top2,
+                "mixture_l1_mean": mix_mean,
+                "mixture_l1_max": mix_max,
+                **metrics_summary,
+            }
+            seed_rows.append(row)
+            if figure_embedding is None:
+                figure_embedding = embedding
+                figure_seed = seed
+
+        if not seed_rows:
+            continue
+
+        summary = aggregate_seed_results(seed_rows, seed_list)
+        summary.update(
+            {
+                "scenario": f"{reduction}:{scenario_name_base}",
+                "description": description,
+                "metric": metric,
+                "preproc_id": preproc_id,
+                "figure_seed": figure_seed,
+                "reduction": reduction,
+            }
+        )
+        results.append(summary)
+        per_seed_records.extend(seed_rows)
+        if figure_embedding is not None:
+            figure_payloads.append(
+                {
+                    "scenario": f"{reduction}:{scenario_name_base}",
+                    "preproc_id": preproc_id,
+                    "metric": metric,
+                    "description": description,
+                    "reduction": reduction,
+                    "figure_seed": figure_seed,
+                    "embedding": figure_embedding,
+                }
+            )
+
+    return {
+        "warnings": warnings,
+        "results": results,
+        "per_seed_records": per_seed_records,
+        "figure_payloads": figure_payloads,
+    }
 
 
 def compute_embeddings(
@@ -2099,164 +2222,175 @@ def main() -> None:
 
     per_seed_records: List[Dict[str, object]] = []
 
+    scenario_tasks: List[Dict[str, Any]] = []
+    expected_order: List[str] = []
+
     for scenario in scenarios:
         preproc_id = scenario["preproc_id"]
-        metric = scenario["metric"]
-        scenario_name_base = scenario["name"]
-        description = scenario["description"]
-
         if preproc_id not in dist_simplex_cache:
             preproc_func = scenario["preproc_func"]
             kwargs = scenario["preproc_kwargs"]
             X, simplex = preproc_func(hist, counts=counts, pairs=pairs, **kwargs)
             preproc_cache[preproc_id] = X
             dist_simplex_cache[preproc_id] = simplex
-        X = preproc_cache[preproc_id]
-        simplex = dist_simplex_cache[preproc_id]
-
-        try:
-            dist_condensed = metric_distance(metric, X, simplex)
-        except ValueError as exc:
-            print(f"[skip] {scenario_name_base}: {exc}")
-            continue
-
         for reduction in reductions:
-            dist_matrix = squareform(dist_condensed)
-            base_matrix = X if metric in {"cosine", "euclidean", "l1", "l2", "cityblock", "manhattan"} else simplex
+            expected_order.append(f"{reduction}:{scenario['name']}")
+        scenario_tasks.append(
+            {
+                "scenario": scenario,
+                "reductions": list(reductions),
+                "seed_list": list(seed_list),
+                "deterministic": deterministic,
+                "jobs": jobs,
+                "mds_n_init": mds_n_init,
+            }
+        )
 
-            seed_rows: List[Dict[str, Optional[float]]] = []
-            figure_embedding: Optional[np.ndarray] = None
-            figure_seed: Optional[int] = None
+    figure_payloads: List[Dict[str, Any]] = []
+    warnings: List[str] = []
 
-            for seed in seed_list:
-                embedding = compute_embeddings(
-                    dist_condensed,
-                    reduction,
-                    seed,
-                    base_matrix=base_matrix,
-                    n_jobs=jobs,
-                    deterministic=deterministic,
-                    mds_n_init=mds_n_init,
-                )
+    if scenario_tasks:
+        context = {
+            "entries": entries,
+            "preproc_cache": preproc_cache,
+            "dist_simplex_cache": dist_simplex_cache,
+        }
+        use_parallel = len(scenario_tasks) > 1 and cpu_count > 1
+        if use_parallel:
+            max_workers = min(len(scenario_tasks), cpu_count)
+            with ProcessPoolExecutor(
+                max_workers=max_workers,
+                initializer=_parallel_worker_setup,
+                initargs=(context,),
+            ) as executor:
+                futures = [executor.submit(_run_scenario_task, task) for task in scenario_tasks]
+                for fut in as_completed(futures):
+                    res = fut.result()
+                    warnings.extend(res["warnings"])
+                    results.extend(res["results"])
+                    per_seed_records.extend(res["per_seed_records"])
+                    figure_payloads.extend(res["figure_payloads"])
+        else:
+            _parallel_worker_setup(context)
+            for task in scenario_tasks:
+                res = _run_scenario_task(task)
+                warnings.extend(res["warnings"])
+                results.extend(res["results"])
+                per_seed_records.extend(res["per_seed_records"])
+                figure_payloads.extend(res["figure_payloads"])
 
-                nn_top1, nn_top2 = evaluate_nn_hits(dist_matrix, entries, simplex)
-                mix_mean, mix_max = evaluate_mixture_error(simplex, entries)
-                metrics_summary = summarise_embedding_metrics(base_matrix, embedding, dist_matrix)
+    for msg in warnings:
+        print(msg)
 
-                row: Dict[str, Optional[float]] = {
-                    "scenario": f"{reduction}:{scenario_name_base}",
-                    "description": description,
-                    "metric": metric,
-                    "preproc_id": preproc_id,
-                    "seed": seed,
-                    "reduction": reduction,
-                    "nn_hit_top1": nn_top1,
-                    "nn_hit_top2": nn_top2,
-                    "mixture_l1_mean": mix_mean,
-                    "mixture_l1_max": mix_max,
-                    **metrics_summary,
-                }
-                seed_rows.append(row)
-                per_seed_records.append(row)
+    order_map = {name: idx for idx, name in enumerate(expected_order)}
+    seed_rank = {seed: idx for idx, seed in enumerate(seed_list)}
+    results.sort(key=lambda row: order_map.get(row["scenario"], len(order_map)))
+    def _seed_rank(row: Dict[str, Any]) -> int:
+        value = row.get("seed")
+        if value is None:
+            return len(seed_rank)
+        try:
+            return seed_rank.get(int(value), len(seed_rank))
+        except (TypeError, ValueError):
+            return len(seed_rank)
 
-                if figure_embedding is None:
-                    figure_embedding = embedding
-                    figure_seed = seed
+    per_seed_records.sort(
+        key=lambda row: (
+            order_map.get(row["scenario"], len(order_map)),
+            _seed_rank(row),
+        )
+    )
+    figure_payloads.sort(key=lambda payload: order_map.get(payload["scenario"], len(order_map)))
 
-            if not seed_rows:
-                continue
+    figures = []
+    base_vector_metrics = {"cosine", "euclidean", "l1", "l2", "cityblock", "manhattan"}
 
-            scenario_name = f"{reduction}:{scenario_name_base}"
-            summary = aggregate_seed_results(seed_rows, seed_list)
-            summary.update(
-                {
-                    "scenario": scenario_name,
-                    "description": description,
-                    "metric": metric,
-                    "preproc_id": preproc_id,
-                    "figure_seed": figure_seed,
-                    "reduction": reduction,
-                }
+    def _format_exp(val: float) -> str:
+        return f"{val:.2f}".rstrip("0").rstrip(".")
+
+    def _apply_color_mode(
+        mode: str,
+        exponent: Optional[float],
+        totals_raw: np.ndarray,
+        totals_adjusted: np.ndarray,
+        pairs_arr: np.ndarray,
+        types_arr: np.ndarray,
+    ) -> Tuple[np.ndarray, str]:
+        """Devuelve (valores normalizados, título de la barra)."""
+        mode_lower = mode.lower()
+        if mode_lower == "pair_exp":
+            exp = exponent if exponent is not None else 1.0
+            denom = _safe_denominator(pairs_arr, subtract=COLOR_PER_PAIR_SUBTRACT)
+            denom = np.power(denom, exp)
+            if not np.isclose(COLOR_DEN_EXPONENT, 1.0):
+                denom = np.power(denom, COLOR_DEN_EXPONENT)
+            vals = totals_raw / denom
+            title = f"Total/Pares^{_format_exp(exp)}"
+        elif mode_lower == "types_exp":
+            exp = exponent if exponent is not None else 1.0
+            denom = _safe_denominator(types_arr, subtract=COLOR_PER_EXISTING_SUBTRACT)
+            denom = np.power(denom, exp)
+            if not np.isclose(COLOR_DEN_EXPONENT, 1.0):
+                denom = np.power(denom, COLOR_DEN_EXPONENT)
+            vals = totals_adjusted / denom
+            title = f"Total ajustado/Tipos^{_format_exp(exp)}"
+        elif mode_lower == "raw_total":
+            vals = totals_raw.copy()
+            title = "Total bruto"
+        else:
+            raise ValueError(f"Modo de color no soportado: {mode}")
+
+        if not np.isclose(COLOR_OUTPUT_EXPONENT, 1.0):
+            vals = np.power(np.clip(vals, 0.0, None), COLOR_OUTPUT_EXPONENT)
+        return vals, title
+
+    for payload in figure_payloads:
+        scenario_name = payload["scenario"]
+        preproc_id = payload["preproc_id"]
+        metric = payload["metric"]
+        reduction = payload["reduction"]
+        figure_seed = payload["figure_seed"]
+        embedding = np.asarray(payload["embedding"], dtype=float)
+        base_matrix = (
+            np.asarray(preproc_cache[preproc_id], dtype=float)
+            if metric in base_vector_metrics
+            else np.asarray(dist_simplex_cache[preproc_id], dtype=float)
+        )
+        vectors_adjusted = np.asarray(preproc_cache[preproc_id], dtype=float)
+        totals_adj = np.sum(vectors_adjusted, axis=1)
+        existing_counts = np.sum(vectors_adjusted > COLOR_EXISTING_THRESHOLD, axis=1).astype(float)
+
+        color_modes: List[Tuple[str, Optional[float]]] = []
+        if preproc_id == "identity":
+            color_modes.append(("raw_total", None))
+        for exp in COLOR_EXPONENTS:
+            color_modes.append(("pair_exp", exp))
+            color_modes.append(("types_exp", exp))
+
+        fig_title = f"{scenario_name} (seed {figure_seed})"
+        for mode, exponent in color_modes:
+            vals, ctitle = _apply_color_mode(
+                mode,
+                exponent,
+                totals,
+                totals_adj,
+                pairs,
+                existing_counts,
             )
-            results.append(summary)
-
-            if figure_embedding is not None:
-                vectors_adjusted = preproc_cache[preproc_id]
-                totals_adj = np.sum(np.asarray(vectors_adjusted, dtype=float), axis=1)
-                existing_counts = np.sum(
-                    np.asarray(vectors_adjusted, dtype=float) > COLOR_EXISTING_THRESHOLD,
-                    axis=1,
-                ).astype(float)
-
-                def _format_exp(val: float) -> str:
-                    return f"{val:.2f}".rstrip("0").rstrip(".")
-
-            def _apply_color_mode(
-                mode: str,
-                exponent: Optional[float],
-                totals_raw: np.ndarray,
-                totals_adjusted: np.ndarray,
-                pairs_arr: np.ndarray,
-                types_arr: np.ndarray,
-            ) -> Tuple[np.ndarray, str]:
-                """Devuelve (valores normalizados, título de la barra)."""
-                mode = mode.lower()
-                if mode == "pair_exp":
-                    exp = exponent if exponent is not None else 1.0
-                    denom = _safe_denominator(pairs_arr, subtract=COLOR_PER_PAIR_SUBTRACT)
-                    denom = np.power(denom, exp)
-                    if not np.isclose(COLOR_DEN_EXPONENT, 1.0):
-                        denom = np.power(denom, COLOR_DEN_EXPONENT)
-                    vals = totals_raw / denom
-                    title = f"Total/Pares^{_format_exp(exp)}"
-                elif mode == "types_exp":
-                    exp = exponent if exponent is not None else 1.0
-                    denom = _safe_denominator(types_arr, subtract=COLOR_PER_EXISTING_SUBTRACT)
-                    denom = np.power(denom, exp)
-                    if not np.isclose(COLOR_DEN_EXPONENT, 1.0):
-                        denom = np.power(denom, COLOR_DEN_EXPONENT)
-                    vals = totals_adjusted / denom
-                    title = f"Total ajustado/Tipos^{_format_exp(exp)}"
-                elif mode == "raw_total":
-                    vals = totals_raw.copy()
-                    title = "Total bruto"
-                else:
-                    raise ValueError(f"Modo de color no soportado: {mode}")
-
-                if not np.isclose(COLOR_OUTPUT_EXPONENT, 1.0):
-                    vals = np.power(np.clip(vals, 0.0, None), COLOR_OUTPUT_EXPONENT)
-                return vals, title
-
-            color_modes: List[Tuple[str, Optional[float]]] = []
-            if preproc_id == "identity":
-                color_modes.append(("raw_total", None))
-            for exp in COLOR_EXPONENTS:
-                color_modes.append(("pair_exp", exp))
-                color_modes.append(("types_exp", exp))
-            fig_title = f"{scenario_name} (seed {figure_seed})"
-            for mode, exponent in color_modes:
-                vals, ctitle = _apply_color_mode(
-                    mode,
-                    exponent,
-                    totals,
-                    totals_adj,
-                    pairs,
-                    existing_counts,
-                )
-                key = mode if exponent is None else f"{mode}_{int(round(exponent * 100)):03d}"
-                fig = build_scatter_figure(
-                    embedding=figure_embedding,
-                    entries=entries,
-                    color_values=vals,
-                    pair_counts=pairs,
-                    type_counts=existing_counts,
-                    vectors=base_matrix,
-                    adjusted_vectors=preproc_cache[preproc_id],
-                    title=fig_title,
-                    is_proposal=(preproc_id != "identity"),
-                    color_title=ctitle,
-                )
-                figures.append((f"{scenario_name}||{key}", fig))
+            key = mode if exponent is None else f"{mode}_{int(round(exponent * 100)):03d}"
+            fig = build_scatter_figure(
+                embedding=embedding,
+                entries=entries,
+                color_values=vals,
+                pair_counts=pairs,
+                type_counts=existing_counts,
+                vectors=base_matrix,
+                adjusted_vectors=vectors_adjusted,
+                title=fig_title,
+                is_proposal=(preproc_id != "identity"),
+                color_title=ctitle,
+            )
+            figures.append((f"{scenario_name}||{key}", fig))
 
     if not results:
         raise SystemExit("No se generaron resultados. Revisa propuestas y métricas.")
