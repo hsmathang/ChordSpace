@@ -19,11 +19,10 @@ from tkinter import filedialog, messagebox
 from tkinter import ttk
 from tkinter.scrolledtext import ScrolledText
 
-from tools import experiment_inversions
+from tools import experiment_inversions, data_access
 from tools.query_registry import add_custom_query, get_all_queries, resolve_query_sql
 from tools.compare_proposals import PROPOSAL_INFO, METRIC_INFO, AVAILABLE_REDUCTIONS, PREPROCESSORS
 from tools.population_utils import dedupe_population
-from config import config_db
 from config import CHORD_TEMPLATES_METADATA
 import subprocess
 import sys
@@ -31,11 +30,6 @@ import re
 import webbrowser
 import datetime as _dt
 import pandas as pd
-try:
-    from chordcodex.model import QueryExecutor  # type: ignore
-except ModuleNotFoundError:  # pragma: no cover
-    from synth_tools import QueryExecutor  # type: ignore
-from tools.experiment_inversions import _parse_pop_spec, _build_population
 import time
 from config import MODELO_OPTIONS_LIST, METRICA_OPTIONS_LIST, PONDERACION_OPTIONS_LIST
 
@@ -573,28 +567,22 @@ class ExperimentLauncher(tk.Tk):
         self._append_log(f"[población] Cargada en {(t1 - t0):.3f}s. {stats_text}\n")
 
     def _load_population(self) -> pd.DataFrame:
-        qe = QueryExecutor(**config_db)
+        executor = data_access.get_executor()
         frames: list[pd.DataFrame] = []
-
+        profile = data_access.ColumnProfile.VISUAL
         base = self.base_query_var.get().strip()
         if base and base != "<Ninguna>":
-            sql = resolve_query_sql(base)
-            df_base = qe.as_pandas(sql)
-            try:
-                df_base = df_base.copy()
-                df_base["__source__"] = f"BASE:{base}"
-            except Exception:
-                pass
+            df_base = data_access.fetch_population_by_name(base, profile=profile, executor=executor).copy()
+            df_base["__source__"] = f"BASE:{base}"
             frames.append(df_base)
 
         for spec in self.pops_entries:
-            ptype, qname = _parse_pop_spec(spec)
-            df_p = _build_population(ptype, qname)
-            try:
-                df_p = df_p.copy()
-                df_p["__source__"] = f"{ptype}:{qname}"
-            except Exception:
-                pass
+            df_p = data_access.fetch_population_with_source(
+                spec,
+                profile=profile,
+                source_label=spec,
+                executor=executor,
+            )
             frames.append(df_p)
 
         if not frames:
