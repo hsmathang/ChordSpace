@@ -726,6 +726,7 @@ def _run_scenario_task(task: Dict[str, Any]) -> Dict[str, Any]:
     entries = _PARALLEL_CONTEXT["entries"]
     preproc_cache: Dict[str, np.ndarray] = _PARALLEL_CONTEXT["preproc_cache"]
     dist_simplex_cache: Dict[str, np.ndarray] = _PARALLEL_CONTEXT["dist_simplex_cache"]
+    distance_cache: Dict[Tuple[str, str], np.ndarray] = _PARALLEL_CONTEXT["distance_cache"]
 
     scenario = task["scenario"]
     reductions: Sequence[str] = task["reductions"]
@@ -741,18 +742,18 @@ def _run_scenario_task(task: Dict[str, Any]) -> Dict[str, Any]:
 
     X = np.asarray(preproc_cache[preproc_id], dtype=float)
     simplex = np.asarray(dist_simplex_cache[preproc_id], dtype=float)
+    dist_condensed_base = distance_cache[(preproc_id, metric)]
 
     warnings: List[str] = []
     results: List[Dict[str, Any]] = []
     per_seed_records: List[Dict[str, Any]] = []
     figure_payloads: List[Dict[str, Any]] = []
+    scenario_time_details: List[Tuple[str, float]] = []
+    reduction_timings: List[Tuple[str, float]] = []
 
     for reduction in reductions:
-        try:
-            dist_condensed = metric_distance(metric, X, simplex)
-        except ValueError as exc:
-            warnings.append(f"[skip] {scenario_name_base} · {reduction}: {exc}")
-            continue
+        t_red_start = time.perf_counter()
+        dist_condensed = dist_condensed_base
 
         dist_matrix = squareform(dist_condensed)
         base_matrix = X if metric in BASE_VECTOR_METRICS else simplex
@@ -821,12 +822,16 @@ def _run_scenario_task(task: Dict[str, Any]) -> Dict[str, Any]:
                     "embedding": figure_embedding,
                 }
             )
+        t_red_end = time.perf_counter()
+        scenario_key = f"{reduction}:{scenario_name_base}"
+        reduction_timings.append((scenario_key, t_red_end - t_red_start))
 
     return {
         "warnings": warnings,
         "results": results,
         "per_seed_records": per_seed_records,
         "figure_payloads": figure_payloads,
+        "timings": reduction_timings,
     }
 
 
@@ -2376,6 +2381,7 @@ def main() -> None:
 
     scenario_tasks: List[Dict[str, Any]] = []
     expected_order: List[str] = []
+    distance_cache: Dict[Tuple[str, str], np.ndarray] = {}
 
     for scenario in scenarios:
         preproc_id = scenario["preproc_id"]
@@ -2385,6 +2391,18 @@ def main() -> None:
             X, simplex = preproc_func(hist, counts=counts, pairs=pairs, **kwargs)
             preproc_cache[preproc_id] = X
             dist_simplex_cache[preproc_id] = simplex
+        key = (preproc_id, scenario["metric"])
+        if key not in distance_cache:
+            X = preproc_cache[preproc_id]
+            simplex = dist_simplex_cache[preproc_id]
+            try:
+                dist_condensed = metric_distance(scenario["metric"], X, simplex)
+            except ValueError as exc:
+                print(f"[skip] {scenario['name']}: {exc}")
+                continue
+            distance_cache[key] = dist_condensed
+        dist_condensed = distance_cache[key]
+
         for reduction in reductions:
             expected_order.append(f"{reduction}:{scenario['name']}")
         scenario_tasks.append(
@@ -2400,12 +2418,14 @@ def main() -> None:
 
     figure_payloads: List[Dict[str, Any]] = []
     warnings: List[str] = []
+    scenario_time_details: List[Tuple[str, float]] = []
 
     if scenario_tasks:
         context = {
             "entries": entries,
             "preproc_cache": preproc_cache,
             "dist_simplex_cache": dist_simplex_cache,
+            "distance_cache": distance_cache,
         }
         use_parallel = len(scenario_tasks) > 1 and cpu_count > 1
         if use_parallel:
@@ -2422,6 +2442,7 @@ def main() -> None:
                     results.extend(res["results"])
                     per_seed_records.extend(res["per_seed_records"])
                     figure_payloads.extend(res["figure_payloads"])
+                    scenario_time_details.extend(res.get("timings", []))
         else:
             _parallel_worker_setup(context)
             for task in scenario_tasks:
@@ -2430,6 +2451,7 @@ def main() -> None:
                 results.extend(res["results"])
                 per_seed_records.extend(res["per_seed_records"])
                 figure_payloads.extend(res["figure_payloads"])
+                scenario_time_details.extend(res.get("timings", []))
     timer.mark("scenarios")
 
     for msg in warnings:
@@ -2454,6 +2476,7 @@ def main() -> None:
         )
     )
     figure_payloads.sort(key=lambda payload: order_map.get(payload["scenario"], len(order_map)))
+    scenario_time_details.sort(key=lambda item: order_map.get(item[0], len(order_map)))
 
     figures = _generate_figures(
         figure_payloads,
@@ -2501,6 +2524,11 @@ def main() -> None:
             elapsed += seconds
             print(f"  - {label:<14}: {seconds:6.2f}")
         print(f"  - total          : {total_time:6.2f}")
+        if scenario_time_details:
+            print("[timing] escenarios detallados (s):")
+            for key, seconds in scenario_time_details:
+                friendly = key.replace(":", " ▸ ", 1)
+                print(f"  · {friendly}: {seconds:7.2f}")
 
 
 def build_scenarios(proposals: Iterable[str], metrics: Iterable[str]) -> List[Dict[str, object]]:
