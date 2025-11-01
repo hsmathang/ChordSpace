@@ -17,6 +17,12 @@ from tkinter.scrolledtext import ScrolledText
 from typing import Dict, List, Optional, Tuple
 
 from tools import experiment_inversions, data_access
+from tools.gui_commands import (
+    CommandRegistry,
+    CommandResult,
+    ExperimentCommand,
+    LauncherState,
+)
 from tools.query_registry import get_all_queries, resolve_query_sql
 from services.proposals import PROPOSAL_INFO, METRIC_INFO, AVAILABLE_REDUCTIONS, PREPROCESSORS
 from tools.population_utils import dedupe_population
@@ -72,6 +78,9 @@ class ExperimentLauncher(tk.Tk):
         self.population_row_ids: dict[int, int | None] = {}
         self._temp_payloads: list[Path] = []
         self._create_layout()
+
+        # Registro de comandos extensible
+        self._command_registry = CommandRegistry()
 
         self.after(100, self._process_log_queue)
 
@@ -199,6 +208,77 @@ class ExperimentLauncher(tk.Tk):
         default_pop_mode = self.pop_type_var.get() or "B"
         self.filter_mode_var = tk.StringVar(value=default_pop_mode)
         self.filter_mode_var.trace_add("write", lambda *_: self._mark_population_dirty())
+
+    # ---------------------------------------------------------------- commands
+    @property
+    def command_registry(self) -> CommandRegistry:
+        """Expose the command registry so extensions can register handlers."""
+
+        return self._command_registry
+
+    def register_command(self, name: str, command: ExperimentCommand) -> None:
+        """Register a new command in the internal registry."""
+
+        self._command_registry.register(name, command)
+
+    def dispatch_command(
+        self,
+        name: str,
+        state: LauncherState | None = None,
+    ) -> CommandResult:
+        """Execute a command by name, building a snapshot if necessary."""
+
+        snapshot = state if state is not None else self.snapshot_state()
+        return self._command_registry.dispatch(name, snapshot)
+
+    def snapshot_state(self) -> LauncherState:
+        """Create a :class:`LauncherState` snapshot of the current GUI."""
+
+        params: Dict[str, object] = {
+            "type": self.type_var.get(),
+            "reduction": self.reduction_var.get(),
+            "model": self.model_label_to_value.get(self.model_var.get()),
+            "metric": self.metric_label_to_value.get(self.metric_var.get()),
+            "ponderation": self.ponder_label_to_value.get(self.ponder_var.get()),
+            "execution_mode": self.exec_mode_var.get(),
+            "n_jobs": self.n_jobs_var.get().strip(),
+            "pops": list(self.pops_entries),
+            "filters_enabled": self.filter_enable_var.get(),
+        }
+        base_query = self.base_query_var.get().strip()
+        if base_query and base_query != "<Ninguna>":
+            params["base_query"] = base_query
+
+        datasets: Dict[str, pd.DataFrame] = {}
+        if self.population_df is not None and not self.population_df.empty:
+            datasets["population"] = self.population_df.copy()
+
+        selected_rows = sorted(self.population_selected_rows)
+        selection: Dict[str, object] = {"rows": selected_rows}
+        selected_ids: List[int] = []
+        if selected_rows:
+            try:
+                selected_ids = self._selected_population_ids(selected_rows)
+            except Exception:
+                selected_ids = []
+        selection["ids"] = selected_ids
+        if self.population_df is not None and selected_rows:
+            try:
+                datasets["selection"] = self.population_df.iloc[selected_rows].copy()
+            except Exception:
+                pass
+
+        metadata: Dict[str, object] = {
+            "output_dir": Path(self.output_var.get().strip()).expanduser(),
+            "timestamp": dt.datetime.now(),
+        }
+
+        return LauncherState(
+            params=params,
+            datasets=datasets,
+            selection=selection,
+            metadata=metadata,
+        )
 
     def _create_layout(self) -> None:
         main = ttk.Frame(self, padding=14)
