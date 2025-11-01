@@ -15,7 +15,7 @@ from concurrent.futures import ProcessPoolExecutor, ThreadPoolExecutor, as_compl
 from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path
-from typing import Any, Callable, Dict, Iterable, List, Optional, Sequence, Tuple
+from typing import Any, Callable, Dict, Iterable, List, Mapping, Optional, Sequence, Tuple
 
 import os
 def _format_exp(val: float) -> str:
@@ -46,11 +46,6 @@ try:  # pragma: no cover
 except Exception:
     pass
 
-from config import (
-    QUERY_DYADS_REFERENCE,
-    QUERY_TRIADS_CORE,
-    config_db,
-)
 from lab import kruskal_stress_1
 from metrics import (
     compute_continuity,
@@ -63,12 +58,15 @@ from pre_process import (
     ModeloSetharesVec,
     get_chord_type_from_intervals,
 )
-from tools.query_registry import resolve_query_sql
-
-try:  # Prefer packaged executor
-    from chordcodex.model import QueryExecutor  # type: ignore
-except ModuleNotFoundError:  # pragma: no cover
-    from synth_tools import QueryExecutor  # type: ignore
+from services.data_gateway import (
+    DEFAULT_DYADS_QUERY,
+    DEFAULT_GATEWAY_NAME,
+    DEFAULT_TRIADS_QUERY,
+    ExperimentDataGateway,
+    PopulationResult,
+    create_data_gateway,
+    get_registered_gateways,
+)
 
 
 EPS = 1e-12
@@ -285,17 +283,21 @@ METRIC_INFO = {
 }
 
 def parse_args() -> argparse.Namespace:
+    available_gateways = sorted(get_registered_gateways())
+    default_gateway = DEFAULT_GATEWAY_NAME if DEFAULT_GATEWAY_NAME in available_gateways else (
+        available_gateways[0] if available_gateways else DEFAULT_GATEWAY_NAME
+    )
     parser = argparse.ArgumentParser(
         description="Compare roughness normalisation proposals on dyads/triads."
     )
     parser.add_argument(
         "--dyads-query",
-        default="QUERY_DYADS_REFERENCE",
+        default=DEFAULT_DYADS_QUERY,
         help="Config constant or SQL for dyads (default: QUERY_DYADS_REFERENCE).",
     )
     parser.add_argument(
         "--triads-query",
-        default="QUERY_TRIADS_CORE",
+        default=DEFAULT_TRIADS_QUERY,
         help="Config constant or SQL for triads (default: QUERY_TRIADS_CORE).",
     )
     parser.add_argument(
@@ -307,6 +309,25 @@ def parse_args() -> argparse.Namespace:
         "--population-json",
         default=None,
         help="Ruta a un archivo JSON (registros) con la población ya preparada. Si se especifica, se ignoran las consultas individuales.",
+    )
+    parser.add_argument(
+        "--data-gateway",
+        choices=available_gateways if available_gateways else None,
+        default=default_gateway,
+        help=(
+            "Nombre del gateway de datos a utilizar. Los gateways disponibles se registran"
+            " en services.data_gateway (default: database)."
+        ),
+    )
+    parser.add_argument(
+        "--gateway-option",
+        action="append",
+        default=[],
+        metavar="CLAVE=VALOR",
+        help=(
+            "Parámetros adicionales para el gateway seleccionado (puede repetirse)."
+            " Ejemplo: --gateway-option path=data.csv"
+        ),
     )
     parser.add_argument(
         "--execution-mode",
@@ -377,6 +398,11 @@ def parse_args() -> argparse.Namespace:
             "Por defecto: log_per_pair (recomendado para poblaciones mixtas)."
         ),
     )
+    parser.add_argument(
+        "--no-dedupe",
+        action="store_true",
+        help="Desactiva la deduplicación automática de la población combinada.",
+    )
     return parser.parse_args()
 
 
@@ -395,28 +421,62 @@ def parse_seed_list(seeds_arg: str) -> List[int]:
     return seeds
 
 
+def _coerce_gateway_value(raw_value: str) -> Any:
+    value = raw_value.strip()
+    lower = value.lower()
+    if lower in {"true", "false"}:
+        return lower == "true"
+    try:
+        if any(char in value for char in (".", "e", "E")):
+            return float(value)
+        return int(value)
+    except ValueError:
+        return value
+
+
+def parse_gateway_options(options: Sequence[str]) -> Dict[str, Any]:
+    parsed: Dict[str, Any] = {}
+    for opt in options:
+        if "=" not in opt:
+            raise SystemExit(
+                f"Formato inválido para --gateway-option: '{opt}'. Use clave=valor."
+            )
+        key, raw_value = opt.split("=", 1)
+        key = key.strip()
+        if not key:
+            raise SystemExit("Las opciones de gateway requieren una clave no vacía.")
+        parsed[key] = _coerce_gateway_value(raw_value)
+    return parsed
+
+
 def load_chords(
+    gateway: ExperimentDataGateway,
     dyads_query: str,
     triads_query: str,
     sevenths_query: Optional[str] = None,
     df_override: Optional[pd.DataFrame] = None,
-) -> List[ChordEntry]:
+    *,
+    dedupe: bool = True,
+    templates: Optional[Mapping[Tuple[int, ...], Mapping[str, Any]]] = None,
+) -> Tuple[List[ChordEntry], PopulationResult]:
     if df_override is not None:
-        df_all = df_override.copy()
+        population = gateway.ingest_population(
+            df_override,
+            dedupe=dedupe,
+            source="override",
+        )
     else:
-        executor = QueryExecutor(**config_db)
-        frames: List[pd.DataFrame] = []
-        for query in (dyads_query, triads_query, sevenths_query):
-            if not query:
-                continue
-            sql = resolve_query_sql(query) if query.upper().startswith("QUERY_") else query
-            frames.append(executor.as_pandas(sql))
-        if not frames:
+        query_refs = [q for q in (dyads_query, triads_query, sevenths_query) if q]
+        if not query_refs:
             raise SystemExit("No se proporcionaron consultas válidas ni población precombinada.")
-        df_all = pd.concat(frames, ignore_index=True)
+        try:
+            population = gateway.fetch_population(query_refs, dedupe=dedupe)
+        except (KeyError, FileNotFoundError, ValueError) as exc:
+            raise SystemExit(f"Error al preparar la población: {exc}") from exc
+
+    df_all = population.dataframe.copy()
 
     has_family = "__family_id" in df_all.columns
-    has_family_size = "__family_size" in df_all.columns
     has_inv_flag = "__inv_flag" in df_all.columns
     has_inv_source = "__inv_source_id" in df_all.columns
     has_inv_rotation = "__inv_rotation" in df_all.columns
@@ -424,12 +484,26 @@ def load_chords(
     modelo = ModeloSetharesVec(config={})
     entries: List[ChordEntry] = []
 
+    template_map: Mapping[Tuple[int, ...], Mapping[str, Any]] = templates or {}
+
     for _, row in df_all.iterrows():
         acorde = ChordAdapter.from_csv_row(row)
+        intervals_tuple = tuple(int(step) for step in getattr(acorde, "intervals", []))
         identity_obj = get_chord_type_from_intervals(acorde.intervals, with_alias=True)
         identity_name = getattr(identity_obj, "name", str(identity_obj))
         identity_aliases = tuple(getattr(identity_obj, "aliases", ()))
         is_named = bool(identity_name and identity_name != "Unknown")
+
+        tpl = template_map.get(intervals_tuple)
+        if tpl:
+            tpl_name = tpl.get("name")
+            tpl_aliases = tpl.get("aliases", [])
+            if tpl_name:
+                identity_name = str(tpl_name)
+                is_named = True
+            if tpl_aliases:
+                identity_aliases = tuple(str(alias) for alias in tpl_aliases)
+
         hist, total = modelo.calcular(acorde)
         hist = np.asarray(hist, dtype=float)
         counts = compute_interval_counts(acorde.intervals)
@@ -493,7 +567,7 @@ def load_chords(
                 inversion_rotation=inv_rotation,
             )
         )
-    return entries
+    return entries, population
 
 
 def compute_interval_counts(intervals: Sequence[int]) -> np.ndarray:
@@ -2326,19 +2400,71 @@ def build_sections(ranked_df: pd.DataFrame) -> List[Dict[str, object]]:
 
 def main() -> None:
     args = parse_args()
+    gateway_options = parse_gateway_options(getattr(args, "gateway_option", []))
+    try:
+        data_gateway = create_data_gateway(args.data_gateway, **gateway_options)
+    except (KeyError, ValueError) as exc:
+        raise SystemExit(str(exc))
+
     df_override: Optional[pd.DataFrame] = None
     if getattr(args, "population_json", None):
         df_override = pd.read_json(args.population_json, orient="records", lines=True)
         print(f"[input] Población cargada desde JSON: {args.population_json} ({len(df_override)} filas)")
+
+    dedupe_enabled = not args.no_dedupe
+
+    templates_map: Dict[Tuple[int, ...], Mapping[str, Any]] = {}
+    try:
+        for tpl in data_gateway.get_templates():
+            intervals = tpl.get("intervals")
+            if not intervals:
+                continue
+            try:
+                key = tuple(int(step) for step in intervals)
+            except (TypeError, ValueError):
+                continue
+            templates_map[key] = tpl
+    except Exception:
+        templates_map = {}
+
     timer = TimingRecorder()
 
-    entries = load_chords(
+    entries, population = load_chords(
+        data_gateway,
         args.dyads_query,
         args.triads_query,
         args.sevenths_query,
         df_override=df_override,
+        dedupe=dedupe_enabled,
+        templates=templates_map,
     )
     timer.mark("load_chords")
+
+    pop_stats = population.stats
+    if pop_stats:
+        raw = pop_stats.get("raw_count")
+        final = pop_stats.get("final_count")
+        removed = pop_stats.get("removed", 0)
+        if raw is not None:
+            if dedupe_enabled and final is not None and final != raw:
+                print(f"[población] Registros combinados: {raw} -> {final} (dedupe eliminó {removed}).")
+            else:
+                detail = f" -> {final}" if final is not None and final != raw else ""
+                print(f"[población] Registros combinados: {raw}{detail}")
+        if dedupe_enabled and population.dedupe_key:
+            print(f"[población] Clave de dedupe aplicada: {population.dedupe_key}")
+        before = pop_stats.get("source_counts_before")
+        after = pop_stats.get("source_counts_after")
+        if before:
+            print("[población] Conteo por fuente (antes de dedupe):")
+            for name, count in sorted(before.items()):
+                print(f"  - {name}: {count}")
+        if after:
+            label = "después de dedupe" if dedupe_enabled else "combinado"
+            print(f"[población] Conteo por fuente ({label}):")
+            for name, count in sorted(after.items()):
+                print(f"  - {name}: {count}")
+
     hist, totals, counts, pairs, notes = stack_hist(entries)
     timer.mark("stack_hist")
 
