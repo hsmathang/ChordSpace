@@ -40,7 +40,15 @@ class ColumnProfile(str, Enum):
     def columns(self) -> Tuple[str, ...]:
         base_minimal = ("id", "n", "interval", "notes")
         base_audio = base_minimal + ("frequencies", "octave")
-        base_visual = base_audio + ("tag", "code", "chroma")
+        base_visual = base_audio + (
+            "tag",
+            "code",
+            "chroma",
+            "span_semitones",
+            "abs_mask_int",
+            "abs_mask_hex",
+            "notes_abs_json",
+        )
         mapping: Dict[ColumnProfile, Tuple[str, ...]] = {
             ColumnProfile.MINIMAL: base_minimal,
             ColumnProfile.AUDIO: base_audio,
@@ -84,6 +92,12 @@ class ChordFilters:
     limit: Optional[int] = None
     order_by: Optional[str] = "id"
     sample_strategy: Optional[SampleStrategy] = None
+    span_min: Optional[int] = None
+    span_max: Optional[int] = None
+    include_pitch_classes: Optional[List[int]] = None
+    exclude_pitch_classes: Optional[List[int]] = None
+    interval_exact: Optional[List[int]] = None
+    codes: Optional[List[str]] = None
 
 
 @dataclass
@@ -162,12 +176,29 @@ def build_sql(filters: ChordFilters, profile: ColumnProfile) -> str:
         conditions.append(
             "(SELECT COALESCE(SUM(i), 0) FROM unnest(interval) AS i) <= " + str(int(filters.max_interval_sum))
         )
+    if filters.span_min is not None:
+        conditions.append(f"span_semitones >= {int(filters.span_min)}")
+    if filters.span_max is not None:
+        conditions.append(f"span_semitones <= {int(filters.span_max)}")
+    if filters.interval_exact:
+        conditions.append(f"interval = {_format_interval(filters.interval_exact)}")
+    if filters.codes:
+        codes = ", ".join(f"'{str(code)}'" for code in filters.codes)
+        conditions.append(f"code = ANY(ARRAY[{codes}]::varchar[])")
     if filters.include_ids:
         cond = f"id = ANY(ARRAY[{_format_int_list(filters.include_ids)}]::integer[])"
         conditions.append(cond)
     if filters.exclude_ids:
         cond = f"id <> ALL(ARRAY[{_format_int_list(filters.exclude_ids)}]::integer[])"
         conditions.append(cond)
+    if filters.include_pitch_classes:
+        for pc in filters.include_pitch_classes:
+            idx = int(pc) + 1
+            conditions.append(f"chroma[{idx}] = 1")
+    if filters.exclude_pitch_classes:
+        for pc in filters.exclude_pitch_classes:
+            idx = int(pc) + 1
+            conditions.append(f"chroma[{idx}] = 0")
 
     sql_lines = [f"SELECT {select_expr}", f"FROM chords{sample_clause}"]
     if conditions:
