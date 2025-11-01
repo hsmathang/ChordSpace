@@ -22,7 +22,7 @@ from typing import Dict, List, Optional, Tuple
 
 from tools import experiment_inversions, data_access
 from tools.query_registry import get_all_queries, resolve_query_sql
-from tools.compare_proposals import PROPOSAL_INFO, METRIC_INFO, AVAILABLE_REDUCTIONS, PREPROCESSORS
+from services.proposals import PROPOSAL_INFO, METRIC_INFO, AVAILABLE_REDUCTIONS, PREPROCESSORS
 from tools.population_utils import dedupe_population
 from config import CHORD_TEMPLATES_METADATA
 import subprocess

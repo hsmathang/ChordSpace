@@ -12,20 +12,16 @@ import argparse
 import json
 import time
 from concurrent.futures import ProcessPoolExecutor, ThreadPoolExecutor, as_completed
-from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path
-from typing import Any, Callable, Dict, Iterable, List, Optional, Sequence, Tuple
+from typing import Any, Callable, Dict, Iterable, List, Mapping, Optional, Sequence, Tuple
 
 import os
-def _format_exp(val: float) -> str:
-    return f"{val:.2f}".rstrip("0").rstrip(".")
 
 import numpy as np
 import pandas as pd
 from plotly.io import to_html
-from scipy.ndimage import gaussian_filter1d
-from scipy.spatial.distance import pdist, squareform, jensenshannon
+from scipy.spatial.distance import squareform
 from sklearn.manifold import MDS, TSNE, Isomap
 try:
     import umap  # type: ignore
@@ -45,11 +41,6 @@ try:  # pragma: no cover
 except Exception:
     pass
 
-from config import (
-    QUERY_DYADS_REFERENCE,
-    QUERY_TRIADS_CORE,
-    config_db,
-)
 from lab import kruskal_stress_1
 from metrics import (
     compute_continuity,
@@ -61,6 +52,20 @@ from pre_process import (
     ChordAdapter,
     ModeloSetharesVec,
     get_chord_type_from_intervals,
+)
+from services.data_gateway import (
+    DEFAULT_DYADS_QUERY,
+    DEFAULT_GATEWAY_NAME,
+    DEFAULT_TRIADS_QUERY,
+    ExperimentDataGateway,
+    PopulationResult,
+    create_data_gateway,
+    get_registered_gateways,
+)
+from config import (
+    QUERY_DYADS_REFERENCE,
+    QUERY_TRIADS_CORE,
+    config_db,
 )
 from tools.query_registry import resolve_query_sql
 
@@ -180,158 +185,103 @@ ranked AS (
     FROM chords c
     JOIN seventh_catalog ON c.interval = seventh_catalog.intervals
     WHERE c.n = 4
+from services.proposals import (
+    AVAILABLE_REDUCTIONS,
+    METRIC_INFO,
+    PREPROCESSORS,
+    PROPOSAL_INFO,
 )
-SELECT * FROM ranked WHERE rn = 1 ORDER BY quality, root;
-"""
+from services.proposals.data import (
+    ChordEntry,
+    PopulationLoader,
+    stack_hist,
+)
+from services.proposals.metrics import (
+    BASE_VECTOR_METRICS,
+    aggregate_seed_results,
+    evaluate_mixture_error,
+    evaluate_nn_hits,
+    metric_distance,
+    summarise_embedding_metrics,
+)
+from services.proposals.report import (
+    COLOR_EXPONENTS,
+    COLOR_EXISTING_THRESHOLD,
+    apply_color_mode,
+)
 
 
-@dataclass
-class ChordEntry:
-    acorde: object  # pre_process.Acorde
-    hist: np.ndarray
-    total: float
-    counts: np.ndarray
-    total_pairs: float
-    n_notes: int
-    dyad_bin: Optional[int]
-    identity_name: str
-    identity_aliases: Tuple[str, ...]
-    is_named: bool
-    is_inversion: bool = False
-    family_id: Optional[object] = None
-    inversion_rotation: Optional[int] = None
+EPS = 1e-12
 
+# --------------------------------------------------------------------------- CLI
 
-
-PROPOSAL_INFO = {
-    "simplex": {
-        "title": "Simplex (distribución)",
-        "casual": "Reparte la rugosidad entre las 12 clases de intervalo para identificar qué mezcla de díadas caracteriza al acorde.",
-        "technical": "Normaliza el histograma \(H\) sobre el simplex: \(p_k = H_k / \sum_j H_j\). Las distancias se calculan sobre \(p\), lo que garantiza invariancia a cardinalidad.",
-    },
-    "simplex_sqrt": {
-        "title": "Raíz + simplex",
-        "casual": "Atenúa picos muy grandes antes de normalizar, dejando ver mejor las contribuciones secundarias.",
-        "technical": "Aplica \(\sqrt{H}\) previo al paso al simplex para comprimir amplitudes y estabilizar métricas angulares.",
-    },
-    "simplex_smooth": {
-        "title": "Simplex suavizado",
-        "casual": "Difumina ligeramente la distribución para tolerar intervalos vecinos en la rueda cromática.",
-        "technical": "Convoluciona \(p\) con un kernel Gaussiano circular (\(\sigma = 0.75\)) y renormaliza; evita discontinuidades mod 12.",
-    },
-    "perclass_alpha1": {
-        "title": "Media por clase",
-        "casual": "Promedia la rugosidad de cada tipo de díada sin importar cuántas veces se repita.",
-        "technical": "Divide por la multiplicidad \(m_k\): \(H'_k = H_k / m_k\) y normaliza. Garantiza invariancia a duplicidades por clase.",
-    },
-    "perclass_alpha0_5": {
-        "title": "Media por clase sublineal",
-        "casual": "Reduce el peso de las repeticiones sin eliminarlas por completo.",
-        "technical": "Usa \(H'_k = H_k / m_k^{0.5}\) como descuento sublineal para controlar redundancias fuertes.",
-    },
-
-    "perclass_alpha0_75": {
-        "title": "Media por clase (α=0.75)",
-        "casual": "Descuento sublineal moderado sobre repeticiones de díadas.",
-        "technical": "Usa \(H'_k = H_k / m_k^{0.75}\) para atenuar la multiplicidad sin colapsarla como α=1.",
-    },
-
-    "perclass_alpha0_25": {
-        "title": "Media por clase (α=0.25)",
-        "casual": "Descuento leve, mantiene más la contribución de repeticiones.",
-        "technical": "Usa \(H'_k = H_k / m_k^{0.25}\), apropiado cuando se desea penalización mínima por duplicidad.",
-    },
-    "global_pairs": {
-        "title": "Media global por pares",
-        "casual": "Escala el vector por el número total de díadas; conserva la forma pero reduce la magnitud.",
-        "technical": "Normaliza por \(P = n(n-1)/2\): \(\bar{H} = H/P\). Sirve como baseline que preserva la distribución relativa.",
-    },
-    "divide_mminus1": {
-        "title": "División por \(m-1\)",
-        "casual": "Heurística que intenta penalizar la repetición de díadas restando una unidad.",
-        "technical": "Escala por \(m_k - 1\) cuando \(m_k \ge 2\); se usa como control negativo frente a alternativas más formales.",
-    },
-    "identity": {
-        "title": "Histograma original",
-        "casual": "Usa el vector tal cual lo entrega el modelo de Sethares.",
-        "technical": "Vector bruto \(H\); referencia para medir el efecto de cada normalización.",
-    },
-}
-
-
-METRIC_INFO = {
-    "cosine": {
-        "title": "Cosine",
-        "casual": "Mide el ángulo entre perfiles; importa la forma relativa más que la magnitud.",
-        "technical": "\(d(u,v) = 1 - \frac{u\cdot v}{\|u\|\,\|v\|}\). Adecuado para distribuciones en el simplex.",
-    },
-    "js": {
-        "title": "Jensen–Shannon",
-        "casual": "Compara distribuciones como diferencias de información simétrica.",
-        "technical": "\(d_{JS}(p,q) = \sqrt{\tfrac{1}{2} D_{KL}(p\|m) + \tfrac{1}{2} D_{KL}(q\|m)}\) con \(m = (p+q)/2\); métrica suave y finita.",
-    },
-    "hellinger": {
-        "title": "Hellinger",
-        "casual": "Distancia probabilística equilibrada, robusta a valores pequeños.",
-        "technical": "\(d_H(p,q) = \tfrac{1}{\sqrt{2}}\|\sqrt{p}-\sqrt{q}\|_2\). Equivalente a la euclidiana en raíces.",
-    },
-    "euclidean": {
-        "title": "Euclidiana",
-        "casual": "Mide separaciones directas punto a punto.",
-        "technical": "\(d(u,v) = \|u-v\|_2\). Con vectores normalizados refleja diferencias absolutas por clase.",
-    },
-    "l1": {
-        "title": "Manhattan",
-        "casual": "Suma diferencias absolutas por componente.",
-        "technical": "\(d(u,v) = \|u-v\|_1\).",
-    },
-    "cityblock": {
-        "title": "Manhattan",
-        "casual": "Suma diferencias absolutas por componente.",
-        "technical": "\(d(u,v) = \|u-v\|_1\).",
-    },
-    "manhattan": {
-        "title": "Manhattan",
-        "casual": "Suma diferencias absolutas por componente.",
-        "technical": "\(d(u,v) = \|u-v\|_1\).",
-    },
-}
 
 def parse_args() -> argparse.Namespace:
+    available_gateways = sorted(get_registered_gateways())
+    default_gateway = DEFAULT_GATEWAY_NAME if DEFAULT_GATEWAY_NAME in available_gateways else (
+        available_gateways[0] if available_gateways else DEFAULT_GATEWAY_NAME
+    )
     parser = argparse.ArgumentParser(
         description="Compare roughness normalisation proposals on dyads/triads."
     )
     parser.add_argument(
         "--dyads-query",
-        default="QUERY_DYADS_REFERENCE",
-        help="Config constant or SQL for dyads (default: QUERY_DYADS_REFERENCE).",
+        default=DEFAULT_DYADS_QUERY,
+        help=(
+            "Config constant, custom query or raw SQL for dyads. "
+            "Acepta nombres QUERY_*, prefijos config:/custom: o sql:... "
+            "(default: QUERY_DYADS_REFERENCE)."
+        ),
     )
     parser.add_argument(
         "--triads-query",
-        default="QUERY_TRIADS_CORE",
-        help="Config constant or SQL for triads (default: QUERY_TRIADS_CORE).",
+        default=DEFAULT_TRIADS_QUERY,
+        help=(
+            "Config constant, custom query or raw SQL for triads. "
+            "Acepta nombres QUERY_*, prefijos config:/custom: o sql:... "
+            "(default: QUERY_TRIADS_CORE)."
+        ),
     )
     parser.add_argument(
         "--sevenths-query",
         default=SEVENTHS_DEFAULT_SQL,
-        help="Config constant or SQL for seventh chords (default: built-in catalog).",
+        help="Config constant or SQL para séptimas (default: catálogo interno).",
     )
     parser.add_argument(
         "--population-json",
         default=None,
-        help="Ruta a un archivo JSON (registros) con la población ya preparada. Si se especifica, se ignoran las consultas individuales.",
+        help="Ruta a un archivo JSON (registros) con la población ya preparada.",
+    )
+    parser.add_argument(
+        "--data-gateway",
+        choices=available_gateways if available_gateways else None,
+        default=default_gateway,
+        help=(
+            "Nombre del gateway de datos a utilizar. Los gateways disponibles se registran"
+            " en services.data_gateway (default: database)."
+        ),
+    )
+    parser.add_argument(
+        "--gateway-option",
+        action="append",
+        default=[],
+        metavar="CLAVE=VALOR",
+        help=(
+            "Parámetros adicionales para el gateway seleccionado (puede repetirse)."
+            " Ejemplo: --gateway-option path=data.csv"
+        ),
     )
     parser.add_argument(
         "--execution-mode",
         choices=["deterministic", "parallel"],
         default="deterministic",
-        help="Modo de ejecución: determinista (semillas fijas) o paralelo (sin semilla, usa múltiples núcleos).",
+        help="Modo de ejecución: determinista (semillas fijas) o paralelo (sin semilla).",
     )
     parser.add_argument(
         "--n-jobs",
         type=int,
         default=None,
-        help="Número de procesos para las reducciones (usa -1 para todos los núcleos). Por defecto: 1 en modo determinista, -1 en paralelo.",
+        help="Número de procesos para las reducciones (usa -1 para todos los núcleos).",
     )
     parser.add_argument(
         "--mds-n-init",
@@ -353,13 +303,11 @@ def parse_args() -> argparse.Namespace:
         default="cosine,js,hellinger,euclidean",
         help="Comma separated metrics to evaluate for compatible proposals.",
     )
-    # Reducciones: permitir múltiples métodos (p.ej. MDS,UMAP)
     parser.add_argument(
         "--reductions",
         default="MDS",
         help="Lista separada por comas de métodos de reducción (p.ej. MDS,UMAP).",
     )
-    # Compatibilidad hacia atrás
     parser.add_argument(
         "--reduction",
         default=None,
@@ -385,10 +333,12 @@ def parse_args() -> argparse.Namespace:
         "--color-mode",
         choices=["total", "per_pair", "log_total", "log_per_pair"],
         default="log_per_pair",
-        help=(
-            "Modo de color para el scatter: total bruto, por par, log(total) o log(total/par). "
-            "Por defecto: log_per_pair (recomendado para poblaciones mixtas)."
-        ),
+        help="Modo de color para el scatter: total bruto, por par, log(total) o log(total/par).",
+    )
+    parser.add_argument(
+        "--no-dedupe",
+        action="store_true",
+        help="Desactiva la deduplicación automática de la población combinada.",
     )
     return parser.parse_args()
 
@@ -408,28 +358,62 @@ def parse_seed_list(seeds_arg: str) -> List[int]:
     return seeds
 
 
+def _coerce_gateway_value(raw_value: str) -> Any:
+    value = raw_value.strip()
+    lower = value.lower()
+    if lower in {"true", "false"}:
+        return lower == "true"
+    try:
+        if any(char in value for char in (".", "e", "E")):
+            return float(value)
+        return int(value)
+    except ValueError:
+        return value
+
+
+def parse_gateway_options(options: Sequence[str]) -> Dict[str, Any]:
+    parsed: Dict[str, Any] = {}
+    for opt in options:
+        if "=" not in opt:
+            raise SystemExit(
+                f"Formato inválido para --gateway-option: '{opt}'. Use clave=valor."
+            )
+        key, raw_value = opt.split("=", 1)
+        key = key.strip()
+        if not key:
+            raise SystemExit("Las opciones de gateway requieren una clave no vacía.")
+        parsed[key] = _coerce_gateway_value(raw_value)
+    return parsed
+
+
 def load_chords(
+    gateway: ExperimentDataGateway,
     dyads_query: str,
     triads_query: str,
     sevenths_query: Optional[str] = None,
     df_override: Optional[pd.DataFrame] = None,
-) -> List[ChordEntry]:
+    *,
+    dedupe: bool = True,
+    templates: Optional[Mapping[Tuple[int, ...], Mapping[str, Any]]] = None,
+) -> Tuple[List[ChordEntry], PopulationResult]:
     if df_override is not None:
-        df_all = df_override.copy()
+        population = gateway.ingest_population(
+            df_override,
+            dedupe=dedupe,
+            source="override",
+        )
     else:
-        executor = QueryExecutor(**config_db)
-        frames: List[pd.DataFrame] = []
-        for query in (dyads_query, triads_query, sevenths_query):
-            if not query:
-                continue
-            sql = resolve_query_sql(query) if query.upper().startswith("QUERY_") else query
-            frames.append(executor.as_pandas(sql))
-        if not frames:
+        query_refs = [q for q in (dyads_query, triads_query, sevenths_query) if q]
+        if not query_refs:
             raise SystemExit("No se proporcionaron consultas válidas ni población precombinada.")
-        df_all = pd.concat(frames, ignore_index=True)
+        try:
+            population = gateway.fetch_population(query_refs, dedupe=dedupe)
+        except (KeyError, FileNotFoundError, ValueError) as exc:
+            raise SystemExit(f"Error al preparar la población: {exc}") from exc
+
+    df_all = population.dataframe.copy()
 
     has_family = "__family_id" in df_all.columns
-    has_family_size = "__family_size" in df_all.columns
     has_inv_flag = "__inv_flag" in df_all.columns
     has_inv_source = "__inv_source_id" in df_all.columns
     has_inv_rotation = "__inv_rotation" in df_all.columns
@@ -437,12 +421,26 @@ def load_chords(
     modelo = ModeloSetharesVec(config={})
     entries: List[ChordEntry] = []
 
+    template_map: Mapping[Tuple[int, ...], Mapping[str, Any]] = templates or {}
+
     for _, row in df_all.iterrows():
         acorde = ChordAdapter.from_csv_row(row)
+        intervals_tuple = tuple(int(step) for step in getattr(acorde, "intervals", []))
         identity_obj = get_chord_type_from_intervals(acorde.intervals, with_alias=True)
         identity_name = getattr(identity_obj, "name", str(identity_obj))
         identity_aliases = tuple(getattr(identity_obj, "aliases", ()))
         is_named = bool(identity_name and identity_name != "Unknown")
+
+        tpl = template_map.get(intervals_tuple)
+        if tpl:
+            tpl_name = tpl.get("name")
+            tpl_aliases = tpl.get("aliases", [])
+            if tpl_name:
+                identity_name = str(tpl_name)
+                is_named = True
+            if tpl_aliases:
+                identity_aliases = tuple(str(alias) for alias in tpl_aliases)
+
         hist, total = modelo.calcular(acorde)
         hist = np.asarray(hist, dtype=float)
         counts = compute_interval_counts(acorde.intervals)
@@ -506,7 +504,7 @@ def load_chords(
                 inversion_rotation=inv_rotation,
             )
         )
-    return entries
+    return entries, population
 
 
 def compute_interval_counts(intervals: Sequence[int]) -> np.ndarray:
@@ -554,175 +552,70 @@ def preprocess_simplex_sqrt(hist: np.ndarray, **_) -> Tuple[np.ndarray, np.ndarr
     sqrt_h = np.sqrt(np.clip(hist, 0.0, None))
     dist = l1_normalize(sqrt_h)
     return dist, dist
+) -> List[ChordEntry]:
+    loader = PopulationLoader(QueryExecutor(**config_db))
+    if df_override is not None:
+        return loader.from_dataframe(df_override)
+    return loader.from_queries(dyads_query, triads_query, sevenths_query)
 
+# ======================
+# Color: parámetros y utilidades
+# ======================
+# Esta sección centraliza TODA la lógica y parámetros de normalización de color
+# usada en el reporte (pestañas por modo de color). Si quieres experimentar con:
+#   - usar P (pares) o (P-1),
+#   - usar N (número de notas) o (N-1),
+#   - aplicar log(1+·) o no,
+# haz los cambios aquí y el resto del código los reflejará automáticamente.
 
-def preprocess_simplex_smooth(hist: np.ndarray, sigma: float = 0.75, **_) -> Tuple[np.ndarray, np.ndarray]:
-    base = l1_normalize(hist.copy())
-    smoothed = np.array(
-        [gaussian_filter1d(row, sigma=sigma, mode="wrap") for row in base], dtype=float
-    )
-    dist = l1_normalize(smoothed)
-    return dist, dist
+# --- Configuración compartida por los modos de color ---------------------------
+# La normalización de color se centraliza en ``services.proposals.report``.
+# Aquí solo se mantienen constantes auxiliares para resaltar familias y estilos.
 
-
-def preprocess_per_class(hist: np.ndarray, counts: np.ndarray, alpha: float = 1.0, **_) -> Tuple[np.ndarray, np.ndarray]:
-    """Divide H_k por m_k^alpha sin aplicar normalización L1.
-
-    - X (salida 1): vector 'adjusted' en escala original (para Euclidiana/L1/Cosine).
-    - salida 2 ('simplex') se deja igual a 'adjusted' para que el pipeline
-      pueda decidir si normaliza al usar métricas de distribución.
-    """
-    adjusted = hist.copy()
-    for i in range(adjusted.shape[0]):
-        divisor = np.power(np.clip(counts[i], 1.0, None), alpha)
-        adjusted[i] = adjusted[i] / divisor
-    adjusted = np.clip(adjusted, 0.0, None)
-    return adjusted, adjusted
-
-
-def preprocess_global_pairs(hist: np.ndarray, pairs: np.ndarray, **_) -> Tuple[np.ndarray, np.ndarray]:
-    adjusted = hist / pairs[:, None]
-    dist = l1_normalize(np.clip(adjusted, 0.0, None))
-    return adjusted, dist
-
-
-def preprocess_divide_mminus1(hist: np.ndarray, counts: np.ndarray, **_) -> Tuple[np.ndarray, np.ndarray]:
-    """Heurística 'divide por (m-1)' para penalizar duplicidades.
-
-    Para cada fila (acorde) y cada bin k:
-      - Si m_k >= 2, divide H_k por (m_k - 1).
-      - Si m_k < 2, deja H_k sin cambios (evita divisor 0).
-
-    Retorna:
-      - X = 'adjusted' (vector en escala original, útil para métricas vectoriales como euclidiana/L1),
-      - simplex = L1-normalización de 'adjusted' (para métricas de distribución como JS/Hellinger).
-    """
-    adjusted = hist.copy()
-    for i in range(adjusted.shape[0]):
-        divisor = np.where(counts[i] >= 2.0, counts[i] - 1.0, 1.0)
-        adjusted[i] = adjusted[i] / divisor
-    adjusted = np.clip(adjusted, 0.0, None)
-    dist = l1_normalize(adjusted)
-    return adjusted, dist
-
-
-def preprocess_identity(hist: np.ndarray, **_) -> Tuple[np.ndarray, np.ndarray]:
-    dist = l1_normalize(hist.copy())
-    return hist, dist
-
-
-PREPROCESSORS: Dict[str, Tuple[str, Callable[..., Tuple[np.ndarray, np.ndarray]], Dict[str, float]]] = {
-    "simplex": ("Distribución simplex (H/sum)", preprocess_simplex, {}),
-    "simplex_sqrt": ("Raíz + simplex (sqrt(H))", preprocess_simplex_sqrt, {}),
-    "simplex_smooth": ("Suavizado Gaussiano (σ=0.75) + simplex", preprocess_simplex_smooth, {"sigma": 0.75}),
-    "perclass_alpha1": ("Media por clase (H_k / m_k)", preprocess_per_class, {"alpha": 1.0}),
-    "perclass_alpha0_5": ("Media por clase exponente 0.5", preprocess_per_class, {"alpha": 0.5}),
-    "perclass_alpha0_75": ("Media por clase exponente 0.75", preprocess_per_class, {"alpha": 0.75}),
-    "perclass_alpha0_25": ("Media por clase exponente 0.25", preprocess_per_class, {"alpha": 0.25}),
-    "global_pairs": ("Media global por pares (H / P)", preprocess_global_pairs, {}),
-    "divide_mminus1": ("División por (m-1)", preprocess_divide_mminus1, {}),
-    "identity": ("Identidad (control)", preprocess_identity, {}),
+CARDINALITY_SYMBOLS: Dict[int, Tuple[str, int]] = {
+    2: ("circle", 16),
+    3: ("diamond", 18),
+    4: ("square", 18),
+    5: ("triangle-up", 18),
+    6: ("triangle-down", 18),
+    7: ("hexagon", 18),
+    8: ("star", 18),
+    9: ("x", 18),
+    10: ("cross", 18),
 }
+DEFAULT_CARDINALITY_SYMBOL: Tuple[str, int] = ("circle-open", 16)
+NAMED_BORDER_WIDTH = 0.6
 
+FAMILY_HIGHLIGHT_THRESHOLD: int = 2000
+FAMILY_HIGHLIGHT_SIZE_SCALE: float = 1.35
+FAMILY_HIGHLIGHT_SIZE_DELTA: float = 3.0
+FAMILY_HIGHLIGHT_SELECTED_OPACITY: float = 0.95
+FAMILY_HIGHLIGHT_UNSELECTED_OPACITY_FACTOR: float = 0.25
 
-def metric_distance(metric: str, X: np.ndarray, dist_simplex: np.ndarray) -> np.ndarray:
-    metric = metric.lower()
-    if metric == "cosine":
-        return pdist(X, metric="cosine")
-    if metric == "js":
-        # Asegurar distribuciones válidas (normalizar por fila en el par)
-        def _js(u, v):
-            su = float(np.sum(u))
-            sv = float(np.sum(v))
-            uu = (u / su) if su > 0 else u
-            vv = (v / sv) if sv > 0 else v
-            return jensenshannon(uu, vv, base=2.0)
-        return pdist(dist_simplex, _js)
-    if metric == "hellinger":
-        # Normalizar por fila al vuelo
-        def _norm(u):
-            s = float(np.sum(u))
-            return (u / s) if s > 0 else u
-        root = np.sqrt(np.apply_along_axis(_norm, 1, dist_simplex))
-        return pdist(root, metric="euclidean") / np.sqrt(2.0)
-    if metric in {"euclidean", "l2"}:
-        return pdist(X, metric="euclidean")
-    if metric in {"l1", "cityblock", "manhattan"}:
-        return pdist(X, metric="cityblock")
-    raise ValueError(f"Métrica no soportada: {metric}")
-
-
-AVAILABLE_REDUCTIONS = ("MDS", "UMAP", "TSNE", "ISOMAP")
-
-_PARALLEL_CONTEXT: Dict[str, Any] | None = None
-BASE_VECTOR_METRICS = {"cosine", "euclidean", "l1", "l2", "cityblock", "manhattan"}
-
-
-class TimingRecorder:
-    """Acumula marcas de tiempo consecutivas para reportar duraciones amigables."""
-
-    def __init__(self) -> None:
-        self._marks: List[Tuple[str, float]] = [("start", time.perf_counter())]
-
-    def mark(self, label: str) -> None:
-        self._marks.append((label, time.perf_counter()))
-
-    def summary(self) -> List[Tuple[str, float]]:
-        """Devuelve pares (etapa, duración en segundos) excluyendo la marca inicial."""
-        if len(self._marks) < 2:
-            return []
-        out: List[Tuple[str, float]] = []
-        for idx in range(1, len(self._marks)):
-            label, stamp = self._marks[idx]
-            _, prev_stamp = self._marks[idx - 1]
-            out.append((label, stamp - prev_stamp))
-        return out
-
-    def total(self) -> float:
-        if len(self._marks) < 2:
-            return 0.0
-        return self._marks[-1][1] - self._marks[0][1]
-
-
-def _apply_color_mode(
-    mode: str,
-    exponent: Optional[float],
-    totals_raw: np.ndarray,
-    totals_adjusted: np.ndarray,
-    pairs_arr: np.ndarray,
-    types_arr: np.ndarray,
-) -> Tuple[np.ndarray, str]:
-    """Devuelve (valores normalizados, título de la barra)."""
-    mode_lower = mode.lower()
-
-    def _format_exp(val: float) -> str:
-        return f"{val:.2f}".rstrip("0").rstrip(".")
-
-    if mode_lower == "pair_exp":
-        exp = exponent if exponent is not None else 1.0
-        denom = _safe_denominator(pairs_arr, subtract=COLOR_PER_PAIR_SUBTRACT)
-        denom = np.power(denom, exp)
-        if not np.isclose(COLOR_DEN_EXPONENT, 1.0):
-            denom = np.power(denom, COLOR_DEN_EXPONENT)
-        vals = totals_raw / denom
-        title = f"Total/Pares^{_format_exp(exp)}"
-    elif mode_lower == "types_exp":
-        exp = exponent if exponent is not None else 1.0
-        denom = _safe_denominator(types_arr, subtract=COLOR_PER_EXISTING_SUBTRACT)
-        denom = np.power(denom, exp)
-        if not np.isclose(COLOR_DEN_EXPONENT, 1.0):
-            denom = np.power(denom, COLOR_DEN_EXPONENT)
-        vals = totals_adjusted / denom
-        title = f"Total ajustado/Tipos^{_format_exp(exp)}"
-    elif mode_lower == "raw_total":
-        vals = totals_raw.copy()
-        title = "Total bruto"
-    else:
-        raise ValueError(f"Modo de color no soportado: {mode}")
-
-    if not np.isclose(COLOR_OUTPUT_EXPONENT, 1.0):
-        vals = np.power(np.clip(vals, 0.0, None), COLOR_OUTPUT_EXPONENT)
-    return vals, title
+SEVENTHS_DEFAULT_SQL = """
+WITH seventh_catalog(quality, intervals) AS (
+    VALUES
+        ('Maj7', ARRAY[4,3,4]::integer[]),
+        ('7',    ARRAY[4,3,3]::integer[]),
+        ('m7',   ARRAY[3,4,3]::integer[]),
+        ('m7b5', ARRAY[3,3,4]::integer[]),
+        ('Dim7', ARRAY[3,3,3]::integer[]),
+        ('AugMaj7', ARRAY[4,4,3]::integer[])
+),
+ranked AS (
+    SELECT
+        c.*, seventh_catalog.quality,
+        c.notes[1] AS root,
+        ROW_NUMBER() OVER (
+            PARTITION BY seventh_catalog.quality, c.notes[1]
+            ORDER BY c.octave, c.id
+        ) AS rn
+    FROM chords c
+    JOIN seventh_catalog ON c.interval = seventh_catalog.intervals
+    WHERE c.n = 4
+)
+SELECT * FROM ranked WHERE rn = 1 ORDER BY quality, root;
+"""
 
 
 def _parallel_worker_setup(context: Dict[str, Any]) -> None:
@@ -884,7 +777,7 @@ def _generate_figures(
         fig_title = f"{scenario_name} (seed {figure_seed})"
         figs: List[FigureSpec] = []
         for mode, exponent in color_modes:
-            vals, ctitle = _apply_color_mode(
+            vals, ctitle = apply_color_mode(
                 mode,
                 exponent,
                 totals,
@@ -1021,112 +914,6 @@ def compute_embeddings(
         embedding = reducer.fit_transform(X)
         return embedding
     raise ValueError(f"Reducción no soportada: {reduction}")
-
-
-def top_bins(dist_vector: np.ndarray, top_k: int = 2) -> Tuple[np.ndarray, np.ndarray]:
-    if not np.any(dist_vector > 0):
-        return np.array([], dtype=int), np.array([], dtype=float)
-    idx_sorted = np.argsort(dist_vector)[::-1]
-    idx_sorted = idx_sorted[:top_k]
-    weights = dist_vector[idx_sorted]
-    positive_mask = weights > 0
-    idx_sorted = idx_sorted[positive_mask]
-    weights = weights[positive_mask]
-    return idx_sorted, weights
-
-
-def evaluate_nn_hits(
-    dist_matrix: np.ndarray,
-    entries: List[ChordEntry],
-    simplex: np.ndarray,
-) -> Tuple[Optional[float], Optional[float]]:
-    if not any(e.n_notes == 3 for e in entries):
-        return None, None
-    hits_top1: List[int] = []
-    hits_top2: List[int] = []
-    for idx, entry in enumerate(entries):
-        if entry.n_notes != 3:
-            continue
-        row = dist_matrix[idx].copy()
-        row[idx] = np.inf
-        neighbor = int(np.argmin(row))
-        if entries[neighbor].n_notes != 2:
-            hits_top1.append(0)
-            hits_top2.append(0)
-            continue
-        bins, weights = top_bins(simplex[idx], top_k=2)
-        if bins.size == 0:
-            hits_top1.append(0)
-            hits_top2.append(0)
-            continue
-        target_bins = set(int(b) for b in bins)
-        neighbor_bin = entries[neighbor].dyad_bin
-        hit1 = 1 if neighbor_bin is not None and neighbor_bin == int(bins[0]) else 0
-        hit_any = 1 if neighbor_bin is not None and neighbor_bin in target_bins else 0
-        hits_top1.append(hit1)
-        hits_top2.append(hit_any)
-    if hits_top1:
-        top1_rate = float(np.mean(hits_top1))
-        top2_rate = float(np.mean(hits_top2))
-    else:
-        top1_rate = None
-        top2_rate = None
-    return top1_rate, top2_rate
-
-
-def evaluate_mixture_error(simplex: np.ndarray, entries: List[ChordEntry]) -> Tuple[Optional[float], Optional[float]]:
-    errors: List[float] = []
-    for idx, entry in enumerate(entries):
-        if entry.n_notes != 3:
-            continue
-        bins, weights = top_bins(simplex[idx], top_k=2)
-        if bins.size == 0:
-            continue
-        weights = weights / weights.sum()
-        mixture = np.zeros(12, dtype=float)
-        for bin_idx, weight in zip(bins, weights):
-            mixture[int(bin_idx)] = weight
-        error = float(np.linalg.norm(simplex[idx] - mixture, ord=1))
-        errors.append(error)
-    if not errors:
-        return None, None
-    return float(np.mean(errors)), float(np.max(errors))
-
-
-def summarise_embedding_metrics(
-    X_original: np.ndarray,
-    embedding: np.ndarray,
-    dist_matrix: np.ndarray,
-) -> Dict[str, Optional[float]]:
-    try:
-        trust = float(compute_trustworthiness(X_original, embedding))
-    except Exception:
-        trust = None
-    try:
-        cont = float(compute_continuity(X_original, embedding))
-    except Exception:
-        cont = None
-    try:
-        knn = float(compute_knn_recall(X_original, embedding))
-    except Exception:
-        knn = None
-    try:
-        rank_corr = float(compute_rank_correlation(X_original, embedding))
-    except Exception:
-        rank_corr = None
-    try:
-        stress = float(
-            kruskal_stress_1(dist_matrix, squareform(pdist(embedding, metric="euclidean")))
-        )
-    except Exception:
-        stress = None
-    return {
-        "trustworthiness": trust,
-        "continuity": cont,
-        "knn_recall": knn,
-        "rank_corr": rank_corr,
-        "stress": stress,
-    }
 
 
 def marker_style_for_cardinality(n_notes: int) -> Tuple[str, int]:
@@ -1912,27 +1699,6 @@ def mean_std(values: Sequence[Optional[float]]) -> Tuple[Optional[float], Option
     return float(arr.mean()), float(arr.std(ddof=0))
 
 
-def aggregate_seed_results(seed_rows: List[Dict[str, Optional[float]]], seeds: Sequence[int]) -> Dict[str, object]:
-    metrics_keys = [
-        "nn_hit_top1",
-        "nn_hit_top2",
-        "mixture_l1_mean",
-        "mixture_l1_max",
-        "trustworthiness",
-        "continuity",
-        "knn_recall",
-        "rank_corr",
-        "stress",
-    ]
-    summary: Dict[str, object] = {"seeds": list(seeds)}
-    for key in metrics_keys:
-        values = [row.get(key) for row in seed_rows]
-        mean_val, std_val = mean_std(values)
-        summary[f"{key}_mean"] = mean_val
-        summary[f"{key}_std"] = std_val
-    return summary
-
-
 def build_sections(ranked_df: pd.DataFrame) -> List[Dict[str, object]]:
     sections: List[Dict[str, object]] = []
     for metric, group in ranked_df.groupby("metric"):
@@ -1961,19 +1727,71 @@ def build_sections(ranked_df: pd.DataFrame) -> List[Dict[str, object]]:
 
 def main() -> None:
     args = parse_args()
+    gateway_options = parse_gateway_options(getattr(args, "gateway_option", []))
+    try:
+        data_gateway = create_data_gateway(args.data_gateway, **gateway_options)
+    except (KeyError, ValueError) as exc:
+        raise SystemExit(str(exc))
+
     df_override: Optional[pd.DataFrame] = None
     if getattr(args, "population_json", None):
         df_override = pd.read_json(args.population_json, orient="records", lines=True)
         print(f"[input] Población cargada desde JSON: {args.population_json} ({len(df_override)} filas)")
+
+    dedupe_enabled = not args.no_dedupe
+
+    templates_map: Dict[Tuple[int, ...], Mapping[str, Any]] = {}
+    try:
+        for tpl in data_gateway.get_templates():
+            intervals = tpl.get("intervals")
+            if not intervals:
+                continue
+            try:
+                key = tuple(int(step) for step in intervals)
+            except (TypeError, ValueError):
+                continue
+            templates_map[key] = tpl
+    except Exception:
+        templates_map = {}
+
     timer = TimingRecorder()
 
-    entries = load_chords(
+    entries, population = load_chords(
+        data_gateway,
         args.dyads_query,
         args.triads_query,
         args.sevenths_query,
         df_override=df_override,
+        dedupe=dedupe_enabled,
+        templates=templates_map,
     )
     timer.mark("load_chords")
+
+    pop_stats = population.stats
+    if pop_stats:
+        raw = pop_stats.get("raw_count")
+        final = pop_stats.get("final_count")
+        removed = pop_stats.get("removed", 0)
+        if raw is not None:
+            if dedupe_enabled and final is not None and final != raw:
+                print(f"[población] Registros combinados: {raw} -> {final} (dedupe eliminó {removed}).")
+            else:
+                detail = f" -> {final}" if final is not None and final != raw else ""
+                print(f"[población] Registros combinados: {raw}{detail}")
+        if dedupe_enabled and population.dedupe_key:
+            print(f"[población] Clave de dedupe aplicada: {population.dedupe_key}")
+        before = pop_stats.get("source_counts_before")
+        after = pop_stats.get("source_counts_after")
+        if before:
+            print("[población] Conteo por fuente (antes de dedupe):")
+            for name, count in sorted(before.items()):
+                print(f"  - {name}: {count}")
+        if after:
+            label = "después de dedupe" if dedupe_enabled else "combinado"
+            print(f"[población] Conteo por fuente ({label}):")
+            for name, count in sorted(after.items()):
+                print(f"  - {name}: {count}")
+
     hist, totals, counts, pairs, notes = stack_hist(entries)
     timer.mark("stack_hist")
 
