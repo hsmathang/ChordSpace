@@ -104,8 +104,36 @@ def dedupe_population(df: pd.DataFrame) -> Tuple[pd.DataFrame, str]:
                 return "inv|" + "|".join(parts)
 
             if inv_mask.any():
-                inv_suffix = work.loc[inv_mask].apply(_inv_suffix, axis=1)
-                key_series.loc[inv_mask] = key_series.loc[inv_mask].astype(str) + "|" + inv_suffix
+                base_masks = set()
+                if (~inv_mask).any():
+                    try:
+                        base_masks = set(
+                            work.loc[~inv_mask, "abs_mask_int"]
+                            .dropna()
+                            .astype(int)
+                            .tolist()
+                        )
+                    except Exception:  # pragma: no cover - defensive
+                        base_masks = set()
+
+                inv_rows = work.loc[inv_mask]
+
+                def _needs_suffix(row: pd.Series) -> bool:
+                    mask_val = row.get("abs_mask_int")
+                    if mask_val is None or pd.isna(mask_val):
+                        return True
+                    try:
+                        mask_int = int(mask_val)
+                    except Exception:
+                        return True
+                    return mask_int not in base_masks
+
+                suffix_mask = inv_rows.apply(_needs_suffix, axis=1)
+                if suffix_mask.any():
+                    inv_suffix = inv_rows.loc[suffix_mask].apply(_inv_suffix, axis=1)
+                    key_series.loc[inv_suffix.index] = (
+                        key_series.loc[inv_suffix.index].astype(str) + "|" + inv_suffix
+                    )
 
         work["__dedupe_key__"] = key_series
         dedup = work.drop_duplicates(subset="__dedupe_key__", keep="first").copy()

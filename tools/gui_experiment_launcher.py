@@ -91,8 +91,9 @@ class ExperimentLauncher(tk.Tk):
         self.type_var = tk.StringVar(value="B")
         self.reduction_var = tk.StringVar(value="MDS")
         options = ["<Ninguna>"] + sorted(self.query_registry.keys())
-        # Por defecto no usar consulta base; solo A/B/C a menos que el usuario elija una
-        self.base_query_var = tk.StringVar(value="<Ninguna>")
+        # Por defecto usar QUERY_DYADS_REFERENCE si existe (sigue siendo opcional)
+        default_base = "QUERY_DYADS_REFERENCE" if "QUERY_DYADS_REFERENCE" in self.query_registry else "<Ninguna>"
+        self.base_query_var = tk.StringVar(value=default_base)
         self.output_var = tk.StringVar(value=str(self._default_output_dir()))
 
         self.pop_type_var = tk.StringVar(value="A")
@@ -123,7 +124,7 @@ class ExperimentLauncher(tk.Tk):
     def _init_compare_vars(self) -> None:
         # Proposals: combinación de definidos en PROPOSAL_INFO y PREPROCESSORS
         all_props = sorted(set(PREPROCESSORS.keys()) | set(PROPOSAL_INFO.keys()))
-        default_props = {"baseline_identity", "simplex", "perclass_alpha1"}
+        default_props = {"perclass_alpha0_75"}
         self.proposals_order: list[str] = all_props
         self.proposal_vars: dict[str, tk.BooleanVar] = {
             name: tk.BooleanVar(value=(name in default_props))
@@ -144,10 +145,10 @@ class ExperimentLauncher(tk.Tk):
             for name in metric_keys
         }
 
-        # Reducciones soportadas (todas seleccionadas por defecto)
+        # Reducciones soportadas: por defecto solo MDS
         self.reductions_order: list[str] = list(AVAILABLE_REDUCTIONS)
         self.reduction_vars: dict[str, tk.BooleanVar] = {
-            name: tk.BooleanVar(value=True) for name in self.reductions_order
+            name: tk.BooleanVar(value=(name == "MDS")) for name in self.reductions_order
         }
 
         # Estado para comparación de reducciones (propuesta única)
@@ -173,6 +174,35 @@ class ExperimentLauncher(tk.Tk):
         self.filter_exclude_pcs_var = tk.StringVar(value="")
         self.filter_interval_var = tk.StringVar(value="")
         self.filter_code_var = tk.StringVar(value="")
+        # Nuevos modos para filtros avanzados
+        self.filter_pc_mode_labels = [
+            "Contiene todas",
+            "Contiene alguna",
+            "Subconjunto de",
+        ]
+        self.filter_pc_mode_map = {
+            "Contiene todas": "contains_all",
+            "Contiene alguna": "contains_any",
+            "Subconjunto de": "subset_of",
+        }
+        self.filter_pc_mode_var = tk.StringVar(value=self.filter_pc_mode_labels[0])
+
+        self.filter_interval_mode_labels = [
+            "Exacto",
+            "Subestructura",
+            "Cualquier valor",
+        ]
+        self.filter_interval_mode_map = {
+            "Exacto": "exact",
+            "Subestructura": "subseq",
+            "Cualquier valor": "any_value",
+        }
+        self.filter_interval_mode_var = tk.StringVar(value=self.filter_interval_mode_labels[0])
+
+        # Modo A/B/C aplicado a la poblacion filtrada (independiente de pops conjuntas)
+        default_pop_mode = self.pop_type_var.get() or "B"
+        self.filter_mode_var = tk.StringVar(value=default_pop_mode)
+        self.filter_mode_var.trace_add("write", lambda *_: self._mark_population_dirty())
 
     def _create_layout(self) -> None:
         main = ttk.Frame(self, padding=14)
@@ -215,7 +245,7 @@ class ExperimentLauncher(tk.Tk):
         table_frame = ttk.Frame(pop_container)
         table_frame.pack(fill=tk.BOTH, expand=True, padx=6, pady=(0, 6))
         columns = ("use","id","n","interval","notes","code","bass","octave","tag","span_semitones","abs_mask_int","abs_mask_hex")
-        self.pop_tree = ttk.Treeview(table_frame, columns=columns, show="headings", height=8)
+        self.pop_tree = ttk.Treeview(table_frame, columns=columns, show="headings", height=5)
         for c in columns:
             self.pop_tree.heading(c, text=c)
             self.pop_tree.column(c, width=90 if c != "interval" else 120, anchor="center")
@@ -365,63 +395,98 @@ class ExperimentLauncher(tk.Tk):
         ttk.Button(buttons, text="Limpiar lista", command=self._clear_pops).pack(side=tk.RIGHT)
 
     def _build_filter_frame(self, parent: ttk.Frame) -> None:
-        frame = ttk.LabelFrame(parent, text="Filtros dinámicos")
+        frame = ttk.LabelFrame(parent, text="Filtros dinamicos")
         frame.pack(fill=tk.X, padx=6, pady=(6, 0))
 
         ttk.Checkbutton(
             frame,
             text="Activar filtros personalizados",
             variable=self.filter_enable_var,
-        ).grid(row=0, column=0, columnspan=6, sticky="w")
+        ).grid(row=0, column=0, columnspan=2, sticky="w")
 
         help_text = (
-            "Activa para añadir una población filtrada. "
-            "Cardinalidades hasta 6 notas, span en semitonos, "
-            "pitch classes 0-11 (0=C, 1=C♯, …), intervalos exactos y códigos absolutos."
+            "Activa para agregar una poblacion filtrada. Configura cardinalidades, span en semitonos, "
+            "pitch classes (0-11) y patrones de intervalos (por ejemplo, 3,3; 5,2)."
         )
-        ttk.Label(frame, text=help_text, foreground="#555", wraplength=420, justify="left").grid(
-            row=1, column=0, columnspan=6, sticky="w", pady=(4, 2)
+        ttk.Label(frame, text=help_text, foreground="#555", wraplength=460, justify="left").grid(
+            row=1, column=0, columnspan=2, sticky="w", pady=(4, 2)
         )
 
-        ttk.Label(frame, text="Cardinalidades (2-6):").grid(row=2, column=0, sticky="w", pady=(4, 0))
-        for idx, n in enumerate(sorted(self.filter_cardinality_vars.keys()), start=1):
+        ttk.Label(frame, text="Cardinalidades (2-6):").grid(row=2, column=0, sticky="nw", pady=(4, 0))
+        card_frame = ttk.Frame(frame)
+        card_frame.grid(row=2, column=1, sticky="w", pady=(4, 0))
+        for idx, n in enumerate(sorted(self.filter_cardinality_vars.keys())):
             ttk.Checkbutton(
-                frame,
+                card_frame,
                 text=str(n),
                 variable=self.filter_cardinality_vars[n],
-            ).grid(row=2, column=idx, sticky="w", padx=(2, 2), pady=(4, 0))
+            ).grid(row=0, column=idx, sticky="w", padx=(2, 2))
 
-        ttk.Label(frame, text="Span semitonos (mín):").grid(row=3, column=0, sticky="w", pady=(4, 0))
-        ttk.Entry(frame, textvariable=self.filter_span_min_var, width=6).grid(
-            row=3, column=1, sticky="w", pady=(4, 0)
-        )
-        ttk.Label(frame, text="máx:").grid(row=3, column=2, sticky="e", padx=(12, 2), pady=(4, 0))
-        ttk.Entry(frame, textvariable=self.filter_span_max_var, width=6).grid(
-            row=3, column=3, sticky="w", pady=(4, 0)
-        )
+        ttk.Label(frame, text="Span semitonos (min-max):").grid(row=3, column=0, sticky="w", pady=(4, 0))
+        span_frame = ttk.Frame(frame)
+        span_frame.grid(row=3, column=1, sticky="w", pady=(4, 0))
+        ttk.Entry(span_frame, textvariable=self.filter_span_min_var, width=6).grid(row=0, column=0)
+        ttk.Label(span_frame, text="max:").grid(row=0, column=1, padx=(8, 4))
+        ttk.Entry(span_frame, textvariable=self.filter_span_max_var, width=6).grid(row=0, column=2)
 
-        ttk.Label(frame, text="Incluir pitch classes (0-11):").grid(row=4, column=0, sticky="w", pady=(4, 0))
+        ttk.Label(frame, text="Pitch classes (0-11):").grid(row=4, column=0, sticky="w", pady=(6, 0))
         ttk.Entry(frame, textvariable=self.filter_include_pcs_var).grid(
-            row=4, column=1, columnspan=2, sticky="we", pady=(4, 0)
+            row=4, column=1, sticky="we", pady=(6, 0)
         )
-        ttk.Label(frame, text="Excluir pitch classes:").grid(row=4, column=3, sticky="w", padx=(12, 0), pady=(4, 0))
+        ttk.Label(
+            frame,
+            text="Separadas por coma. Ejemplo: 0,2,3",
+            foreground="#555",
+        ).grid(row=5, column=0, columnspan=2, sticky="w")
+
+        ttk.Label(frame, text="Modo PC:").grid(row=6, column=0, sticky="w", pady=(6, 0))
+        ttk.Combobox(
+            frame,
+            textvariable=self.filter_pc_mode_var,
+            values=self.filter_pc_mode_labels,
+            state="readonly",
+            width=24,
+        ).grid(row=6, column=1, sticky="w", pady=(6, 0))
+
+        ttk.Label(frame, text="Excluir pitch classes (opcional):").grid(row=7, column=0, sticky="w", pady=(6, 0))
         ttk.Entry(frame, textvariable=self.filter_exclude_pcs_var).grid(
-            row=4, column=4, columnspan=2, sticky="we", pady=(4, 0)
+            row=7, column=1, sticky="we", pady=(6, 0)
         )
 
-        ttk.Label(frame, text="Intervalo exacto (ej. 4,3,3):").grid(row=5, column=0, sticky="w", pady=(4, 0))
+        ttk.Label(frame, text="Patrones intervalares (por ejemplo, 3,3; 5,2):").grid(row=8, column=0, sticky="w", pady=(6, 0))
         ttk.Entry(frame, textvariable=self.filter_interval_var).grid(
-            row=5, column=1, columnspan=2, sticky="we", pady=(4, 0)
+            row=8, column=1, sticky="we", pady=(6, 0)
         )
-        ttk.Label(frame, text="Código absoluto (ej. 0135679AB0):").grid(
-            row=5, column=3, sticky="w", padx=(12, 0), pady=(4, 0)
-        )
+        ttk.Label(
+            frame,
+            text="Separa patrones con ';'. Dentro de cada patron usa comas.",
+            foreground="#555",
+        ).grid(row=9, column=0, columnspan=2, sticky="w")
+
+        ttk.Label(frame, text="Modo intervalos:").grid(row=10, column=0, sticky="w", pady=(6, 0))
+        ttk.Combobox(
+            frame,
+            textvariable=self.filter_interval_mode_var,
+            values=self.filter_interval_mode_labels,
+            state="readonly",
+            width=24,
+        ).grid(row=10, column=1, sticky="w", pady=(6, 0))
+
+        ttk.Label(frame, text="Codigos absolutos (ej. 0135679AB0):").grid(row=11, column=0, sticky="w", pady=(6, 0))
         ttk.Entry(frame, textvariable=self.filter_code_var).grid(
-            row=5, column=4, columnspan=2, sticky="we", pady=(4, 0)
+            row=11, column=1, sticky="we", pady=(6, 0)
         )
 
-        for col in range(6):
-            frame.columnconfigure(col, weight=1)
+        ttk.Label(frame, text="Modo para filtros (A/B/C):").grid(row=12, column=0, sticky="w", pady=(8, 0))
+        ttk.Combobox(
+            frame,
+            textvariable=self.filter_mode_var,
+            values=["A", "B", "C"],
+            state="readonly",
+            width=6,
+        ).grid(row=12, column=1, sticky="w", pady=(8, 0))
+
+        frame.columnconfigure(1, weight=1)
 
     
     # ------------------------ comparison report UI
@@ -643,6 +708,13 @@ class ExperimentLauncher(tk.Tk):
         if custom_filters is not None:
             filters, label = custom_filters
             df_filters = data_access.fetch_population(filters, profile=profile, executor=executor).copy()
+            # Aplicar modo A/B/C definido para los filtros personalizados
+            try:
+                filt_mode = (self.filter_mode_var.get() or "A").strip().upper()
+                df_filters = data_access.apply_population_mode(df_filters, filt_mode)
+                label = f"{label} [{filt_mode}]"
+            except Exception:
+                pass
             df_filters["__source__"] = label
             frames.append(df_filters)
 
@@ -732,6 +804,8 @@ class ExperimentLauncher(tk.Tk):
         exclude_pcs_raw = self.filter_exclude_pcs_var.get().strip()
         if include_pcs_raw:
             filters.include_pitch_classes = _parse_pc_list(include_pcs_raw, "Pitch classes a incluir")
+            pc_mode_label = self.filter_pc_mode_var.get().strip()
+            filters.include_pc_mode = self.filter_pc_mode_map.get(pc_mode_label, "contains_all")
         if exclude_pcs_raw:
             filters.exclude_pitch_classes = _parse_pc_list(exclude_pcs_raw, "Pitch classes a excluir")
         if filters.include_pitch_classes and filters.exclude_pitch_classes:
@@ -741,13 +815,34 @@ class ExperimentLauncher(tk.Tk):
 
         interval_raw = self.filter_interval_var.get().strip()
         if interval_raw:
-            try:
-                interval = [int(token.strip()) for token in interval_raw.split(",") if token.strip()]
-            except ValueError:
-                raise ValueError("Intervalo exacto debe ser una lista de enteros separados por comas.")
-            if not interval:
-                raise ValueError("Intervalo exacto no puede estar vacío.")
-            filters.interval_exact = interval
+            mode_label = self.filter_interval_mode_var.get().strip()
+            interval_mode = self.filter_interval_mode_map.get(mode_label, "exact")
+            filters.interval_mode = interval_mode
+            if interval_mode == "any_value":
+                tokens = [t.strip() for t in interval_raw.replace(";", ",").split(",") if t.strip()]
+                try:
+                    values = [int(t) for t in tokens]
+                except ValueError:
+                    raise ValueError("Intervalos (cualquier valor): usa enteros separados por coma o ';'.")
+                if not values:
+                    raise ValueError("Intervalos (cualquier valor) no puede estar vacio.")
+                filters.interval_values = values
+            else:
+                pattern_tokens = [pt.strip() for pt in interval_raw.split(";") if pt.strip()]
+                patterns = []
+                for pt in pattern_tokens:
+                    try:
+                        patt = [int(x.strip()) for x in pt.split(",") if x.strip()]
+                    except ValueError:
+                        raise ValueError("Patrones de intervalos: usa enteros separados por coma y patrones separados por ';'.")
+                    if not patt:
+                        raise ValueError("Patron de intervalos vacio.")
+                    patterns.append(patt)
+                if not patterns:
+                    raise ValueError("Debes ingresar al menos un patron de intervalos.")
+                filters.interval_patterns = patterns
+                if interval_mode == "exact" and len(patterns) == 1:
+                    filters.interval_exact = patterns[0]
 
         code_raw = self.filter_code_var.get().strip()
         if code_raw:
@@ -761,6 +856,8 @@ class ExperimentLauncher(tk.Tk):
             filters.include_pitch_classes,
             filters.exclude_pitch_classes,
             filters.interval_exact,
+            filters.interval_patterns,
+            filters.interval_values,
             filters.codes,
         ]):
             raise ValueError("Configura al menos un criterio en filtros personalizados.")
@@ -775,8 +872,18 @@ class ExperimentLauncher(tk.Tk):
             summary_parts.append("pc+" + ",".join(str(v) for v in filters.include_pitch_classes))
         if filters.exclude_pitch_classes:
             summary_parts.append("pc-" + ",".join(str(v) for v in filters.exclude_pitch_classes))
+        if getattr(filters, "include_pc_mode", None) and filters.include_pc_mode != "contains_all":
+            summary_parts.append(f"pc_mode={filters.include_pc_mode}")
         if filters.interval_exact:
             summary_parts.append("int=" + ",".join(str(v) for v in filters.interval_exact))
+        if getattr(filters, "interval_patterns", None):
+            summary_parts.append(
+                "patrones=" + ";".join(",".join(str(v) for v in pattern) for pattern in filters.interval_patterns)
+            )
+        if getattr(filters, "interval_values", None):
+            summary_parts.append("int_any=" + ",".join(str(v) for v in filters.interval_values))
+        if getattr(filters, "interval_mode", None) and filters.interval_mode not in {"exact", ""}:
+            summary_parts.append(f"int_mode={filters.interval_mode}")
         if filters.codes:
             summary_parts.append("code=" + ",".join(filters.codes))
 
@@ -1470,6 +1577,24 @@ class ExperimentLauncher(tk.Tk):
         self.pops_listbox.delete(0, tk.END)
         self._mark_population_dirty()
 
+    def _mark_population_dirty(self) -> None:
+        """Invalida la previsualizacin para reconstruirla con la configuracin actual."""
+
+        self.population_df = None
+        self.population_selected_rows.clear()
+        self.population_row_ids.clear()
+
+        tree = getattr(self, "pop_tree", None)
+        if tree is not None:
+            for item in tree.get_children():
+                tree.delete(item)
+
+        if hasattr(self, "pop_stats_var"):
+            self.pop_stats_var.set("(poblacin pendiente; pulsa 'Construir / Previsualizar')")
+
+        # Informar en el log de poblacin para facilitar depuracin
+        self._append_pop_log("[poblacin] La configuracin cambi; vuelve a previsualizar.\n")
+
     def _cleanup_temp_payloads(self) -> None:
         if not getattr(self, "_temp_payloads", None):
             return
@@ -1584,3 +1709,4 @@ def main() -> None:
 
 if __name__ == "__main__":
     main()
+

@@ -1363,6 +1363,7 @@ def build_scatter_figure(
         height=420,
         plot_bgcolor="white",
         margin=dict(l=40, r=200, t=64, b=42),
+        showlegend=True,
         legend=dict(
             orientation="v",
             x=1.22,  # más a la derecha del colorbar

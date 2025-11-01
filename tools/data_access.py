@@ -83,6 +83,7 @@ class SampleStrategy:
 class ChordFilters:
     cardinalities: Optional[List[int]] = None
     min_cardinality: Optional[int] = None
+    # Legacy: exact sets list (kept for compatibility)
     interval_sets: Optional[List[List[int]]] = None
     root_values: Optional[List[str]] = None
     tags: Optional[List[str]] = None
@@ -96,8 +97,15 @@ class ChordFilters:
     span_max: Optional[int] = None
     include_pitch_classes: Optional[List[int]] = None
     exclude_pitch_classes: Optional[List[int]] = None
+    # Legacy: single exact interval vector
     interval_exact: Optional[List[int]] = None
     codes: Optional[List[str]] = None
+
+    # New flexible filters
+    include_pc_mode: Optional[str] = None  # one of: contains_all, contains_any, subset_of
+    interval_mode: Optional[str] = None  # one of: exact, subseq, any_value
+    interval_patterns: Optional[List[List[int]]] = None  # multiple patterns
+    interval_values: Optional[List[int]] = None  # for any_value mode
 
 
 @dataclass
@@ -123,8 +131,72 @@ def _normalize_columns(profile: ColumnProfile, df: pd.DataFrame) -> pd.DataFrame
     missing = [col for col in columns if col not in df.columns]
     for col in missing:
         df[col] = None
-    ordered = existing + [col for col in df.columns if col not in columns]
+    ordered = list(columns) + [col for col in df.columns if col not in columns]
     return df.loc[:, ordered]
+
+
+def _rehydrate_profile_columns(
+    df: pd.DataFrame,
+    profile: ColumnProfile,
+    exec_obj,
+) -> pd.DataFrame:
+    """Ensure all profile columns are populated when the upstream query omitted them."""
+
+    columns = profile.columns
+    if not columns or "id" not in df.columns:
+        return df
+
+    try:
+        id_series = pd.to_numeric(df["id"], errors="coerce")
+    except Exception:
+        return df
+
+    try:
+        valid_ids_list = [int(v) for v in id_series.dropna().astype(int).unique().tolist()]
+    except Exception:
+        valid_ids_list = []
+    if not valid_ids_list:
+        return df
+
+    nullish_cols: List[str] = []
+    for col in columns:
+        if col == "id":
+            continue
+        if col not in df.columns:
+            nullish_cols.append(col)
+        else:
+            series = df[col]
+            if series.isna().all():
+                nullish_cols.append(col)
+
+    if not nullish_cols:
+        return df
+
+    cols_sql = ", ".join(["id"] + nullish_cols)
+    try:
+        extra = exec_obj.as_pandas(
+            f"SELECT {cols_sql} FROM chords WHERE id = ANY(%s)",
+            (valid_ids_list,),
+        )
+    except Exception:
+        return df
+
+    if extra.empty:
+        return df
+
+    extra = extra.drop_duplicates(subset=["id"]).set_index("id")
+    id_int = id_series.astype("Int64")
+
+    for col in nullish_cols:
+        if col not in extra.columns:
+            continue
+        if col not in df.columns:
+            df[col] = None
+        replacement = id_int.map(extra[col])
+        if replacement is not None:
+            df[col] = df[col].where(df[col].notna(), replacement)
+
+    return df
 
 
 def _format_int_list(values: Iterable[int]) -> str:
@@ -163,9 +235,56 @@ def build_sql(filters: ChordFilters, profile: ColumnProfile) -> str:
         conditions.append(cond)
     if filters.min_cardinality:
         conditions.append(f"n >= {int(filters.min_cardinality)}")
-    if filters.interval_sets:
-        interval_conditions = [f"interval = {_format_interval(interval)}" for interval in filters.interval_sets]
-        conditions.append("(" + " OR ".join(interval_conditions) + ")")
+    # Interval filters (new modes first)
+    if filters.interval_mode:
+        mode = (filters.interval_mode or "").strip().lower()
+        if mode == "exact":
+            patterns: List[List[int]] = []
+            if filters.interval_patterns:
+                patterns.extend([list(map(int, p)) for p in filters.interval_patterns if p])
+            # Back-compat fallbacks
+            if not patterns and filters.interval_sets:
+                patterns.extend([list(map(int, p)) for p in filters.interval_sets if p])
+            if not patterns and filters.interval_exact:
+                patterns.append(list(map(int, filters.interval_exact)))
+            if patterns:
+                interval_conditions = [f"interval = {_format_interval(p)}" for p in patterns]
+                conditions.append("(" + " OR ".join(interval_conditions) + ")")
+        elif mode == "subseq":
+            patterns = [list(map(int, p)) for p in (filters.interval_patterns or []) if p]
+            subseq_conds: List[str] = []
+            for p in patterns:
+                m = len(p)
+                if m <= 0:
+                    continue
+                arr = _format_interval(p)
+                # exists subarray slice equals pattern
+                subseq_conds.append(
+                    "EXISTS ("
+                    "SELECT 1 FROM generate_subscripts(interval, 1) AS s "
+                    f"WHERE s >= 1 AND s + {m} - 1 <= array_length(interval, 1) "
+                    f"AND interval[s:s+{m}-1] = {arr}"
+                    ")"
+                )
+            if subseq_conds:
+                conditions.append("(" + " OR ".join(subseq_conds) + ")")
+        elif mode == "any_value":
+            values = list(dict.fromkeys(int(v) for v in (filters.interval_values or [])))
+            if not values and filters.interval_patterns:
+                # Interpret single-length patterns as values
+                for p in filters.interval_patterns:
+                    if len(p) == 1:
+                        values.append(int(p[0]))
+            if values:
+                arr_vals = _format_int_list(values)
+                conditions.append(
+                    "EXISTS (SELECT 1 FROM unnest(interval) AS x WHERE x = ANY(ARRAY[" + arr_vals + "]::integer[]))"
+                )
+    else:
+        # Back-compat legacy behavior
+        if filters.interval_sets:
+            interval_conditions = [f"interval = {_format_interval(interval)}" for interval in filters.interval_sets]
+            conditions.append("(" + " OR ".join(interval_conditions) + ")")
     if filters.root_values:
         cond = f"notes[1] = ANY(ARRAY[{_format_str_list(filters.root_values)}])"
         conditions.append(cond)
@@ -191,10 +310,30 @@ def build_sql(filters: ChordFilters, profile: ColumnProfile) -> str:
     if filters.exclude_ids:
         cond = f"id <> ALL(ARRAY[{_format_int_list(filters.exclude_ids)}]::integer[])"
         conditions.append(cond)
+    # Pitch-class filters with modes
     if filters.include_pitch_classes:
-        for pc in filters.include_pitch_classes:
-            idx = int(pc) + 1
-            conditions.append(f"chroma[{idx}] = 1")
+        pcs = [int(pc) for pc in filters.include_pitch_classes]
+        mode = (filters.include_pc_mode or "contains_all").strip().lower()
+        if mode == "contains_any":
+            any_clause = []
+            for pc in pcs:
+                idx = int(pc) + 1
+                any_clause.append(f"chroma[{idx}] = 1")
+            if any_clause:
+                conditions.append("(" + " OR ".join(any_clause) + ")")
+        elif mode == "subset_of":
+            # All positions not in P must be zero
+            allowed = set(pcs)
+            subset_clauses = []
+            for j in range(12):
+                if j not in allowed:
+                    subset_clauses.append(f"chroma[{j+1}] = 0")
+            if subset_clauses:
+                conditions.append("(" + " AND ".join(subset_clauses) + ")")
+        else:  # contains_all (default)
+            for pc in pcs:
+                idx = int(pc) + 1
+                conditions.append(f"chroma[{idx}] = 1")
     if filters.exclude_pitch_classes:
         for pc in filters.exclude_pitch_classes:
             idx = int(pc) + 1
@@ -320,7 +459,8 @@ def fetch_population(
     sql = build_sql(filters, profile)
     exec_obj = executor or get_executor()
     df = exec_obj.as_pandas(sql)
-    return _normalize_columns(profile, df)
+    df = _normalize_columns(profile, df)
+    return _rehydrate_profile_columns(df, profile, exec_obj)
 
 
 def fetch_population_by_name(
@@ -340,7 +480,8 @@ def fetch_population_by_name(
         sql = resolve_query_sql(name)
     exec_obj = executor or get_executor()
     df = exec_obj.as_pandas(sql)
-    return _normalize_columns(profile, df)
+    df = _normalize_columns(profile, df)
+    return _rehydrate_profile_columns(df, profile, exec_obj)
 
 
 def fetch_population_spec(
@@ -352,7 +493,9 @@ def fetch_population_spec(
     if ":" in spec:
         ptype, qname = _parse_pop_spec(spec)
         df = _build_population(ptype, qname)
-        return _normalize_columns(profile, df)
+        df = _normalize_columns(profile, df)
+        exec_obj = executor or get_executor()
+        return _rehydrate_profile_columns(df, profile, exec_obj)
     return fetch_population_by_name(spec, profile=profile, executor=executor)
 
 
@@ -371,3 +514,33 @@ def fetch_population_with_source(
 def build_sql_for_ids(ids: Iterable[int], profile: ColumnProfile = ColumnProfile.FULL) -> str:
     filters = ChordFilters(include_ids=[int(i) for i in ids], order_by="id")
     return build_sql(filters, profile)
+
+
+# --------------------------------------------------------------------------- #
+# Transformations: apply A/B/C population mode to arbitrary DataFrames
+# --------------------------------------------------------------------------- #
+
+
+def apply_population_mode(df: pd.DataFrame, mode: str) -> pd.DataFrame:
+    """Apply population mode A/B/C to an arbitrary chord DataFrame.
+
+    - A: return df unchanged
+    - B: anchored inversions intersected with DB (include original)
+    - C: synthetic inversions (include original)
+    """
+    mode = (mode or "A").strip().upper()
+    if mode == "A":
+        return df
+    if mode == "B":
+        try:
+            from tools import experiment_inversions as ei  # lazy import to avoid cycles
+            return ei.build_inversions_anchored_db(df, include_original=True)
+        except Exception:
+            return df
+    if mode == "C":
+        try:
+            from synth_tools import make_inversions_df, DB_TAG  # type: ignore
+            return make_inversions_df(df, tag=DB_TAG, include_original=True)
+        except Exception:
+            return df
+    return df
