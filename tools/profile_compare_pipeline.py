@@ -40,9 +40,9 @@ from typing import Dict, List, Optional, Sequence
 
 import numpy as np
 
+from services.proposals import AVAILABLE_REDUCTIONS, PREPROCESSORS
+from services.proposals.data import stack_hist
 from tools.compare_proposals import (
-    AVAILABLE_REDUCTIONS,
-    PREPROCESSORS,
     aggregate_seed_results,
     compute_embeddings,
     evaluate_mixture_error,
@@ -50,7 +50,6 @@ from tools.compare_proposals import (
     load_chords,
     metric_distance,
     parse_seed_list,
-    stack_hist,
     summarise_embedding_metrics,
 )
 
