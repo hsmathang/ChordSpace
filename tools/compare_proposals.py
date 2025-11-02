@@ -1746,12 +1746,47 @@ def build_report_html_v2(
         return meta.filterDataset || null;
       }
 
+      function ensureSourceCache(source) {
+        if (!source) {
+          return {cardinality: [], intervalPattern: [], pitchClass: []};
+        }
+        if (!source._filterCache) {
+          const filterValues = source.filterValues || {};
+          const normaliseList = values => {
+            if (!Array.isArray(values)) return [];
+            return values.map(value => (value === null || value === undefined ? null : String(value)));
+          };
+          const cardinality = normaliseList(filterValues.cardinality);
+          const intervalPattern = normaliseList(filterValues.intervalPattern);
+          const pitchClass = Array.isArray(filterValues.pitchClass)
+            ? filterValues.pitchClass.map(entry => {
+                if (Array.isArray(entry)) {
+                  return entry
+                    .filter(value => value !== null && value !== undefined)
+                    .map(value => String(value));
+                }
+                if (entry === null || entry === undefined) {
+                  return [];
+                }
+                return [String(entry)];
+              })
+            : [];
+          source._filterCache = {
+            cardinality,
+            intervalPattern,
+            pitchClass,
+          };
+        }
+        return source._filterCache;
+      }
+
       function applyFiltersToFigure(gd, filters) {
         const dataset = getFilterDataset(gd);
         if (!dataset || !Array.isArray(dataset.traceSources)) return;
         const cardinalFilter = filters.cardinality && filters.cardinality.size ? filters.cardinality : null;
         const intervalFilter = filters.intervalPattern && filters.intervalPattern.size ? filters.intervalPattern : null;
         const pitchFilter = filters.pitchClass && filters.pitchClass.size ? filters.pitchClass : null;
+        const noFilters = !cardinalFilter && !intervalFilter && !pitchFilter;
 
         const updates = {
           x: [],
@@ -1770,24 +1805,36 @@ def build_report_html_v2(
           const textSource = Array.isArray(source.text) ? source.text : [];
           const customSource = Array.isArray(source.customdata) ? source.customdata : [];
           const colorSource = Array.isArray(source.colors) ? source.colors : [];
-          const filterValues = source.filterValues || {};
-          const cardinalVals = Array.isArray(filterValues.cardinality) ? filterValues.cardinality : [];
-          const intervalVals = Array.isArray(filterValues.intervalPattern) ? filterValues.intervalPattern : [];
-          const pitchVals = Array.isArray(filterValues.pitchClass) ? filterValues.pitchClass : [];
+
+          if (noFilters) {
+            const baseMarker = Object.assign({}, source.baseMarker || {});
+            baseMarker.color = colorSource.slice();
+            updates.x.push(xSource.slice());
+            updates.y.push(ySource.slice());
+            updates.text.push(textSource.slice());
+            updates.customdata.push(customSource.slice());
+            updates.marker.push(baseMarker);
+            indices.push(traceIndex);
+            return;
+          }
+
+          const cache = ensureSourceCache(source);
+          const cardinalVals = cache.cardinality;
+          const intervalVals = cache.intervalPattern;
+          const pitchVals = cache.pitchClass;
 
           const selected = [];
           for (let i = 0; i < xSource.length; i++) {
-            const cardVal = String(cardinalVals[i]);
-            const intervalVal = String(intervalVals[i]);
-            if (cardinalFilter && !cardinalFilter.has(cardVal)) continue;
-            if (intervalFilter && !intervalFilter.has(intervalVal)) continue;
-            if (pitchFilter && pitchFilter.size) {
-              const rawPitch = Array.isArray(pitchVals[i]) ? pitchVals[i] : [pitchVals[i]];
+            const cardVal = cardinalVals[i];
+            const intervalVal = intervalVals[i];
+            if (cardinalFilter && (!cardVal || !cardinalFilter.has(cardVal))) continue;
+            if (intervalFilter && (!intervalVal || !intervalFilter.has(intervalVal))) continue;
+            if (pitchFilter) {
+              const rawPitch = Array.isArray(pitchVals[i]) ? pitchVals[i] : [];
               let intersects = false;
               for (let j = 0; j < rawPitch.length; j++) {
                 const pitchVal = rawPitch[j];
-                if (pitchVal === undefined || pitchVal === null) continue;
-                if (pitchFilter.has(String(pitchVal))) {
+                if (pitchFilter.has(pitchVal)) {
                   intersects = true;
                   break;
                 }
@@ -1834,6 +1881,16 @@ def build_report_html_v2(
           intervalPattern: new Set(),
           pitchClass: new Set(),
         };
+        const metadata = {
+          cardinality: new Set(),
+          intervalPattern: new Set(),
+          pitchClass: new Set(),
+        };
+        const controls = {
+          cardinality: new Map(),
+          intervalPattern: new Map(),
+          pitchClass: new Map(),
+        };
 
         function ensureOptionGroup(def, field) {
           if (!def || !Array.isArray(def.options) || !def.options.length) return;
@@ -1842,38 +1899,231 @@ def build_report_html_v2(
           const legend = document.createElement('legend');
           legend.textContent = def.label || field;
           fieldset.appendChild(legend);
-          def.options.forEach(opt => {
+
+          const fieldMetadata = metadata[field] || new Set();
+          metadata[field] = fieldMetadata;
+          const fieldControls = controls[field] || new Map();
+          controls[field] = fieldControls;
+
+          let optionElements = null;
+          let subgroups = null;
+
+          const registerOption = (parent, opt, subgroup = null) => {
+            const idStr = String(opt.id);
+            fieldMetadata.add(idStr);
+
             const checkbox = document.createElement('input');
             checkbox.type = 'checkbox';
-            checkbox.value = String(opt.id);
+            checkbox.value = idStr;
             checkbox.checked = opt.default !== false;
+
             if (checkbox.checked) {
-              state[field].add(String(opt.id));
+              state[field].add(idStr);
             }
+
+            fieldControls.set(idStr, checkbox);
+
             const label = document.createElement('label');
+            label.className = 'filter-option';
+            const labelText = opt.label || opt.id;
+            const rawCount = typeof opt.count === 'number' ? opt.count : NaN;
+            const count = Number.isFinite(rawCount) && rawCount > 0 ? rawCount : null;
+            const searchText = count ? `${labelText} ${count}` : String(labelText);
+            label.dataset.optionText = searchText.toLowerCase();
+
             label.appendChild(checkbox);
-            label.appendChild(document.createTextNode(' ' + (opt.label || opt.id)));
+            const textSpan = document.createElement('span');
+            textSpan.textContent = labelText;
+            label.appendChild(textSpan);
+
+            if (count) {
+              const countSpan = document.createElement('span');
+              countSpan.className = 'option-count';
+              countSpan.textContent = `(${count})`;
+              label.appendChild(countSpan);
+            }
+
             checkbox.addEventListener('change', () => {
-              const val = String(opt.id);
               if (checkbox.checked) {
-                state[field].add(val);
+                state[field].add(idStr);
               } else {
-                state[field].delete(val);
+                state[field].delete(idStr);
               }
               applyAll();
             });
-            fieldset.appendChild(label);
-          });
+
+            parent.appendChild(label);
+            if (optionElements && subgroup) {
+              optionElements.push({label, subgroup});
+            }
+          };
+
+          if (field === 'intervalPattern') {
+            optionElements = [];
+            subgroups = [];
+
+            const setAll = checked => {
+              const fieldState = state[field];
+              if (checked) {
+                fieldState.clear();
+                fieldControls.forEach((checkbox, id) => {
+                  checkbox.checked = true;
+                  fieldState.add(id);
+                });
+              } else {
+                fieldControls.forEach(checkbox => {
+                  checkbox.checked = false;
+                });
+                fieldState.clear();
+              }
+              applyAll();
+            };
+
+            const actions = document.createElement('div');
+            actions.className = 'filter-actions';
+            const selectAllBtn = document.createElement('button');
+            selectAllBtn.type = 'button';
+            selectAllBtn.textContent = 'Seleccionar todo';
+            selectAllBtn.addEventListener('click', () => setAll(true));
+            const clearBtn = document.createElement('button');
+            clearBtn.type = 'button';
+            clearBtn.textContent = 'Limpiar';
+            clearBtn.addEventListener('click', () => setAll(false));
+            actions.appendChild(selectAllBtn);
+            actions.appendChild(clearBtn);
+            fieldset.appendChild(actions);
+
+            const searchWrapper = document.createElement('div');
+            searchWrapper.className = 'filter-search';
+            const searchInput = document.createElement('input');
+            searchInput.type = 'search';
+            searchInput.placeholder = 'Buscar patrón...';
+            searchWrapper.appendChild(searchInput);
+            fieldset.appendChild(searchWrapper);
+
+            const groupsContainer = document.createElement('div');
+            groupsContainer.className = 'filter-subgroup-container';
+            fieldset.appendChild(groupsContainer);
+
+            const groups = new Map();
+            def.options.forEach(opt => {
+              const cardValue = typeof opt.cardinality === 'number' ? opt.cardinality : parseInt(opt.cardinality, 10);
+              const key = Number.isFinite(cardValue) ? String(cardValue) : 'Otros';
+              if (!groups.has(key)) {
+                groups.set(key, []);
+              }
+              groups.get(key).push(opt);
+            });
+
+            const sortedKeys = Array.from(groups.keys()).sort((a, b) => {
+              const aNum = parseInt(a, 10);
+              const bNum = parseInt(b, 10);
+              const aValid = !Number.isNaN(aNum);
+              const bValid = !Number.isNaN(bNum);
+              if (aValid && bValid) return aNum - bNum;
+              if (aValid) return -1;
+              if (bValid) return 1;
+              return String(a).localeCompare(String(b), 'es');
+            });
+
+            sortedKeys.forEach(key => {
+              const opts = groups.get(key) || [];
+              const subgroup = document.createElement('details');
+              subgroup.className = 'filter-subgroup';
+              const keyNum = parseInt(key, 10);
+              const isNumeric = !Number.isNaN(keyNum);
+              const defaultOpen = isNumeric ? keyNum <= 4 : false;
+              subgroup.open = defaultOpen;
+              subgroup.dataset.defaultOpen = defaultOpen ? '1' : '0';
+
+              const summary = document.createElement('summary');
+              const totalCount = opts.reduce((acc, option) => {
+                const raw = typeof option.count === 'number' ? option.count : NaN;
+                return acc + (Number.isFinite(raw) ? raw : 0);
+              }, 0);
+              const parts = [];
+              if (isNumeric) {
+                parts.push(`${keyNum} ${keyNum === 1 ? 'nota' : 'notas'}`);
+              } else {
+                parts.push(key);
+              }
+              parts.push(`${opts.length} ${opts.length === 1 ? 'patrón' : 'patrones'}`);
+              if (totalCount > 0) {
+                parts.push(`${totalCount} ${totalCount === 1 ? 'acorde' : 'acordes'}`);
+              }
+              summary.textContent = parts.join(' · ');
+              subgroup.appendChild(summary);
+
+              const wrapper = document.createElement('div');
+              wrapper.className = 'filter-options-grid';
+              opts.forEach(option => registerOption(wrapper, option, subgroup));
+              subgroup.appendChild(wrapper);
+              groupsContainer.appendChild(subgroup);
+              subgroups.push(subgroup);
+            });
+
+            const handleSearch = () => {
+              const term = searchInput.value.trim().toLowerCase();
+              const visibility = new Map();
+              subgroups.forEach(subgroup => visibility.set(subgroup, false));
+              optionElements.forEach(item => {
+                const text = item.label.dataset.optionText || '';
+                const matches = !term || text.includes(term);
+                item.label.style.display = matches ? '' : 'none';
+                if (matches) {
+                  visibility.set(item.subgroup, true);
+                }
+              });
+              subgroups.forEach(subgroup => {
+                const visible = visibility.get(subgroup);
+                subgroup.style.display = visible ? '' : 'none';
+                subgroup.open = term ? !!visible : subgroup.dataset.defaultOpen === '1';
+              });
+            };
+            searchInput.addEventListener('input', handleSearch);
+          } else {
+            const optionsContainer = document.createElement('div');
+            optionsContainer.className = 'filter-options-vertical';
+            def.options.forEach(opt => registerOption(optionsContainer, opt));
+            fieldset.appendChild(optionsContainer);
+          }
+
           container.appendChild(fieldset);
         }
 
+        const getEffectiveFilter = field => {
+          const selected = state[field];
+          if (!selected || !selected.size) return null;
+          const available = metadata[field];
+          const availableSize = available ? available.size : 0;
+          if (availableSize && selected.size >= availableSize) {
+            return null;
+          }
+          return selected;
+        };
+
+        const buildSignature = filters =>
+          ['cardinality', 'intervalPattern', 'pitchClass']
+            .map(field => {
+              const set = filters[field];
+              if (!set || !set.size) return `${field}:*`;
+              const values = Array.from(set).sort();
+              return `${field}:${values.join(',')}`;
+            })
+            .join('|');
+
         const applyAll = () => {
           const filters = {
-            cardinality: state.cardinality,
-            intervalPattern: state.intervalPattern,
-            pitchClass: state.pitchClass,
+            cardinality: getEffectiveFilter('cardinality'),
+            intervalPattern: getEffectiveFilter('intervalPattern'),
+            pitchClass: getEffectiveFilter('pitchClass'),
           };
-          figures.forEach(gd => applyFiltersToFigure(gd, filters));
+          const signature = buildSignature(filters);
+          figures.forEach(gd => {
+            if (gd.__filterSignature === signature) return;
+            applyFiltersToFigure(gd, filters);
+            gd.__filterSignature = signature;
+          });
         };
 
         const attachUI = dataset => {
@@ -1999,10 +2249,23 @@ def build_report_html_v2(
     .color-controls input[disabled] {{ opacity: 0.5; cursor: not-allowed; }}
     .filter-controls {{ margin: 6px 0 10px 0; padding: 8px 10px; background: #eef3ff; border-radius: 8px; display: flex; flex-wrap: wrap; gap: 12px; align-items: flex-start; }}
     .filter-controls .filter-title {{ font-weight: 600; font-size: 0.88rem; margin-right: 10px; color: #1b2a4b; }}
-    .filter-controls .filter-group {{ border: 1px solid #cfd7f7; border-radius: 6px; padding: 6px 8px; background: #fff; min-width: 160px; }}
+    .filter-controls .filter-group {{ border: 1px solid #cfd7f7; border-radius: 6px; padding: 6px 8px; background: #fff; min-width: 180px; max-width: 320px; }}
     .filter-controls .filter-group legend {{ font-size: 0.82rem; font-weight: 600; color: #3b4260; margin-bottom: 4px; }}
-    .filter-controls .filter-group label {{ display: flex; align-items: center; gap: 4px; font-size: 0.82rem; color: #333; margin-bottom: 4px; }}
-    .filter-controls .filter-group label:last-child {{ margin-bottom: 0; }}
+    .filter-controls .filter-group .filter-option {{ display: flex; align-items: center; gap: 6px; font-size: 0.82rem; color: #333; padding: 2px 0; }}
+    .filter-controls .filter-group .filter-option input {{ margin: 0; }}
+    .filter-controls .filter-group .filter-option span:first-of-type {{ flex: 1 1 auto; min-width: 0; }}
+    .filter-controls .filter-group .filter-option .option-count {{ margin-left: auto; font-size: 0.72rem; color: #4256a6; background: #eef2ff; padding: 1px 6px; border-radius: 12px; }}
+    .filter-controls .filter-group .filter-actions {{ display: flex; gap: 6px; margin: 4px 0 6px 0; flex-wrap: wrap; }}
+    .filter-controls .filter-group .filter-actions button {{ font-size: 0.74rem; padding: 2px 8px; border-radius: 4px; border: 1px solid #95a2d8; background: #f5f7ff; color: #2b3a6f; cursor: pointer; transition: background 0.15s ease; }}
+    .filter-controls .filter-group .filter-actions button:hover {{ background: #e9edff; }}
+    .filter-controls .filter-group .filter-search {{ margin: 4px 0 6px 0; }}
+    .filter-controls .filter-group .filter-search input {{ width: 100%; padding: 4px 6px; font-size: 0.8rem; border: 1px solid #c7d0f2; border-radius: 4px; }}
+    .filter-controls .filter-group .filter-search input:focus {{ outline: none; border-color: #7286d3; box-shadow: 0 0 0 2px rgba(114,134,211,0.2); }}
+    .filter-controls .filter-group .filter-subgroup-container {{ display: flex; flex-direction: column; gap: 6px; }}
+    .filter-controls .filter-group .filter-subgroup {{ border: 1px solid #e0e6ff; border-radius: 6px; padding: 4px 6px; background: #f9fbff; }}
+    .filter-controls .filter-group .filter-subgroup summary {{ cursor: pointer; font-weight: 600; font-size: 0.8rem; color: #1f2a44; }}
+    .filter-controls .filter-group .filter-options-grid {{ display: grid; grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap: 4px 10px; padding: 4px 0 2px 2px; }}
+    .filter-controls .filter-group .filter-options-vertical {{ display: flex; flex-direction: column; gap: 4px; }}
     .highlight-note {{ font-size: 0.82rem; color: #1f4c5c; margin: 6px 0 10px 0; }}
     .highlight-note.muted {{ color: #6a6f7a; font-style: italic; }}
     .detail-panel {{ margin: 8px 0 10px 0; padding: 10px 12px; background: #fffbe6; border: 1px solid #f0d98c; border-radius: 8px; font-size: 0.88rem; min-height: 56px; line-height: 1.35; }}

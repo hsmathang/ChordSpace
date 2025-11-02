@@ -291,6 +291,9 @@ def _build_filter_metadata(
                 "id": pid,
                 "label": data["label"],
                 "default": True,
+                "count": int(data.get("count", 0)),
+                "cardinality": len(data["pattern"]) + 1,
+                "patternLength": len(data["pattern"]),
             }
             for pid, data in sorted(
                 pattern_registry.items(),

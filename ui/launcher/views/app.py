@@ -75,7 +75,23 @@ class ScrollableFrame(ttk.Frame):
         self._canvas.itemconfigure(self._window, width=event.width)
 
     def _on_mousewheel(self, event: tk.Event) -> None:
-        pointer_widget = self.winfo_containing(self.winfo_pointerx(), self.winfo_pointery())
+        try:
+            widget_path = self.tk.call(
+                "winfo",
+                "containing",
+                self.winfo_pointerx(),
+                self.winfo_pointery(),
+            )
+        except tk.TclError:
+            return
+        if not widget_path:
+            return
+        if "popdown" in str(widget_path):
+            return
+        try:
+            pointer_widget = self.nametowidget(widget_path)
+        except KeyError:
+            return
         if pointer_widget is None:
             return
         if not self._is_descendant(pointer_widget):
