@@ -64,6 +64,7 @@ from pre_process import (
     get_chord_type_from_intervals,
 )
 from tools.query_registry import resolve_query_sql
+from visualisations.proposals import build_scatter_payload
 
 try:  # Prefer packaged executor
     from chordcodex.model import QueryExecutor  # type: ignore
@@ -891,6 +892,11 @@ def _generate_figures(
                 title=fig_title,
                 is_proposal=(preproc_id != "identity"),
                 color_title=ctitle,
+                meta={
+                    "scenario": scenario_name,
+                    "mode": mode,
+                    "exponent": exponent,
+                },
             )
             figs.append((f"{scenario_name}||{key}", fig))
         return figs
@@ -1115,283 +1121,30 @@ def build_scatter_figure(
     *,
     is_proposal: bool = False,
     color_title: str = "Color",
+    meta: Optional[Dict[str, Any]] = None,
 ) -> go.Figure:
-    x = embedding[:, 0]
-    y = embedding[:, 1]
-    color_values = np.asarray(color_values, dtype=float)
-    cmin = float(np.min(color_values))
-    cmax = float(np.max(color_values))
-
-    fig = go.Figure()
-    total_points = len(entries)
-
-    family_tags: List[str] = []
-    family_counts: Dict[str, int] = {}
-    highlight_summary: Dict[str, object] = {
-        "enabled": False,
+    highlight_cfg = {
         "threshold": FAMILY_HIGHLIGHT_THRESHOLD,
-        "total_points": total_points,
-        "families": 0,
         "size_scale": FAMILY_HIGHLIGHT_SIZE_SCALE,
         "size_delta": FAMILY_HIGHLIGHT_SIZE_DELTA,
         "selected_opacity": FAMILY_HIGHLIGHT_SELECTED_OPACITY,
         "fade_factor": FAMILY_HIGHLIGHT_UNSELECTED_OPACITY_FACTOR,
-        "has_inversions": any(e.is_inversion for e in entries),
     }
-    customdata_all: List[List[object]] = []
-
-    if total_points:
-        def _normalize_family(raw_value: Optional[object], idx: int) -> str:
-            if raw_value is None:
-                return f"__solo_{idx}"
-            if isinstance(raw_value, float) and np.isnan(raw_value):
-                return f"__solo_{idx}"
-            return str(raw_value)
-
-        for idx, entry in enumerate(entries):
-            tag = _normalize_family(entry.family_id, idx)
-            family_tags.append(tag)
-            family_counts[tag] = family_counts.get(tag, 0) + 1
-
-        families_with_links = sum(1 for count in family_counts.values() if count > 1)
-        highlight_enabled = (
-            total_points <= FAMILY_HIGHLIGHT_THRESHOLD and families_with_links > 0
-        )
-        highlight_summary.update(
-            {
-                "enabled": highlight_enabled,
-                "families": int(families_with_links),
-            }
-        )
-    else:
-        highlight_enabled = False
-
-    detail_texts: List[str] = []
-    summary_texts: List[str] = []
-    for idx in range(total_points):
-        fam_size = family_counts.get(family_tags[idx], 1)
-        detail_texts.append(
-            build_hover(
-                entries[idx],
-                vectors[idx],
-                adjusted_vectors[idx],
-                color_values[idx],
-                color_title,
-                int(round(pair_counts[idx])),
-                int(round(type_counts[idx])),
-                is_proposal=is_proposal,
-                family_size=fam_size,
-            )
-        )
-        summary_texts.append(
-            build_hover_summary(
-                entries[idx],
-                fam_size,
-                color_values[idx],
-                color_title,
-            )
-        )
-
-    customdata_all = [
-        [
-            family_tags[i],
-            1 if entries[i].is_inversion else 0,
-            family_counts.get(family_tags[i], 1),
-            summary_texts[i],
-            detail_texts[i],
-        ]
-        for i in range(total_points)
-    ]
-
-    def _base_marker_params(count: int) -> Tuple[float, float]:
-        # Tamaño máximo para datasets pequeños y mínimo para muy grandes.
-        if count <= 40:
-            return 20.0, 0.5
-        if count >= 1000:
-            return 6.0, 0.2
-        # Interpolación lineal entre 40 y 1000
-        frac = (count - 40) / (1000 - 40)
-        size = 20.0 - frac * (20.0 - 6.0)
-        opacity = 0.5 - frac * (0.5 - 0.2)
-        return max(size, 4.0), max(min(opacity, 0.5), 0.2)
-
-    def _highlight_markers(base_size: float, base_opacity: float) -> Tuple[Dict[str, object], Dict[str, object]]:
-        selected_size = max(base_size * FAMILY_HIGHLIGHT_SIZE_SCALE, base_size + FAMILY_HIGHLIGHT_SIZE_DELTA)
-        selected_opacity = min(1.0, max(FAMILY_HIGHLIGHT_SELECTED_OPACITY, base_opacity + 0.35))
-        unselected_opacity = max(0.05, base_opacity * FAMILY_HIGHLIGHT_UNSELECTED_OPACITY_FACTOR)
-        selected_marker: Dict[str, object] = {
-            "size": selected_size,
-            "opacity": selected_opacity,
-        }
-        unselected_marker: Dict[str, object] = {
-            "opacity": unselected_opacity,
-        }
-        return selected_marker, unselected_marker
-
-    def _symbol_for_cardinality(n: int) -> str:
-        if n == 3:
-            return "triangle-up"
-        if n == 4:
-            return "square"
-        if n == 5:
-            return "star"
-        return "circle"
-
-    def _size_for_cardinality(_n: int, base: float) -> float:
-        return base
-
-    base_size, base_opacity = _base_marker_params(total_points)
-
-    named_groups = {
-        "Diadas": [],
-        "Triadas": [],
-        "Séptimas": [],
-        "Extensiones": [],
-    }
-    unnamed_groups: Dict[str, List[int]] = {
-        "3 notas": [],
-        "4 notas": [],
-        "5 notas": [],
-        "Más de 5 notas": [],
-    }
-
-    def _classify_named(entry: ChordEntry) -> Optional[str]:
-        if not entry.is_named:
-            return None
-        n = entry.n_notes
-        name = (entry.identity_name or "").lower()
-        if n == 2:
-            return "Diadas"
-        if n == 3:
-            return "Triadas"
-        if n == 4 and "7" in name:
-            return "Séptimas"
-        return "Extensiones"
-
-    for idx, entry in enumerate(entries):
-        category = _classify_named(entry)
-        if category is not None:
-            named_groups[category].append(idx)
-            continue
-        if entry.n_notes == 3:
-            unnamed_groups["3 notas"].append(idx)
-        elif entry.n_notes == 4:
-            unnamed_groups["4 notas"].append(idx)
-        elif entry.n_notes == 5:
-            unnamed_groups["5 notas"].append(idx)
-        else:
-            unnamed_groups["Más de 5 notas"].append(idx)
-
-    named_symbol_map = {
-        "Diadas": "diamond",
-        "Triadas": "triangle-down",
-        "Séptimas": "square",
-        "Extensiones": "cross",
-    }
-
-    named_size = max(base_size + 2.5, base_size * 1.2, 8.0)
-    named_opacity = min(0.9, base_opacity + 0.25)
-
-    for label in ["Diadas", "Triadas", "Séptimas", "Extensiones"]:
-        idxs = named_groups[label]
-        if not idxs:
-            continue
-        base_marker = dict(
-            symbol=named_symbol_map[label],
-            size=named_size,
-            color=color_values[idxs],
-            colorscale="Turbo",
-            cmin=cmin,
-            cmax=cmax,
-            coloraxis="coloraxis",
-            opacity=named_opacity,
-            line=dict(width=0),
-        )
-        trace_kwargs: Dict[str, object] = {
-            "x": x[idxs],
-            "y": y[idxs],
-            "mode": "markers",
-            "name": f"{label} ({len(idxs)})",
-            "marker": base_marker,
-            "text": [summary_texts[i] for i in idxs],
-            "customdata": [customdata_all[i] for i in idxs],
-            "hovertemplate": "%{text}<extra></extra>",
-        }
-        if highlight_enabled:
-            selected_marker, unselected_marker = _highlight_markers(named_size, named_opacity)
-            trace_kwargs["selected"] = {"marker": selected_marker}
-            trace_kwargs["unselected"] = {"marker": unselected_marker}
-        fig.add_trace(go.Scatter(**trace_kwargs))
-
-    unnamed_symbol_map = {
-        "3 notas": "triangle-up",
-        "4 notas": "x",
-        "5 notas": "star",
-        "Más de 5 notas": "circle",
-    }
-
-    for label in ["3 notas", "4 notas", "5 notas", "Más de 5 notas"]:
-        idxs = unnamed_groups[label]
-        if not idxs:
-            continue
-        unnamed_size = _size_for_cardinality(0, base_size)
-        base_marker = dict(
-            symbol=unnamed_symbol_map[label],
-            size=unnamed_size,
-            color=color_values[idxs],
-            colorscale="Turbo",
-            cmin=cmin,
-            cmax=cmax,
-            coloraxis="coloraxis",
-            opacity=base_opacity,
-            line=dict(width=0),
-        )
-        trace_kwargs = {
-            "x": x[idxs],
-            "y": y[idxs],
-            "mode": "markers",
-            "name": f"{label} ({len(idxs)})",
-            "marker": base_marker,
-            "text": [summary_texts[i] for i in idxs],
-            "customdata": [customdata_all[i] for i in idxs],
-            "hovertemplate": "%{text}<extra></extra>",
-        }
-        if highlight_enabled:
-            selected_marker, unselected_marker = _highlight_markers(unnamed_size, base_opacity)
-            trace_kwargs["selected"] = {"marker": selected_marker}
-            trace_kwargs["unselected"] = {"marker": unselected_marker}
-        fig.add_trace(go.Scatter(**trace_kwargs))
-
-    fig.update_layout(
+    payload = build_scatter_payload(
+        embedding=embedding,
+        entries=entries,
+        color_values=color_values,
+        pair_counts=pair_counts,
+        type_counts=type_counts,
+        vectors=vectors,
+        adjusted_vectors=adjusted_vectors,
         title=title,
-        width=640,
-        height=420,
-        plot_bgcolor="white",
-        margin=dict(l=40, r=200, t=64, b=42),
-        showlegend=True,
-        legend=dict(
-            orientation="v",
-            x=1.22,  # más a la derecha del colorbar
-            y=0.5,
-            xanchor="left",
-            yanchor="middle",
-            bgcolor="rgba(255,255,255,0.90)",
-            bordercolor="#ccc",
-            borderwidth=1,
-            font=dict(size=11),
-        ),
-        xaxis=dict(visible=False),
-        yaxis=dict(visible=False),
-        coloraxis=dict(
-            colorscale="Turbo",
-            cmin=cmin,
-            cmax=cmax,
-            colorbar=dict(title=color_title, thickness=14, len=0.75, x=1.08),
-        ),
-        meta={"familyHighlight": highlight_summary},
+        color_title=color_title,
+        is_proposal=is_proposal,
+        highlight=highlight_cfg,
+        meta=meta,
     )
-    return fig
-
+    return go.Figure(data=payload["data"], layout=payload["layout"])
 
 def _format_vec(vec: np.ndarray, *, precision: int = 2, max_len: int = 12) -> str:
     slice_vec = vec[:max_len]
@@ -1987,6 +1740,160 @@ def build_report_html_v2(
         applySelection(null);
       }
 
+      function getFilterDataset(gd) {
+        if (!gd || !gd.layout || !gd.layout.meta) return null;
+        const meta = gd.layout.meta;
+        return meta.filterDataset || null;
+      }
+
+      function applyFiltersToFigure(gd, filters) {
+        const dataset = getFilterDataset(gd);
+        if (!dataset || !Array.isArray(dataset.traceSources)) return;
+        dataset.traceSources.forEach(source => {
+          const traceIndex = typeof source.traceIndex === 'number' ? source.traceIndex : parseInt(source.traceIndex, 10);
+          if (!Number.isFinite(traceIndex)) return;
+          const namedFilter = filters.named && filters.named.size ? filters.named : null;
+          const inversionFilter = filters.inversion && filters.inversion.size ? filters.inversion : null;
+          const cardinalFilter = filters.cardinality && filters.cardinality.size ? filters.cardinality : null;
+          const familyFilter = filters.families && filters.families.size ? filters.families : null;
+          const namedVals = (source.filterValues && source.filterValues.named) || [];
+          const inversionVals = (source.filterValues && source.filterValues.inversion) || [];
+          const cardinalVals = (source.filterValues && source.filterValues.cardinality) || [];
+          const familyVals = (source.filterValues && source.filterValues.family) || [];
+          const x = [];
+          const y = [];
+          const text = [];
+          const custom = [];
+          const colors = [];
+          const total = Array.isArray(source.x) ? source.x.length : 0;
+          for (let i = 0; i < total; i++) {
+            const namedVal = String(namedVals[i]);
+            const inversionVal = String(inversionVals[i]);
+            const cardVal = String(cardinalVals[i]);
+            const famVal = String(familyVals[i]);
+            if (namedFilter && !namedFilter.has(namedVal)) continue;
+            if (inversionFilter && !inversionFilter.has(inversionVal)) continue;
+            if (cardinalFilter && !cardinalFilter.has(cardVal)) continue;
+            if (familyFilter && !familyFilter.has(famVal)) continue;
+            x.push(source.x[i]);
+            y.push(source.y[i]);
+            text.push(source.text[i]);
+            custom.push(source.customdata[i]);
+            colors.push(source.colors[i]);
+          }
+          const baseMarker = Object.assign({}, source.baseMarker || {});
+          baseMarker.color = colors;
+          Plotly.restyle(gd, {
+            x: [x],
+            y: [y],
+            text: [text],
+            customdata: [custom],
+            marker: [baseMarker],
+          }, [traceIndex]);
+        });
+      }
+
+      function registerCardFilters(card) {
+        const figures = Array.from(card.querySelectorAll('.js-plotly-plot'));
+        if (!figures.length) return;
+        const detailPanel = card.querySelector('.detail-panel');
+        const container = document.createElement('div');
+        container.className = 'filter-controls';
+        const title = document.createElement('span');
+        title.className = 'filter-title';
+        title.textContent = 'Filtros dinámicos';
+        container.appendChild(title);
+        if (detailPanel) {
+          card.insertBefore(container, detailPanel);
+        } else {
+          card.appendChild(container);
+        }
+
+        const state = {
+          named: new Set(),
+          inversion: new Set(),
+          cardinality: new Set(),
+          families: new Set(),
+        };
+
+        function ensureOptionGroup(def, field) {
+          if (!def || !Array.isArray(def.options) || !def.options.length) return;
+          const fieldset = document.createElement('fieldset');
+          fieldset.className = 'filter-group';
+          const legend = document.createElement('legend');
+          legend.textContent = def.label || field;
+          fieldset.appendChild(legend);
+          def.options.forEach(opt => {
+            const checkbox = document.createElement('input');
+            checkbox.type = 'checkbox';
+            checkbox.value = String(opt.id);
+            checkbox.checked = opt.default !== false;
+            if (checkbox.checked) {
+              state[field].add(String(opt.id));
+            }
+            const label = document.createElement('label');
+            label.appendChild(checkbox);
+            label.appendChild(document.createTextNode(' ' + (opt.label || opt.id)));
+            checkbox.addEventListener('change', () => {
+              const val = String(opt.id);
+              if (checkbox.checked) {
+                state[field].add(val);
+              } else {
+                state[field].delete(val);
+              }
+              applyAll();
+            });
+            fieldset.appendChild(label);
+          });
+          container.appendChild(fieldset);
+        }
+
+        const applyAll = () => {
+          const filters = {
+            named: state.named,
+            inversion: state.inversion,
+            cardinality: state.cardinality,
+            families: state.families,
+          };
+          figures.forEach(gd => applyFiltersToFigure(gd, filters));
+        };
+
+        const attachUI = dataset => {
+          const fields = dataset && dataset.fields ? dataset.fields : {};
+          ensureOptionGroup(fields.named, 'named');
+          ensureOptionGroup(fields.inversion, 'inversion');
+          ensureOptionGroup(fields.cardinality, 'cardinality');
+        };
+
+        let pending = figures.length;
+        figures.forEach(gd => {
+          const dataset = getFilterDataset(gd);
+          if (dataset) {
+            pending -= 1;
+            if (pending === figures.length - 1) {
+              attachUI(dataset);
+            }
+            if (pending === 0) {
+              applyAll();
+            }
+          } else {
+            const handler = () => {
+              const ds = getFilterDataset(gd);
+              if (!ds) return;
+              gd.removeListener('plotly_afterplot', handler);
+              pending -= 1;
+              if (pending === figures.length - 1) {
+                attachUI(ds);
+              }
+              if (pending === 0) {
+                applyAll();
+              }
+            };
+            gd.on('plotly_afterplot', handler);
+          }
+        });
+      }
+
       function registerCardHighlight(card) {
         if (!card || card.dataset.familyHighlight !== '1') return;
         const figures = card.querySelectorAll('.js-plotly-plot');
@@ -2031,6 +1938,7 @@ def build_report_html_v2(
       }
 
       document.querySelectorAll('.plot-card').forEach(card => {
+        registerCardFilters(card);
         registerCardHighlight(card);
         registerCardDetail(card);
       });
@@ -2071,6 +1979,12 @@ def build_report_html_v2(
     .color-controls {{ margin: 8px 0 10px 0; display: flex; gap: 16px; align-items: center; }}
     .color-controls label {{ font-size: 0.9rem; color: #333; }}
     .color-controls input[disabled] {{ opacity: 0.5; cursor: not-allowed; }}
+    .filter-controls {{ margin: 6px 0 10px 0; padding: 8px 10px; background: #eef3ff; border-radius: 8px; display: flex; flex-wrap: wrap; gap: 12px; align-items: flex-start; }}
+    .filter-controls .filter-title {{ font-weight: 600; font-size: 0.88rem; margin-right: 10px; color: #1b2a4b; }}
+    .filter-controls .filter-group {{ border: 1px solid #cfd7f7; border-radius: 6px; padding: 6px 8px; background: #fff; min-width: 160px; }}
+    .filter-controls .filter-group legend {{ font-size: 0.82rem; font-weight: 600; color: #3b4260; margin-bottom: 4px; }}
+    .filter-controls .filter-group label {{ display: flex; align-items: center; gap: 4px; font-size: 0.82rem; color: #333; margin-bottom: 4px; }}
+    .filter-controls .filter-group label:last-child {{ margin-bottom: 0; }}
     .highlight-note {{ font-size: 0.82rem; color: #1f4c5c; margin: 6px 0 10px 0; }}
     .highlight-note.muted {{ color: #6a6f7a; font-style: italic; }}
     .detail-panel {{ margin: 8px 0 10px 0; padding: 10px 12px; background: #fffbe6; border: 1px solid #f0d98c; border-radius: 8px; font-size: 0.88rem; min-height: 56px; line-height: 1.35; }}

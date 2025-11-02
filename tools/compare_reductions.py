@@ -148,6 +148,12 @@ def _prepare_color_panels(
             title=fig_title,
             is_proposal=(preproc_id != "identity"),
             color_title=ctitle,
+            meta={
+                "scenario": scenario_name,
+                "mode": mode,
+                "exponent": exponent,
+                "reduction": reduction,
+            },
         )
         figures.append((f"{scenario_name}||{reduction}||{key}", fig))
 

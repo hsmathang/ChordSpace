@@ -6,6 +6,7 @@ import plotly.graph_objects as go
 
 from visualisations.proposals import (
     FigureSpec,
+    apply_scatter_filters,
     build_board_index,
     build_scatter_payload,
 )
@@ -46,18 +47,39 @@ class DummyEntry:
 def build_sample_entries() -> List[DummyEntry]:
     return [
         DummyEntry("Cmaj7", [4, 3, 4], [0.5, 0.3, 0.2], family_id="Fam1", aliases=["CM7"]),
-        DummyEntry("C7/E", [4, 3, 3], [0.4, 0.4, 0.1], family_id="Fam1", is_inversion=True, inversion_rotation=1),
+        DummyEntry(
+            "C7/E",
+            [4, 3, 3],
+            [0.4, 0.4, 0.1],
+            family_id="Fam1",
+            is_inversion=True,
+            inversion_rotation=1,
+        ),
+        DummyEntry(
+            "Unknown",
+            [3, 3],
+            [0.2, 0.6, 0.2],
+            family_id="Fam2",
+            is_named=False,
+            identity="",
+        ),
     ]
 
 
 def test_build_scatter_payload_returns_serialisable_dict():
     entries = build_sample_entries()
-    embedding = np.array([[0.0, 0.1], [0.2, 0.3]])
-    vectors = np.array([[0.5, 0.3, 0.2], [0.4, 0.4, 0.1]])
+    embedding = np.array([[0.0, 0.1], [0.2, 0.3], [0.4, 0.5]])
+    vectors = np.array(
+        [
+            [0.5, 0.3, 0.2],
+            [0.4, 0.4, 0.1],
+            [0.2, 0.6, 0.2],
+        ]
+    )
     adjusted = vectors * 1.1
-    color_values = np.array([0.8, 0.6])
-    pair_counts = np.array([4.0, 5.0])
-    type_counts = np.array([3.0, 2.0])
+    color_values = np.array([0.8, 0.6, 0.4])
+    pair_counts = np.array([4.0, 5.0, 3.0])
+    type_counts = np.array([3.0, 2.0, 2.0])
 
     payload = build_scatter_payload(
         embedding=embedding,
@@ -79,18 +101,33 @@ def test_build_scatter_payload_returns_serialisable_dict():
     assert payload["meta"]["scenario"] == "demo"
     assert payload["meta"]["mode"] == "raw_total"
     assert payload["data"][0]["customdata"], "customdata should carry hover details"
+    assert "filterDataset" in payload["meta"]
+    dataset = payload["meta"]["filterDataset"]
+    assert dataset["traceSources"], "expected trace sources for filter operations"
 
 
 def test_figurespec_materialises_plotly_figures():
     entries = build_sample_entries()
     payload = build_scatter_payload(
-        embedding=np.array([[0.0, 0.0], [1.0, 1.0]]),
+        embedding=np.array([[0.0, 0.0], [1.0, 1.0], [0.5, 0.75]]),
         entries=entries,
-        color_values=np.array([0.1, 0.9]),
-        pair_counts=np.array([3.0, 4.0]),
-        type_counts=np.array([2.0, 2.0]),
-        vectors=np.array([[0.2, 0.3, 0.5], [0.1, 0.2, 0.7]]),
-        adjusted_vectors=np.array([[0.22, 0.33, 0.55], [0.11, 0.22, 0.77]]),
+        color_values=np.array([0.1, 0.9, 0.3]),
+        pair_counts=np.array([3.0, 4.0, 2.0]),
+        type_counts=np.array([2.0, 2.0, 1.0]),
+        vectors=np.array(
+            [
+                [0.2, 0.3, 0.5],
+                [0.1, 0.2, 0.7],
+                [0.15, 0.25, 0.6],
+            ]
+        ),
+        adjusted_vectors=np.array(
+            [
+                [0.22, 0.33, 0.55],
+                [0.11, 0.22, 0.77],
+                [0.165, 0.275, 0.66],
+            ]
+        ),
         title="Spec",
         color_title="Total",
         is_proposal=False,
@@ -117,13 +154,25 @@ def test_figurespec_materialises_plotly_figures():
 def test_board_index_handles_optional_reductions():
     entries = build_sample_entries()
     payload = build_scatter_payload(
-        embedding=np.array([[0.0, 0.0], [0.1, 0.2]]),
+        embedding=np.array([[0.0, 0.0], [0.1, 0.2], [0.3, 0.4]]),
         entries=entries,
-        color_values=np.array([0.1, 0.2]),
-        pair_counts=np.array([3.0, 3.0]),
-        type_counts=np.array([1.0, 1.0]),
-        vectors=np.array([[0.1, 0.2, 0.3], [0.2, 0.2, 0.2]]),
-        adjusted_vectors=np.array([[0.11, 0.22, 0.33], [0.22, 0.22, 0.22]]),
+        color_values=np.array([0.1, 0.2, 0.3]),
+        pair_counts=np.array([3.0, 3.0, 2.0]),
+        type_counts=np.array([1.0, 1.0, 1.0]),
+        vectors=np.array(
+            [
+                [0.1, 0.2, 0.3],
+                [0.2, 0.2, 0.2],
+                [0.15, 0.25, 0.35],
+            ]
+        ),
+        adjusted_vectors=np.array(
+            [
+                [0.11, 0.22, 0.33],
+                [0.22, 0.22, 0.22],
+                [0.165, 0.275, 0.385],
+            ]
+        ),
         title="Board",
         color_title="Total",
         is_proposal=True,
@@ -146,3 +195,41 @@ def test_board_index_handles_optional_reductions():
     assert "cosine" in boards["by_metric"]
     assert "MDS" in boards["by_reduction"]
     assert "UMAP" not in boards["by_reduction"], "UMAP board should be optional"
+
+
+def test_apply_scatter_filters_limits_by_named_flag():
+    entries = build_sample_entries()
+    payload = build_scatter_payload(
+        embedding=np.array([[0.0, 0.0], [0.1, 0.2], [0.2, 0.4]]),
+        entries=entries,
+        color_values=np.array([0.5, 0.4, 0.3]),
+        pair_counts=np.array([3.0, 4.0, 2.0]),
+        type_counts=np.array([2.0, 2.0, 1.0]),
+        vectors=np.array(
+            [
+                [0.5, 0.3, 0.2],
+                [0.4, 0.4, 0.1],
+                [0.2, 0.6, 0.2],
+            ]
+        ),
+        adjusted_vectors=np.array(
+            [
+                [0.55, 0.33, 0.22],
+                [0.44, 0.44, 0.11],
+                [0.22, 0.66, 0.22],
+            ]
+        ),
+        title="Filterable",
+        color_title="Total",
+        is_proposal=True,
+        meta={"scenario": "filter", "mode": "raw_total", "exponent": None},
+    )
+
+    filtered = apply_scatter_filters(payload, named=["unnamed"])
+    assert filtered["data"], "filtered payload should still contain traces"
+    total_points = sum(len(trace.get("x", [])) for trace in filtered["data"])
+    assert total_points == 1, "only one unnamed entry should remain"
+
+    filtered_named = apply_scatter_filters(payload, named=["named"], inversion=["base"])
+    total_named = sum(len(trace.get("x", [])) for trace in filtered_named["data"])
+    assert total_named >= 1, "expected at least one named base entry"

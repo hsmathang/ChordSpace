@@ -1,6 +1,7 @@
 """Utilities for building Plotly visualisations used across proposal comparisons."""
 from __future__ import annotations
 
+import copy
 import json
 from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, Any, Dict, Iterable, List, Optional, Sequence, Tuple
@@ -206,6 +207,57 @@ DEFAULT_HIGHLIGHT: HighlightConfig = {
 }
 
 
+def _build_filter_metadata(
+    entries: Sequence["ChordEntry"],
+    family_tags: Sequence[str],
+) -> Tuple[Dict[str, Any], Dict[str, List[Any]]]:
+    """Return filter definitions and per-entry field values."""
+
+    named_flags = ["named" if getattr(entry, "is_named", False) else "unnamed" for entry in entries]
+    inversion_flags = [
+        "inversion" if getattr(entry, "is_inversion", False) else "base"
+        for entry in entries
+    ]
+    cardinalities = [int(getattr(entry, "n_notes", 0) or 0) for entry in entries]
+    unique_cardinalities = sorted(set(cardinalities))
+
+    filter_definitions: Dict[str, Any] = {
+        "named": {
+            "label": "Tipo de acorde",
+            "options": [
+                {"id": "named", "label": "Nombrados", "default": True},
+                {"id": "unnamed", "label": "Sin nombre", "default": True},
+            ],
+        },
+        "inversion": {
+            "label": "Rol en la familia",
+            "options": [
+                {"id": "base", "label": "Base", "default": True},
+                {"id": "inversion", "label": "Inversiones", "default": True},
+            ],
+        },
+        "cardinality": {
+            "label": "Número de notas",
+            "options": [
+                {
+                    "id": str(card),
+                    "label": f"{card} nota{'s' if card != 1 else ''}",
+                    "default": True,
+                }
+                for card in unique_cardinalities
+            ],
+        },
+    }
+
+    field_values: Dict[str, List[Any]] = {
+        "named": named_flags,
+        "inversion": inversion_flags,
+        "cardinality": cardinalities,
+        "family": list(family_tags),
+    }
+    return filter_definitions, field_values
+
+
 def build_scatter_payload(
     embedding: np.ndarray,
     entries: Sequence["ChordEntry"],
@@ -308,6 +360,9 @@ def build_scatter_payload(
         ]
         for i in range(total_points)
     ]
+
+    filter_definitions, filter_fields = _build_filter_metadata(entries, family_tags)
+    trace_sources: List[Dict[str, Any]] = []
 
     def _base_marker_params(count: int) -> Tuple[float, float]:
         if count <= 40:
@@ -412,6 +467,26 @@ def build_scatter_payload(
             trace["unselected"] = {"marker": unselected_marker}
         traces.append(trace)
 
+        idx_list = list(idxs)
+        base_marker = {k: _to_serialisable(v) for k, v in marker.items() if k != "color"}
+        trace_sources.append(
+            {
+                "traceIndex": len(traces) - 1,
+                "label": label,
+                "x": [float(x[idx]) for idx in idx_list],
+                "y": [float(y[idx]) for idx in idx_list],
+                "text": [_to_serialisable(summary_texts[idx]) for idx in idx_list],
+                "customdata": [_to_serialisable(customdata_all[idx]) for idx in idx_list],
+                "colors": _to_serialisable(color_values[idx_list].tolist()),
+                "baseMarker": base_marker,
+                "hovertemplate": trace.get("hovertemplate", "%{text}<extra></extra>"),
+                "filterValues": {
+                    key: [_to_serialisable(filter_fields[key][idx]) for idx in idx_list]
+                    for key in filter_fields
+                },
+            }
+        )
+
     for label in ["Diadas", "Triadas", "Séptimas", "Extensiones"]:
         idxs = named_groups[label]
         if not idxs:
@@ -450,10 +525,17 @@ def build_scatter_payload(
         "familyHighlight": highlight_summary,
         "colorTitle": color_title,
         "isProposal": bool(is_proposal),
+        "filters": filter_definitions,
     }
     if meta:
         for key, value in meta.items():
             meta_payload[str(key)] = _to_serialisable(value)
+
+    filter_dataset = {
+        "traceSources": trace_sources,
+        "fields": filter_definitions,
+    }
+    meta_payload["filterDataset"] = filter_dataset
 
     layout = {
         "title": title,
@@ -489,6 +571,118 @@ def build_scatter_payload(
         "layout": layout,
         "meta": layout["meta"],
     }
+
+
+def _normalise_filter_values(values: Optional[Sequence[Any]]) -> Optional[set[str]]:
+    if values is None:
+        return None
+    normalised: set[str] = set()
+    for value in values:
+        if value is None:
+            continue
+        if isinstance(value, (int, float)) and not isinstance(value, bool):
+            normalised.add(str(int(value)))
+        else:
+            normalised.add(str(value))
+    return normalised
+
+
+def apply_scatter_filters(
+    payload: Dict[str, Any],
+    *,
+    named: Optional[Sequence[str]] = None,
+    inversion: Optional[Sequence[str]] = None,
+    cardinality: Optional[Sequence[int]] = None,
+    families: Optional[Sequence[str]] = None,
+) -> Dict[str, Any]:
+    """Return a filtered copy of a scatter payload.
+
+    Parameters
+    ----------
+    payload:
+        Scatter payload generated by :func:`build_scatter_payload`.
+    named:
+        Allowed ``named`` categories (``"named"``/``"unnamed"``). ``None`` keeps all.
+    inversion:
+        Allowed ``inversion`` categories (``"base"``/``"inversion"``).
+    cardinality:
+        Allowed numbers of notes.
+    families:
+        Allowed family identifiers.
+    """
+
+    dataset = payload.get("meta", {}).get("filterDataset")
+    if not dataset:
+        raise ValueError("Payload does not contain filter metadata")
+
+    named_set = _normalise_filter_values(named)
+    inversion_set = _normalise_filter_values(inversion)
+    cardinality_set = _normalise_filter_values(cardinality)
+    families_set = _normalise_filter_values(families)
+
+    filtered_traces: List[Dict[str, Any]] = []
+    original_traces = payload.get("data", [])
+
+    for source in dataset.get("traceSources", []):
+        trace_index = int(source.get("traceIndex", 0))
+        if trace_index >= len(original_traces):
+            continue
+        base_trace = copy.deepcopy(original_traces[trace_index])
+
+        x_source = list(source.get("x", []))
+        y_source = list(source.get("y", []))
+        text_source = list(source.get("text", []))
+        custom_source = list(source.get("customdata", []))
+        color_source = list(source.get("colors", []))
+        filter_values = source.get("filterValues", {})
+
+        named_values = [str(v) for v in filter_values.get("named", [])]
+        inversion_values = [str(v) for v in filter_values.get("inversion", [])]
+        cardinality_values = [str(v) for v in filter_values.get("cardinality", [])]
+        family_values = [str(v) for v in filter_values.get("family", [])]
+
+        selected_indices: List[int] = []
+        for idx in range(len(x_source)):
+            if named_set and named_values[idx] not in named_set:
+                continue
+            if inversion_set and inversion_values[idx] not in inversion_set:
+                continue
+            if cardinality_set and cardinality_values[idx] not in cardinality_set:
+                continue
+            if families_set and family_values[idx] not in families_set:
+                continue
+            selected_indices.append(idx)
+
+        def _select(values: List[Any]) -> List[Any]:
+            return [values[idx] for idx in selected_indices]
+
+        base_trace["x"] = _select(x_source)
+        base_trace["y"] = _select(y_source)
+        base_trace["text"] = _select(text_source)
+        base_trace["customdata"] = _select(custom_source)
+
+        marker_base = dict(source.get("baseMarker", {}))
+        marker_base["color"] = _select(color_source)
+        if source.get("hovertemplate"):
+            base_trace["hovertemplate"] = source["hovertemplate"]
+        base_trace["marker"] = marker_base
+        filtered_traces.append(base_trace)
+
+    new_payload = copy.deepcopy(payload)
+    new_payload["data"] = filtered_traces
+    meta = new_payload.get("meta", {})
+    meta["activeFilters"] = {
+        "named": sorted(named_set) if named_set else None,
+        "inversion": sorted(inversion_set) if inversion_set else None,
+        "cardinality": sorted(cardinality_set) if cardinality_set else None,
+        "families": sorted(families_set) if families_set else None,
+    }
+    new_payload["meta"] = meta
+    if "layout" in new_payload:
+        layout_meta = new_payload["layout"].get("meta", {})
+        layout_meta.update(meta)
+        new_payload["layout"]["meta"] = layout_meta
+    return new_payload
 
 
 def build_board_index(
