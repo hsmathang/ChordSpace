@@ -13,6 +13,7 @@ import queue
 import tempfile
 import threading
 import tkinter as tk
+from dataclasses import dataclass
 from pathlib import Path
 from tkinter import filedialog, messagebox
 from tkinter import ttk
@@ -40,11 +41,20 @@ from ui.launcher.controllers import (
     MissingParametersError,
 )
 from ui.launcher.state import LauncherState
+from tools.population_builders import ScaleConstraint, generate_scale_population
 
 # Umbral seguro para no superar el límite de longitud de línea de comandos en Windows.
 # (32 767 caracteres es el máximo; dejamos holgura por el resto de argumentos.)
 MAX_SQL_IDS_CHARS = 20000
 CHECK_MARK = "\u2713"
+
+
+@dataclass
+class CustomFilterSpec:
+    filters: data_access.ChordFilters
+    label: str
+    scale_pitch_classes: List[int] | None = None
+    expand_scale: bool = False
 
 
 class ScrollableFrame(ttk.Frame):
@@ -320,6 +330,7 @@ class ExperimentLauncher(tk.Tk):
         self.filter_exclude_pcs_var = tk.StringVar(value="")
         self.filter_interval_var = tk.StringVar(value="")
         self.filter_code_var = tk.StringVar(value="")
+        self.filter_scale_expand_var = tk.BooleanVar(value=False)
         # Nuevos modos para filtros avanzados
         self.filter_pc_mode_labels = [
             "Contiene todas",
@@ -349,6 +360,7 @@ class ExperimentLauncher(tk.Tk):
         default_pop_mode = self.pop_type_var.get() or "B"
         self.filter_mode_var = tk.StringVar(value=default_pop_mode)
         self.filter_mode_var.trace_add("write", lambda *_: self._mark_population_dirty())
+        self.filter_scale_expand_var.trace_add("write", lambda *_: self._mark_population_dirty())
 
     def _create_layout(self) -> None:
         main = ttk.Frame(self, padding=14)
@@ -804,39 +816,46 @@ class ExperimentLauncher(tk.Tk):
             width=24,
         ).grid(row=6, column=1, sticky="w", pady=(6, 0))
 
-        ttk.Label(frame, text="Excluir pitch classes (opcional):").grid(row=7, column=0, sticky="w", pady=(6, 0))
-        ttk.Entry(frame, textvariable=self.filter_exclude_pcs_var).grid(row=7, column=1, sticky="we", pady=(6, 0))
+        ttk.Checkbutton(
+            frame,
+            text="Expandir escala con transposiciones (usa pitch classes incluidas)",
+            variable=self.filter_scale_expand_var,
+            command=self._mark_population_dirty,
+        ).grid(row=7, column=0, columnspan=2, sticky="w", pady=(4, 0))
 
-        ttk.Label(frame, text="Patrones intervalares (por ejemplo, 3,3; 5,2):").grid(row=8, column=0, sticky="w", pady=(6, 0))
-        ttk.Entry(frame, textvariable=self.filter_interval_var).grid(row=8, column=1, sticky="we", pady=(6, 0))
+        ttk.Label(frame, text="Excluir pitch classes (opcional):").grid(row=8, column=0, sticky="w", pady=(6, 0))
+        ttk.Entry(frame, textvariable=self.filter_exclude_pcs_var).grid(row=8, column=1, sticky="we", pady=(6, 0))
+
+        ttk.Label(frame, text="Patrones intervalares (por ejemplo, 3,3; 5,2):").grid(row=9, column=0, sticky="w", pady=(6, 0))
+        ttk.Entry(frame, textvariable=self.filter_interval_var).grid(row=9, column=1, sticky="we", pady=(6, 0))
         ttk.Label(
             frame,
             text="Separa patrones con ';'. Dentro de cada patron usa comas.",
             foreground="#555",
-        ).grid(row=9, column=0, columnspan=2, sticky="w")
+        ).grid(row=10, column=0, columnspan=2, sticky="w")
 
-        ttk.Label(frame, text="Modo intervalos:").grid(row=10, column=0, sticky="w", pady=(6, 0))
+        ttk.Label(frame, text="Modo intervalos:").grid(row=11, column=0, sticky="w", pady=(6, 0))
         ttk.Combobox(
             frame,
             textvariable=self.filter_interval_mode_var,
             values=self.filter_interval_mode_labels,
             state="readonly",
             width=24,
-        ).grid(row=10, column=1, sticky="w", pady=(6, 0))
+        ).grid(row=11, column=1, sticky="w", pady=(6, 0))
 
-        ttk.Label(frame, text="Codigos absolutos (ej. 0135679AB0):").grid(row=11, column=0, sticky="w", pady=(6, 0))
+        ttk.Label(frame, text="Codigos absolutos (ej. 0135679AB0):").grid(row=12, column=0, sticky="w", pady=(6, 0))
         ttk.Entry(frame, textvariable=self.filter_code_var).grid(
-            row=11, column=1, sticky="we", pady=(6, 0)
+            row=12, column=1, sticky="we", pady=(6, 0)
         )
 
-        ttk.Label(frame, text="Modo para filtros (A/B/C):").grid(row=12, column=0, sticky="w", pady=(8, 0))
+        ttk.Label(frame, text="Modo para filtros (A/B/C):").grid(row=13, column=0, sticky="w", pady=(8, 0))
         ttk.Combobox(
             frame,
             textvariable=self.filter_mode_var,
             values=["A", "B", "C"],
             state="readonly",
             width=6,
-        ).grid(row=12, column=1, sticky="w", pady=(8, 0))
+        ).grid(row=13, column=1, sticky="w", pady=(8, 0))
 
         frame.columnconfigure(1, weight=1)
 
@@ -1069,8 +1088,16 @@ class ExperimentLauncher(tk.Tk):
 
         custom_filters = self._collect_custom_filters()
         if custom_filters is not None:
-            filters, label = custom_filters
-            df_filters = data_access.fetch_population(filters, profile=profile, executor=executor).copy()
+            df_filters = data_access.fetch_population(
+                custom_filters.filters,
+                profile=profile,
+                executor=executor,
+            ).copy()
+            label = custom_filters.label
+            if custom_filters.expand_scale and custom_filters.scale_pitch_classes:
+                constraint = ScaleConstraint(tuple(custom_filters.scale_pitch_classes))
+                df_filters = generate_scale_population(df_filters, constraint, source_label=label)
+                label = f"{label} [escala]"
             # Aplicar modo A/B/C definido para los filtros personalizados
             try:
                 filt_mode = (self.filter_mode_var.get() or "A").strip().upper()
@@ -1125,7 +1152,7 @@ class ExperimentLauncher(tk.Tk):
         self.log_widget.see(tk.END)
         self.log_widget.configure(state=tk.DISABLED)
 
-    def _collect_custom_filters(self) -> Optional[Tuple[data_access.ChordFilters, str]]:
+    def _collect_custom_filters(self) -> Optional[CustomFilterSpec]:
         if not self.filter_enable_var.get():
             return None
         filters = data_access.ChordFilters()
@@ -1154,7 +1181,7 @@ class ExperimentLauncher(tk.Tk):
             filters.span_max = None
 
         def _parse_pc_list(raw: str, field: str) -> List[int]:
-            items = []
+            items: List[int] = []
             for token in [t.strip() for t in raw.replace(";", ",").split(",") if t.strip()]:
                 try:
                     val = int(token)
@@ -1168,10 +1195,14 @@ class ExperimentLauncher(tk.Tk):
 
         include_pcs_raw = self.filter_include_pcs_var.get().strip()
         exclude_pcs_raw = self.filter_exclude_pcs_var.get().strip()
+        expand_scale = bool(self.filter_scale_expand_var.get())
+        scale_pitch_classes: List[int] | None = None
         if include_pcs_raw:
             filters.include_pitch_classes = _parse_pc_list(include_pcs_raw, "Pitch classes a incluir")
             pc_mode_label = self.filter_pc_mode_var.get().strip()
             filters.include_pc_mode = self.filter_pc_mode_map.get(pc_mode_label, "contains_all")
+            if expand_scale and filters.include_pitch_classes:
+                scale_pitch_classes = list(filters.include_pitch_classes)
         if exclude_pcs_raw:
             filters.exclude_pitch_classes = _parse_pc_list(exclude_pcs_raw, "Pitch classes a excluir")
         if filters.include_pitch_classes and filters.exclude_pitch_classes:
@@ -1195,7 +1226,7 @@ class ExperimentLauncher(tk.Tk):
                 filters.interval_values = values
             else:
                 pattern_tokens = [pt.strip() for pt in interval_raw.split(";") if pt.strip()]
-                patterns = []
+                patterns: List[List[int]] = []
                 for pt in pattern_tokens:
                     try:
                         patt = [int(x.strip()) for x in pt.split(",") if x.strip()]
@@ -1228,7 +1259,7 @@ class ExperimentLauncher(tk.Tk):
         ]):
             raise ValueError("Configura al menos un criterio en filtros personalizados.")
 
-        summary_parts = []
+        summary_parts: List[str] = []
         if selected_card:
             summary_parts.append("n=" + ",".join(str(n) for n in selected_card))
         if filters.span_min is not None or filters.span_max is not None:
@@ -1252,12 +1283,23 @@ class ExperimentLauncher(tk.Tk):
             summary_parts.append(f"int_mode={filters.interval_mode}")
         if filters.codes:
             summary_parts.append("code=" + ",".join(filters.codes))
+        if expand_scale and scale_pitch_classes:
+            summary_parts.append("escala")
 
         label = "FILTER:CUSTOM"
         if summary_parts:
             label = f"{label} ({'; '.join(summary_parts)})"
 
-        return filters, label
+        if expand_scale and scale_pitch_classes:
+            filters.include_pitch_classes = None
+            filters.include_pc_mode = None
+
+        return CustomFilterSpec(
+            filters=filters,
+            label=label,
+            scale_pitch_classes=scale_pitch_classes,
+            expand_scale=bool(expand_scale and scale_pitch_classes),
+        )
 
     def _fill_population_tree(self) -> None:
         # Clear
