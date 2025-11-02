@@ -206,17 +206,48 @@ def _rotate_once(notes_abs: Sequence[int], k: int) -> List[int]:
     return tail + head
 
 
-def invert_row(row: Dict[str, Any], tag: Optional[str] = None) -> List[Dict[str, Any]]:
+def invert_row(
+    row: Dict[str, Any],
+    tag: Optional[str] = None,
+    *,
+    max_abs: Optional[int] = 24,
+    include_rotation: bool = False,
+    warn_on_skip: bool = True,
+) -> List[Dict[str, Any]]:
+    """Genera registros para todas las inversiones de ``row``.
+
+    Parameters
+    ----------
+    row:
+        Fila con columnas compatibles con la tabla ``chords``.
+    tag:
+        Etiqueta opcional para sobrescribir el tag de ``calculate_row``.
+    max_abs:
+        Límite superior para las alturas absolutas permitidas. Usa ``None`` para
+        desactivar la restricción (permite alturas > 24).
+    include_rotation:
+        Si es ``True`` añade ``__inv_rotation`` al registro generado.
+    warn_on_skip:
+        Controla si se imprime una advertencia cuando una inversión queda fuera
+        del rango permitido y se omite.
+    """
+
     notes_abs = _extract_notes_abs(row)
     out: List[Dict[str, Any]] = []
     for k in range(1, len(notes_abs)):
         rotated = _rotate_once(notes_abs, k)
-        if (min(rotated) < 0) or (max(rotated) > 24):
-            print(
-                f"Advertencia: se omite inversión k={k} (id={row.get('id')}, code={row.get('code')}) por salir de [0,24]: {rotated}"
-            )
+        if max_abs is not None and ((min(rotated) < 0) or (max(rotated) > max_abs)):
+            if warn_on_skip:
+                print(
+                    "Advertencia: se omite inversión "
+                    f"k={k} (id={row.get('id')}, code={row.get('code')}) "
+                    f"por salir de [0,{max_abs}]: {rotated}"
+                )
             continue
-        out.append(_build_record_from_notes(rotated, tag))
+        record = _build_record_from_notes(rotated, tag)
+        if include_rotation:
+            record["__inv_rotation"] = k
+        out.append(record)
     return out
 
 
@@ -230,24 +261,166 @@ def transpose_row(row: Dict[str, Any], semitones: int, tag: Optional[str] = None
     return _build_record_from_notes(transposed, tag)
 
 
-def make_inversions_df(df_source: pd.DataFrame, tag: Optional[str] = None, include_original: bool = True) -> pd.DataFrame:
+def make_inversions_df(
+    df_source: pd.DataFrame,
+    tag: Optional[str] = None,
+    include_original: bool = True,
+    *,
+    allow_out_of_range: bool = False,
+) -> pd.DataFrame:
+    """Genera un ``DataFrame`` con inversiones sintéticas.
+
+    Además de las columnas básicas compatibles con ``chords`` añade metadatos
+    que permiten rastrear familias de inversiones (``__family_id`` y
+    ``__family_size``) y marcar qué filas son generadas (``__inv_flag``).
+    """
+
     records: List[Dict[str, Any]] = []
-    cols = [
-        "id", "n", "interval", "notes", "bass", "octave", "frequencies", "chroma",
-        "tag", "code", "span_semitones", "abs_mask_int", "abs_mask_hex", "notes_abs_json",
+    family_tracker: List[Optional[int]] = []
+    fallback_family_id = -1
+
+    base_cols = [
+        "id",
+        "n",
+        "interval",
+        "notes",
+        "bass",
+        "octave",
+        "frequencies",
+        "chroma",
+        "tag",
+        "code",
+        "span_semitones",
+        "abs_mask_int",
+        "abs_mask_hex",
+        "notes_abs_json",
     ]
-    for _, row in df_source.iterrows():
+    meta_cols = [
+        "__source__",
+        "__inv_flag",
+        "__inv_rotation",
+        "__inv_source_id",
+        "__family_id",
+        "__family_size",
+    ]
+
+    for idx, row in df_source.iterrows():
         rowd = row.to_dict()
+
+        raw_id = rowd.get("id")
+        source_id: Optional[int]
+        if raw_id is not None and not pd.isna(raw_id):
+            try:
+                source_id = int(raw_id)
+            except Exception:
+                source_id = None
+        else:
+            source_id = None
+
+        family_id: Optional[int] = source_id
+        if family_id is None:
+            mask_val = rowd.get("abs_mask_int")
+            if mask_val is not None and not pd.isna(mask_val):
+                try:
+                    family_id = int(mask_val)
+                except Exception:
+                    family_id = None
+        if family_id is None:
+            family_id = fallback_family_id
+            fallback_family_id -= 1
+
+        source_label = rowd.get("__source__")
+        generated_label = "C:generated"
+        if isinstance(source_label, str) and source_label.strip():
+            generated_label = source_label
+
+        inv_source_id = source_id if source_id is not None else np.nan
+
         if include_original:
-            # Conservar tal cual el original (pasando por columnas esperadas)
-            base = {key: rowd.get(key) for key in cols}
-            # Normaliza interval/notes si vinieron como strings
-            base["interval"] = _to_int_list(base["interval"]) if isinstance(base.get("interval"), str) else base.get("interval")
-            base["notes"] = [str(x) for x in _parse_pg_array(base.get("notes"))] if isinstance(base.get("notes"), str) else base.get("notes")
-            base["id"] = rowd.get("id")
+            base = {key: rowd.get(key) for key in base_cols}
+            if isinstance(base.get("interval"), str):
+                base["interval"] = _to_int_list(base["interval"])
+            if isinstance(base.get("notes"), str):
+                base["notes"] = [str(x) for x in _parse_pg_array(base.get("notes"))]
+            base["id"] = source_id
+            base["__source__"] = source_label
+            base["__inv_flag"] = False
+            base["__inv_rotation"] = np.nan
+            base["__inv_source_id"] = inv_source_id
+            base["__family_id"] = family_id
             records.append(base)
-        records.extend(invert_row(rowd, tag))
-    return pd.DataFrame.from_records(records, columns=cols)
+            family_tracker.append(family_id)
+
+        inv_records = invert_row(
+            rowd,
+            tag,
+            max_abs=None if allow_out_of_range else 24,
+            include_rotation=True,
+            warn_on_skip=not allow_out_of_range,
+        )
+
+        for rec in inv_records:
+            rec.setdefault("tag", tag if tag is not None else rec.get("tag"))
+            rec.setdefault("__inv_rotation", rec.get("__inv_rotation"))
+            rec["__source__"] = generated_label
+            rec["__inv_flag"] = True
+            rec["__inv_source_id"] = inv_source_id
+            rec["__family_id"] = family_id
+            records.append(rec)
+            family_tracker.append(family_id)
+
+    if not records:
+        return pd.DataFrame(columns=base_cols + meta_cols)
+
+    family_counts: Dict[Optional[int], int] = {}
+    for fid in family_tracker:
+        if fid is None or (isinstance(fid, float) and np.isnan(fid)):
+            continue
+        family_counts[fid] = family_counts.get(fid, 0) + 1
+
+    for rec, fid in zip(records, family_tracker):
+        if fid is None or (isinstance(fid, float) and np.isnan(fid)):
+            rec["__family_size"] = np.nan
+        else:
+            rec["__family_size"] = family_counts.get(fid, 1)
+
+        if "__inv_flag" not in rec:
+            rec["__inv_flag"] = False
+        if "__inv_rotation" not in rec:
+            rec["__inv_rotation"] = np.nan
+        if "__inv_source_id" not in rec:
+            rec["__inv_source_id"] = np.nan
+        if "__family_id" not in rec:
+            rec["__family_id"] = np.nan
+        if "__source__" not in rec:
+            rec["__source__"] = None
+
+    df_out = pd.DataFrame.from_records(records)
+
+    for col in base_cols:
+        if col not in df_out.columns:
+            df_out[col] = np.nan
+    for col in meta_cols:
+        if col not in df_out.columns:
+            df_out[col] = np.nan
+
+    if "__inv_flag" in df_out.columns:
+        df_out["__inv_flag"] = df_out["__inv_flag"].apply(lambda v: bool(v) if not pd.isna(v) else False)
+    if "__inv_rotation" in df_out.columns:
+        df_out["__inv_rotation"] = pd.to_numeric(df_out["__inv_rotation"], errors="coerce")
+    if "__inv_source_id" in df_out.columns:
+        df_out["__inv_source_id"] = pd.to_numeric(df_out["__inv_source_id"], errors="coerce")
+    if "__family_id" in df_out.columns:
+        try:
+            df_out["__family_id"] = pd.to_numeric(df_out["__family_id"])
+        except Exception:
+            pass
+    if "__family_size" in df_out.columns:
+        df_out["__family_size"] = pd.to_numeric(df_out["__family_size"], errors="coerce")
+
+    ordered_cols = base_cols + [c for c in meta_cols if c not in base_cols]
+    extra_cols = [c for c in df_out.columns if c not in ordered_cols]
+    return df_out[ordered_cols + extra_cols]
 
 
 def make_transpositions_df(df_source: pd.DataFrame, semitones: int, tag: Optional[str] = None, include_original: bool = True) -> pd.DataFrame:

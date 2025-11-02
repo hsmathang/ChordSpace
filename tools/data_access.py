@@ -540,7 +540,12 @@ def apply_population_mode(df: pd.DataFrame, mode: str) -> pd.DataFrame:
     if mode == "C":
         try:
             from synth_tools import make_inversions_df, DB_TAG  # type: ignore
-            return make_inversions_df(df, tag=DB_TAG, include_original=True)
+            return make_inversions_df(
+                df,
+                tag=DB_TAG,
+                include_original=True,
+                allow_out_of_range=True,
+            )
         except Exception:
             return df
     return df

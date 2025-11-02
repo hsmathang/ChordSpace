@@ -355,7 +355,12 @@ def _build_population(ptype: str, query_const: str) -> pd.DataFrame:
         return df_src.copy()
     if ptype == "B":
         return build_inversions_anchored_db(df_src, include_original=True)
-    return make_inversions_df(df_src, tag=DB_TAG, include_original=True)
+    return make_inversions_df(
+        df_src,
+        tag=DB_TAG,
+        include_original=True,
+        allow_out_of_range=True,
+    )
 
 
 def _collect_pops_specs(args: argparse.Namespace) -> list[str]:
@@ -501,7 +506,12 @@ def run_experiment_with_args(
             elif run_type == "B":
                 df_pop = build_inversions_anchored_db(df_src, include_original=True)
             else:
-                df_pop = make_inversions_df(df_src, tag=DB_TAG, include_original=True)
+                df_pop = make_inversions_df(
+                    df_src,
+                    tag=DB_TAG,
+                    include_original=True,
+                    allow_out_of_range=True,
+                )
                 df_pop.to_csv(out_dir / "inversions_synthetic.csv", index=False, encoding="utf-8")
 
     if df_pop is None or df_pop.empty:
