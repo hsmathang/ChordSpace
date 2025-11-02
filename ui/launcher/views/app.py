@@ -158,6 +158,50 @@ class ExperimentLauncher(tk.Tk):
         self.after(100, self._process_log_queue)
         self._update_progress(0.0, "Listo.")
 
+    # ----------------------------------------------------------- progress utils
+    def _update_progress(self, percent: float, message: Optional[str] = None) -> None:
+        """Update the progress bar, text and optional message.
+
+        This method is invoked from the Tk main thread via `_process_log_queue`.
+        """
+        try:
+            # Clamp percent to a sane range
+            if percent is None:
+                percent = 0.0
+            percent = max(0.0, min(100.0, float(percent)))
+        except Exception:
+            percent = 0.0
+
+        # Update widgets
+        if hasattr(self, "progress_var"):
+            self.progress_var.set(percent)
+        if hasattr(self, "progress_text_var"):
+            self.progress_text_var.set(f"{percent:.1f}%")
+        if message is not None and hasattr(self, "progress_message_var"):
+            self.progress_message_var.set(message)
+
+    def _schedule_progress_reset(self, delay_ms: int = 2000) -> None:
+        """Schedule a later reset of the progress display to idle state."""
+        # Cancel any pending reset
+        if getattr(self, "_progress_reset_job", None):
+            try:
+                self.after_cancel(self._progress_reset_job)
+            except Exception:
+                pass
+            self._progress_reset_job = None
+
+        # Schedule new reset
+        try:
+            self._progress_reset_job = self.after(delay_ms, self._reset_progress)
+        except Exception:
+            # In case `after` cannot be scheduled, reset immediately
+            self._reset_progress()
+
+    def _reset_progress(self) -> None:
+        """Reset progress bar and message to the ready state."""
+        self._progress_reset_job = None
+        self._update_progress(0.0, "Listo.")
+
     # ------------------------------------------------------------------ props
     @property
     def running_thread(self) -> threading.Thread | None:
