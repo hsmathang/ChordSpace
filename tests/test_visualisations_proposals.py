@@ -197,7 +197,7 @@ def test_board_index_handles_optional_reductions():
     assert "UMAP" not in boards["by_reduction"], "UMAP board should be optional"
 
 
-def test_apply_scatter_filters_limits_by_named_flag():
+def test_apply_scatter_filters_supports_interval_and_pitch_filters():
     entries = build_sample_entries()
     payload = build_scatter_payload(
         embedding=np.array([[0.0, 0.0], [0.1, 0.2], [0.2, 0.4]]),
@@ -225,11 +225,18 @@ def test_apply_scatter_filters_limits_by_named_flag():
         meta={"scenario": "filter", "mode": "raw_total", "exponent": None},
     )
 
-    filtered = apply_scatter_filters(payload, named=["unnamed"])
-    assert filtered["data"], "filtered payload should still contain traces"
-    total_points = sum(len(trace.get("x", [])) for trace in filtered["data"])
-    assert total_points == 1, "only one unnamed entry should remain"
+    # Only keep triads (3 notes)
+    filtered_card = apply_scatter_filters(payload, cardinality=[3])
+    total_card = sum(len(trace.get("x", [])) for trace in filtered_card["data"])
+    assert total_card == 1, "only the triad should remain after cardinality filter"
 
-    filtered_named = apply_scatter_filters(payload, named=["named"], inversion=["base"])
-    total_named = sum(len(trace.get("x", [])) for trace in filtered_named["data"])
-    assert total_named >= 1, "expected at least one named base entry"
+    # Restrict by a specific interval pattern (major seventh 4-3-4)
+    maj7_pattern = "-".join(str(v) for v in entries[0].acorde.intervals)
+    filtered_interval = apply_scatter_filters(payload, interval_pattern=[maj7_pattern])
+    total_interval = sum(len(trace.get("x", [])) for trace in filtered_interval["data"])
+    assert total_interval == 1, "only the matching interval pattern should remain"
+
+    # Keep only chords containing pitch class 6 (diminished triad)
+    filtered_pitch = apply_scatter_filters(payload, pitch_class=[6])
+    total_pitch = sum(len(trace.get("x", [])) for trace in filtered_pitch["data"])
+    assert total_pitch == 1, "pitch-class filter should isolate diminished triad"

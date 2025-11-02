@@ -213,29 +213,65 @@ def _build_filter_metadata(
 ) -> Tuple[Dict[str, Any], Dict[str, List[Any]]]:
     """Return filter definitions and per-entry field values."""
 
-    named_flags = ["named" if getattr(entry, "is_named", False) else "unnamed" for entry in entries]
-    inversion_flags = [
-        "inversion" if getattr(entry, "is_inversion", False) else "base"
-        for entry in entries
-    ]
     cardinalities = [int(getattr(entry, "n_notes", 0) or 0) for entry in entries]
     unique_cardinalities = sorted(set(cardinalities))
 
+    def _interval_sequence(entry: "ChordEntry") -> Tuple[int, ...]:
+        raw = getattr(getattr(entry, "acorde", None), "intervals", []) or []
+        return tuple(int(v) for v in raw)
+
+    def _pattern_id(pattern: Tuple[int, ...]) -> str:
+        if not pattern:
+            return "none"
+        return "-".join(str(v) for v in pattern)
+
+    def _pattern_label(pattern: Tuple[int, ...]) -> str:
+        if not pattern:
+            return "Sin intervalos"
+        return "[" + ", ".join(str(v) for v in pattern) + "]"
+
+    interval_sequences = [_interval_sequence(entry) for entry in entries]
+    pattern_registry: Dict[str, Dict[str, Any]] = {}
+    interval_values: List[str] = []
+    for pattern in interval_sequences:
+        pid = _pattern_id(pattern)
+        interval_values.append(pid)
+        info = pattern_registry.setdefault(
+            pid,
+            {
+                "pattern": pattern,
+                "label": _pattern_label(pattern),
+            },
+        )
+        info["count"] = info.get("count", 0) + 1
+
+    def _pitch_classes(entry: "ChordEntry") -> List[int]:
+        acorde = getattr(entry, "acorde", None)
+        chroma = getattr(acorde, "chroma", None)
+        if chroma is not None and len(chroma):
+            try:
+                active = [int(idx) for idx, val in enumerate(chroma) if val]
+                if active:
+                    return sorted({pc % 12 for pc in active})
+            except Exception:  # pragma: no cover - defensive
+                pass
+        intervals = getattr(acorde, "intervals", []) or []
+        total = 0
+        pcs = {0}
+        for step in intervals:
+            total = (total + int(step)) % 12
+            pcs.add(total)
+        return sorted(pcs)
+
+    pitch_class_values: List[List[str]] = []
+    available_pitch_classes: set[int] = set()
+    for entry in entries:
+        classes = _pitch_classes(entry)
+        for pc in classes:
+            available_pitch_classes.add(int(pc))
+        pitch_class_values.append([str(int(pc)) for pc in classes])
+
     filter_definitions: Dict[str, Any] = {
-        "named": {
-            "label": "Tipo de acorde",
-            "options": [
-                {"id": "named", "label": "Nombrados", "default": True},
-                {"id": "unnamed", "label": "Sin nombre", "default": True},
-            ],
-        },
-        "inversion": {
-            "label": "Rol en la familia",
-            "options": [
-                {"id": "base", "label": "Base", "default": True},
-                {"id": "inversion", "label": "Inversiones", "default": True},
-            ],
-        },
         "cardinality": {
             "label": "Número de notas",
             "options": [
@@ -249,10 +285,40 @@ def _build_filter_metadata(
         },
     }
 
+    if pattern_registry:
+        options = [
+            {
+                "id": pid,
+                "label": data["label"],
+                "default": True,
+            }
+            for pid, data in sorted(
+                pattern_registry.items(),
+                key=lambda item: (len(item[1]["pattern"]), item[0]),
+            )
+        ]
+        filter_definitions["intervalPattern"] = {
+            "label": "Patrones de intervalos",
+            "options": options,
+        }
+
+    if available_pitch_classes:
+        filter_definitions["pitchClass"] = {
+            "label": "Pitch classes presentes",
+            "options": [
+                {
+                    "id": str(pc),
+                    "label": f"PC {pc}",
+                    "default": True,
+                }
+                for pc in sorted(available_pitch_classes)
+            ],
+        }
+
     field_values: Dict[str, List[Any]] = {
-        "named": named_flags,
-        "inversion": inversion_flags,
         "cardinality": cardinalities,
+        "intervalPattern": interval_values,
+        "pitchClass": pitch_class_values,
         "family": list(family_tags),
     }
     return filter_definitions, field_values
@@ -590,10 +656,9 @@ def _normalise_filter_values(values: Optional[Sequence[Any]]) -> Optional[set[st
 def apply_scatter_filters(
     payload: Dict[str, Any],
     *,
-    named: Optional[Sequence[str]] = None,
-    inversion: Optional[Sequence[str]] = None,
     cardinality: Optional[Sequence[int]] = None,
-    families: Optional[Sequence[str]] = None,
+    interval_pattern: Optional[Sequence[str]] = None,
+    pitch_class: Optional[Sequence[int]] = None,
 ) -> Dict[str, Any]:
     """Return a filtered copy of a scatter payload.
 
@@ -601,24 +666,22 @@ def apply_scatter_filters(
     ----------
     payload:
         Scatter payload generated by :func:`build_scatter_payload`.
-    named:
-        Allowed ``named`` categories (``"named"``/``"unnamed"``). ``None`` keeps all.
-    inversion:
-        Allowed ``inversion`` categories (``"base"``/``"inversion"``).
     cardinality:
         Allowed numbers of notes.
-    families:
-        Allowed family identifiers.
+    interval_pattern:
+        Allowed interval patterns encoded as ``"-".join(intervals)`` strings.
+    pitch_class:
+        Allowed pitch classes. If provided, a chord must include at least one of the
+        selected pitch classes to remain visible.
     """
 
     dataset = payload.get("meta", {}).get("filterDataset")
     if not dataset:
         raise ValueError("Payload does not contain filter metadata")
 
-    named_set = _normalise_filter_values(named)
-    inversion_set = _normalise_filter_values(inversion)
     cardinality_set = _normalise_filter_values(cardinality)
-    families_set = _normalise_filter_values(families)
+    interval_set = _normalise_filter_values(interval_pattern)
+    pitch_class_set = _normalise_filter_values(pitch_class)
 
     filtered_traces: List[Dict[str, Any]] = []
     original_traces = payload.get("data", [])
@@ -636,21 +699,24 @@ def apply_scatter_filters(
         color_source = list(source.get("colors", []))
         filter_values = source.get("filterValues", {})
 
-        named_values = [str(v) for v in filter_values.get("named", [])]
-        inversion_values = [str(v) for v in filter_values.get("inversion", [])]
         cardinality_values = [str(v) for v in filter_values.get("cardinality", [])]
-        family_values = [str(v) for v in filter_values.get("family", [])]
+        interval_values = [str(v) for v in filter_values.get("intervalPattern", [])]
+        pitch_values_raw = filter_values.get("pitchClass", [])
 
         selected_indices: List[int] = []
         for idx in range(len(x_source)):
-            if named_set and named_values[idx] not in named_set:
-                continue
-            if inversion_set and inversion_values[idx] not in inversion_set:
-                continue
             if cardinality_set and cardinality_values[idx] not in cardinality_set:
                 continue
-            if families_set and family_values[idx] not in families_set:
+            if interval_set and interval_values[idx] not in interval_set:
                 continue
+            if pitch_class_set:
+                pitch_values = pitch_values_raw[idx]
+                if isinstance(pitch_values, (list, tuple, set)):
+                    pitch_as_set = {str(v) for v in pitch_values if v is not None}
+                else:
+                    pitch_as_set = {str(pitch_values)} if pitch_values is not None else set()
+                if not (pitch_as_set & pitch_class_set):
+                    continue
             selected_indices.append(idx)
 
         def _select(values: List[Any]) -> List[Any]:
@@ -672,10 +738,9 @@ def apply_scatter_filters(
     new_payload["data"] = filtered_traces
     meta = new_payload.get("meta", {})
     meta["activeFilters"] = {
-        "named": sorted(named_set) if named_set else None,
-        "inversion": sorted(inversion_set) if inversion_set else None,
         "cardinality": sorted(cardinality_set) if cardinality_set else None,
-        "families": sorted(families_set) if families_set else None,
+        "intervalPattern": sorted(interval_set) if interval_set else None,
+        "pitchClass": sorted(pitch_class_set) if pitch_class_set else None,
     }
     new_payload["meta"] = meta
     if "layout" in new_payload:

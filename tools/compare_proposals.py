@@ -1527,7 +1527,7 @@ def build_report_html_v2(
         card_attrs_str = " ".join(card_attrs)
         return (
             f"<div class='plot-card' {card_attrs_str}>{header}{metrics_line}{controls}"
-            f"{highlight_note_html}{detail_panel}{panels}</div>"
+            f"{highlight_note_html}{panels}{detail_panel}</div>"
         )
 
     # Build nested tabs: first by reduction, then by metric
@@ -1749,48 +1749,68 @@ def build_report_html_v2(
       function applyFiltersToFigure(gd, filters) {
         const dataset = getFilterDataset(gd);
         if (!dataset || !Array.isArray(dataset.traceSources)) return;
+        const cardinalFilter = filters.cardinality && filters.cardinality.size ? filters.cardinality : null;
+        const intervalFilter = filters.intervalPattern && filters.intervalPattern.size ? filters.intervalPattern : null;
+        const pitchFilter = filters.pitchClass && filters.pitchClass.size ? filters.pitchClass : null;
+
+        const updates = {
+          x: [],
+          y: [],
+          text: [],
+          customdata: [],
+          marker: [],
+        };
+        const indices = [];
+
         dataset.traceSources.forEach(source => {
           const traceIndex = typeof source.traceIndex === 'number' ? source.traceIndex : parseInt(source.traceIndex, 10);
           if (!Number.isFinite(traceIndex)) return;
-          const namedFilter = filters.named && filters.named.size ? filters.named : null;
-          const inversionFilter = filters.inversion && filters.inversion.size ? filters.inversion : null;
-          const cardinalFilter = filters.cardinality && filters.cardinality.size ? filters.cardinality : null;
-          const familyFilter = filters.families && filters.families.size ? filters.families : null;
-          const namedVals = (source.filterValues && source.filterValues.named) || [];
-          const inversionVals = (source.filterValues && source.filterValues.inversion) || [];
-          const cardinalVals = (source.filterValues && source.filterValues.cardinality) || [];
-          const familyVals = (source.filterValues && source.filterValues.family) || [];
-          const x = [];
-          const y = [];
-          const text = [];
-          const custom = [];
-          const colors = [];
-          const total = Array.isArray(source.x) ? source.x.length : 0;
-          for (let i = 0; i < total; i++) {
-            const namedVal = String(namedVals[i]);
-            const inversionVal = String(inversionVals[i]);
+          const xSource = Array.isArray(source.x) ? source.x : [];
+          const ySource = Array.isArray(source.y) ? source.y : [];
+          const textSource = Array.isArray(source.text) ? source.text : [];
+          const customSource = Array.isArray(source.customdata) ? source.customdata : [];
+          const colorSource = Array.isArray(source.colors) ? source.colors : [];
+          const filterValues = source.filterValues || {};
+          const cardinalVals = Array.isArray(filterValues.cardinality) ? filterValues.cardinality : [];
+          const intervalVals = Array.isArray(filterValues.intervalPattern) ? filterValues.intervalPattern : [];
+          const pitchVals = Array.isArray(filterValues.pitchClass) ? filterValues.pitchClass : [];
+
+          const selected = [];
+          for (let i = 0; i < xSource.length; i++) {
             const cardVal = String(cardinalVals[i]);
-            const famVal = String(familyVals[i]);
-            if (namedFilter && !namedFilter.has(namedVal)) continue;
-            if (inversionFilter && !inversionFilter.has(inversionVal)) continue;
+            const intervalVal = String(intervalVals[i]);
             if (cardinalFilter && !cardinalFilter.has(cardVal)) continue;
-            if (familyFilter && !familyFilter.has(famVal)) continue;
-            x.push(source.x[i]);
-            y.push(source.y[i]);
-            text.push(source.text[i]);
-            custom.push(source.customdata[i]);
-            colors.push(source.colors[i]);
+            if (intervalFilter && !intervalFilter.has(intervalVal)) continue;
+            if (pitchFilter && pitchFilter.size) {
+              const rawPitch = Array.isArray(pitchVals[i]) ? pitchVals[i] : [pitchVals[i]];
+              let intersects = false;
+              for (let j = 0; j < rawPitch.length; j++) {
+                const pitchVal = rawPitch[j];
+                if (pitchVal === undefined || pitchVal === null) continue;
+                if (pitchFilter.has(String(pitchVal))) {
+                  intersects = true;
+                  break;
+                }
+              }
+              if (!intersects) continue;
+            }
+            selected.push(i);
           }
+
+          const pick = arr => selected.map(idx => arr[idx]);
           const baseMarker = Object.assign({}, source.baseMarker || {});
-          baseMarker.color = colors;
-          Plotly.restyle(gd, {
-            x: [x],
-            y: [y],
-            text: [text],
-            customdata: [custom],
-            marker: [baseMarker],
-          }, [traceIndex]);
+          baseMarker.color = pick(colorSource);
+          updates.x.push(pick(xSource));
+          updates.y.push(pick(ySource));
+          updates.text.push(pick(textSource));
+          updates.customdata.push(pick(customSource));
+          updates.marker.push(baseMarker);
+          indices.push(traceIndex);
         });
+
+        if (indices.length) {
+          Plotly.restyle(gd, updates, indices);
+        }
       }
 
       function registerCardFilters(card) {
@@ -1810,10 +1830,9 @@ def build_report_html_v2(
         }
 
         const state = {
-          named: new Set(),
-          inversion: new Set(),
           cardinality: new Set(),
-          families: new Set(),
+          intervalPattern: new Set(),
+          pitchClass: new Set(),
         };
 
         function ensureOptionGroup(def, field) {
@@ -1850,19 +1869,18 @@ def build_report_html_v2(
 
         const applyAll = () => {
           const filters = {
-            named: state.named,
-            inversion: state.inversion,
             cardinality: state.cardinality,
-            families: state.families,
+            intervalPattern: state.intervalPattern,
+            pitchClass: state.pitchClass,
           };
           figures.forEach(gd => applyFiltersToFigure(gd, filters));
         };
 
         const attachUI = dataset => {
           const fields = dataset && dataset.fields ? dataset.fields : {};
-          ensureOptionGroup(fields.named, 'named');
-          ensureOptionGroup(fields.inversion, 'inversion');
           ensureOptionGroup(fields.cardinality, 'cardinality');
+          ensureOptionGroup(fields.intervalPattern, 'intervalPattern');
+          ensureOptionGroup(fields.pitchClass, 'pitchClass');
         };
 
         let pending = figures.length;
