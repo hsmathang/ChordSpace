@@ -245,7 +245,6 @@ class LaboratorioAcordes:
         print(f"Experimento completado en {tiempo_total:.2f} segundos.")
         return resultado
 
-print("[ok] lab.py: Clase 'LaboratorioAcordes' actualizada y lista para ejecutar experimentos.")
 
 
 class MemoriaAcordes(LaboratorioAcordes):

@@ -838,5 +838,3 @@ class VisualizadorAcordesModular:
                                modo_forzado=modo_forzado)
         fig.show()
 
-
-print("[ok] Módulo visualization.py cargado con la nueva lógica de color transformado.")

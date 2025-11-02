@@ -8,6 +8,7 @@ and execute the experiment runner without dealing with command line syntax.
 from __future__ import annotations
 
 import datetime as dt
+import os
 import queue
 import tempfile
 import threading
@@ -20,7 +21,7 @@ from typing import Dict, List, Optional, Tuple
 
 from tools import data_access
 from tools.query_registry import get_all_queries, resolve_query_sql
-from tools.compare_proposals import PROPOSAL_INFO, METRIC_INFO, AVAILABLE_REDUCTIONS, PREPROCESSORS
+from services.proposals import PROPOSAL_INFO, METRIC_INFO, AVAILABLE_REDUCTIONS, PREPROCESSORS
 from tools.population_utils import dedupe_population
 from config import CHORD_TEMPLATES_METADATA
 import subprocess
@@ -43,6 +44,60 @@ from ui.launcher.state import LauncherState
 # (32 767 caracteres es el máximo; dejamos holgura por el resto de argumentos.)
 MAX_SQL_IDS_CHARS = 20000
 CHECK_MARK = "\u2713"
+
+
+class ScrollableFrame(ttk.Frame):
+    """Wrapper that provides a vertical scrollbar for large tab content."""
+
+    def __init__(self, master: tk.Misc, *, padding: int | tuple[int, int, int, int] = 0) -> None:
+        super().__init__(master)
+        self._canvas = tk.Canvas(self, highlightthickness=0)
+        self._canvas.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
+        self._vscroll = ttk.Scrollbar(self, orient=tk.VERTICAL, command=self._canvas.yview)
+        self._vscroll.pack(side=tk.RIGHT, fill=tk.Y)
+        self._canvas.configure(yscrollcommand=self._vscroll.set)
+
+        self.content = ttk.Frame(self._canvas, padding=padding)
+        self._window = self._canvas.create_window((0, 0), window=self.content, anchor="nw")
+
+        self.content.bind("<Configure>", self._on_content_configure)
+        self._canvas.bind("<Configure>", self._on_canvas_configure)
+
+        self._canvas.bind_all("<MouseWheel>", self._on_mousewheel)
+        self._canvas.bind_all("<Button-4>", self._on_mousewheel)
+        self._canvas.bind_all("<Button-5>", self._on_mousewheel)
+
+    # ------------------------------------------------------------------ events
+    def _on_content_configure(self, _event: tk.Event) -> None:
+        self._canvas.configure(scrollregion=self._canvas.bbox("all"))
+
+    def _on_canvas_configure(self, event: tk.Event) -> None:
+        self._canvas.itemconfigure(self._window, width=event.width)
+
+    def _on_mousewheel(self, event: tk.Event) -> None:
+        pointer_widget = self.winfo_containing(self.winfo_pointerx(), self.winfo_pointery())
+        if pointer_widget is None:
+            return
+        if not self._is_descendant(pointer_widget):
+            return
+        delta = 0
+        if getattr(event, "delta", 0):
+            delta = int(-event.delta / 120)
+        elif getattr(event, "num", None) in {4, 5}:
+            delta = 1 if event.num == 5 else -1
+        if delta:
+            self._canvas.yview_scroll(delta, "units")
+
+    def _is_descendant(self, widget: tk.Misc) -> bool:
+        current = widget
+        while current is not None:
+            if current is self:
+                return True
+            try:
+                current = current.master
+            except Exception:
+                return False
+        return False
 
 
 class ExperimentLauncher(tk.Tk):
@@ -273,96 +328,129 @@ class ExperimentLauncher(tk.Tk):
         nb.add(tab_compare, text="Parámetros de comparación")
         nb.add(tab_compare_reduction, text="Comparar reducciones")
 
-        # Tab: Población
-        pop_container = ttk.Frame(tab_population, padding=6)
-        pop_container.pack(fill=tk.BOTH, expand=True)
-        config_frame = ttk.LabelFrame(pop_container, text="Fuente base y salida")
-        config_frame.pack(fill=tk.X, pady=(0, 8))
+        # Tab: Población (controles + tabla en paned window)
+        population_paned = ttk.PanedWindow(tab_population, orient=tk.VERTICAL)
+        population_paned.pack(fill=tk.BOTH, expand=True)
+        self.population_paned = population_paned
+
+        pop_controls_scroll = ScrollableFrame(population_paned, padding=8)
+        population_paned.add(pop_controls_scroll, weight=3)
+        controls = pop_controls_scroll.content
+        controls.columnconfigure(0, weight=1)
+
+        config_frame = ttk.LabelFrame(controls, text="Fuente base y salida")
+        config_frame.grid(row=0, column=0, sticky="nwe")
         self._build_population_config_frame(config_frame)
 
-        middle_frame = ttk.Frame(pop_container)
-        middle_frame.pack(fill=tk.BOTH, expand=True)
-        left_col = ttk.Frame(middle_frame)
-        left_col.pack(side=tk.LEFT, fill=tk.BOTH, expand=True, padx=(0, 6))
-        pops_frame = ttk.LabelFrame(left_col, text="Poblaciones conjuntas (A/B/C)")
-        pops_frame.pack(fill=tk.BOTH, expand=True)
+        pops_frame = ttk.LabelFrame(controls, text="Poblaciones conjuntas (A/B/C)")
+        pops_frame.grid(row=1, column=0, sticky="nwe", pady=(8, 0))
         self._build_pops_frame(pops_frame)
-        self._build_filter_frame(left_col)
 
-        preview_row = ttk.Frame(pop_container)
-        preview_row.pack(fill=tk.X, padx=6, pady=(0, 6))
+        self._build_filter_frame(controls, row=2)
+
+        preview_row = ttk.Frame(controls)
+        preview_row.grid(row=3, column=0, sticky="w", pady=(10, 6))
         ttk.Button(preview_row, text="Construir / Previsualizar", command=self._on_population_preview_clicked).pack(side=tk.LEFT)
-        ttk.Label(preview_row, text="(usa la lista A/B/C y la consulta base opcional)").pack(side=tk.LEFT, padx=(8,0))
+        ttk.Label(preview_row, text="(usa la lista A/B/C y la consulta base opcional)").pack(side=tk.LEFT, padx=(8, 0))
 
-        table_frame = ttk.Frame(pop_container)
-        table_frame.pack(fill=tk.BOTH, expand=True, padx=6, pady=(0, 6))
-        columns = ("use","id","n","interval","notes","code","bass","octave","tag","span_semitones","abs_mask_int","abs_mask_hex")
-        self.pop_tree = ttk.Treeview(table_frame, columns=columns, show="headings", height=5)
+        pop_bottom = ttk.Frame(population_paned, padding=6)
+        population_paned.add(pop_bottom, weight=5)
+        pop_bottom.columnconfigure(0, weight=1)
+        pop_bottom.rowconfigure(1, weight=1)
+        pop_bottom.rowconfigure(3, weight=1)
+
+        self.pop_stats_var = tk.StringVar(value="—")
+        ttk.Label(pop_bottom, textvariable=self.pop_stats_var, foreground="#555").grid(row=0, column=0, sticky="w")
+
+        table_frame = ttk.Frame(pop_bottom)
+        table_frame.grid(row=1, column=0, sticky="nsew", pady=(4, 4))
+        table_frame.columnconfigure(0, weight=1)
+        table_frame.rowconfigure(0, weight=1)
+        columns = ("use", "id", "n", "interval", "notes", "code", "bass", "octave", "tag", "span_semitones", "abs_mask_int", "abs_mask_hex")
+        self.pop_tree = ttk.Treeview(table_frame, columns=columns, show="headings", height=6)
         for c in columns:
             self.pop_tree.heading(c, text=c)
             self.pop_tree.column(c, width=90 if c != "interval" else 120, anchor="center")
-        self.pop_tree.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
+        self.pop_tree.grid(row=0, column=0, sticky="nsew")
         scroll = ttk.Scrollbar(table_frame, orient=tk.VERTICAL, command=self.pop_tree.yview)
-        scroll.pack(side=tk.RIGHT, fill=tk.Y)
+        scroll.grid(row=0, column=1, sticky="ns")
         self.pop_tree.configure(yscrollcommand=scroll.set)
         self.pop_tree.bind("<Double-1>", self._on_population_toggle_row)
 
-        sel_tools = ttk.Frame(pop_container)
-        sel_tools.pack(fill=tk.X, padx=6, pady=(0, 6))
+        sel_tools = ttk.Frame(pop_bottom)
+        sel_tools.grid(row=2, column=0, sticky="w", pady=(0, 4))
         ttk.Button(sel_tools, text="Seleccionar todo", command=self._population_select_all).pack(side=tk.LEFT)
-        ttk.Button(sel_tools, text="Limpiar", command=self._population_clear).pack(side=tk.LEFT, padx=(6,0))
-        ttk.Button(sel_tools, text="Invertir", command=self._population_invert).pack(side=tk.LEFT, padx=(6,0))
+        ttk.Button(sel_tools, text="Limpiar", command=self._population_clear).pack(side=tk.LEFT, padx=(6, 0))
+        ttk.Button(sel_tools, text="Invertir", command=self._population_invert).pack(side=tk.LEFT, padx=(6, 0))
 
-        self.pop_stats_var = tk.StringVar(value="—")
-        ttk.Label(pop_container, textvariable=self.pop_stats_var, foreground="#555").pack(fill=tk.X, padx=6, pady=(0,6))
-
-        pop_log_frame = ttk.LabelFrame(pop_container, text="Registro de población")
-        pop_log_frame.pack(fill=tk.BOTH, expand=True, pady=(8, 0))
+        pop_log_frame = ttk.LabelFrame(pop_bottom, text="Registro de población")
+        pop_log_frame.grid(row=3, column=0, sticky="nsew", pady=(4, 0))
+        pop_log_frame.columnconfigure(0, weight=1)
+        pop_log_frame.rowconfigure(0, weight=1)
         self.pop_log = ScrolledText(pop_log_frame, height=8, state=tk.DISABLED, font=("Consolas", 10))
-        self.pop_log.pack(fill=tk.BOTH, expand=True, padx=4, pady=4)
+        self.pop_log.grid(row=0, column=0, sticky="nsew", padx=4, pady=4)
 
         # Tab: Experimento
-        exp_container = ttk.Frame(tab_experiment, padding=6)
-        exp_container.pack(fill=tk.BOTH, expand=True)
+        exp_scroll = ScrollableFrame(tab_experiment, padding=8)
+        exp_scroll.pack(fill=tk.BOTH, expand=True)
+        exp_container = exp_scroll.content
+        exp_container.columnconfigure(0, weight=1)
+
         exp_frame = ttk.LabelFrame(exp_container, text="Parámetros de experimento")
-        exp_frame.pack(fill=tk.X)
+        exp_frame.grid(row=0, column=0, sticky="nwe")
         self._build_experiment_params_frame(exp_frame)
+
         exp_actions = ttk.Frame(exp_container)
-        exp_actions.pack(fill=tk.X, pady=(10, 0))
+        exp_actions.grid(row=1, column=0, sticky="w", pady=(10, 0))
         self.run_button = ttk.Button(exp_actions, text="Ejecutar experimento", command=self._on_run_clicked)
         self.run_button.pack(side=tk.LEFT)
 
         exp_log_frame = ttk.LabelFrame(exp_container, text="Registro del experimento")
-        exp_log_frame.pack(fill=tk.BOTH, expand=True, pady=(8, 0))
+        exp_log_frame.grid(row=2, column=0, sticky="nsew", pady=(8, 0))
+        exp_log_frame.columnconfigure(0, weight=1)
+        exp_log_frame.rowconfigure(0, weight=1)
         self.exp_log = ScrolledText(exp_log_frame, height=8, state=tk.DISABLED, font=("Consolas", 10))
-        self.exp_log.pack(fill=tk.BOTH, expand=True, padx=4, pady=4)
+        self.exp_log.grid(row=0, column=0, sticky="nsew", padx=4, pady=4)
+        exp_container.rowconfigure(2, weight=1)
 
         # Tab: Comparación
-        compare_container = ttk.Frame(tab_compare, padding=6)
-        compare_container.pack(fill=tk.BOTH, expand=True)
+        compare_scroll = ScrollableFrame(tab_compare, padding=8)
+        compare_scroll.pack(fill=tk.BOTH, expand=True)
+        compare_container = compare_scroll.content
+        compare_container.columnconfigure(0, weight=1)
+
         compare_frame = ttk.LabelFrame(compare_container, text="Reporte de comparación")
-        compare_frame.pack(fill=tk.BOTH, expand=True)
+        compare_frame.grid(row=0, column=0, sticky="nwe")
         self._build_compare_frame(compare_frame)
 
         compare_log_frame = ttk.LabelFrame(compare_container, text="Registro de comparación")
-        compare_log_frame.pack(fill=tk.BOTH, expand=True, pady=(8, 0))
+        compare_log_frame.grid(row=1, column=0, sticky="nsew", pady=(8, 0))
+        compare_log_frame.columnconfigure(0, weight=1)
+        compare_log_frame.rowconfigure(0, weight=1)
         self.compare_log = ScrolledText(compare_log_frame, height=8, state=tk.DISABLED, font=("Consolas", 10))
-        self.compare_log.pack(fill=tk.BOTH, expand=True, padx=4, pady=4)
+        self.compare_log.grid(row=0, column=0, sticky="nsew", padx=4, pady=4)
+        compare_container.rowconfigure(1, weight=1)
 
         # Tab: Comparación de reducciones
-        red_container = ttk.Frame(tab_compare_reduction, padding=6)
-        red_container.pack(fill=tk.BOTH, expand=True)
+        red_scroll = ScrollableFrame(tab_compare_reduction, padding=8)
+        red_scroll.pack(fill=tk.BOTH, expand=True)
+        red_container = red_scroll.content
+        red_container.columnconfigure(0, weight=1)
+
         red_frame = ttk.LabelFrame(red_container, text="Comparación de reducciones dimensionales")
-        red_frame.pack(fill=tk.BOTH, expand=True)
+        red_frame.grid(row=0, column=0, sticky="nwe")
         self._build_reduction_compare_frame(red_frame)
 
         red_log_frame = ttk.LabelFrame(red_container, text="Registro comparación reducciones")
-        red_log_frame.pack(fill=tk.BOTH, expand=True, pady=(8, 0))
+        red_log_frame.grid(row=1, column=0, sticky="nsew", pady=(8, 0))
+        red_log_frame.columnconfigure(0, weight=1)
+        red_log_frame.rowconfigure(0, weight=1)
         self.reduction_log = ScrolledText(red_log_frame, height=8, state=tk.DISABLED, font=("Consolas", 10))
-        self.reduction_log.pack(fill=tk.BOTH, expand=True, padx=4, pady=4)
+        self.reduction_log.grid(row=0, column=0, sticky="nsew", padx=4, pady=4)
+        red_container.rowconfigure(1, weight=1)
 
         # Log global
-        log_frame = ttk.LabelFrame(main, text="Registro de ejecución")
+        log_frame = ttk.LabelFrame(main, text="Registro global")
         log_frame.pack(fill=tk.BOTH, expand=True, pady=(8, 0))
         self.log_widget = ScrolledText(log_frame, height=10, state=tk.DISABLED, font=("Consolas", 10))
         self.log_widget.pack(fill=tk.BOTH, expand=True)
@@ -371,6 +459,18 @@ class ExperimentLauncher(tk.Tk):
         self._bind_state_var(self.status_var, self.state.set_status)
         status_label = ttk.Label(main, textvariable=self.status_var, foreground="#555", anchor="w")
         status_label.pack(fill=tk.X, pady=(6, 0))
+
+        self.after(200, self._position_population_pane)
+
+    def _position_population_pane(self) -> None:
+        try:
+            if hasattr(self, "population_paned"):
+                self.population_paned.update_idletasks()
+                height = self.population_paned.winfo_height()
+                if height > 0:
+                    self.population_paned.sashpos(0, int(height * 0.55))
+        except Exception:
+            pass
 
     # --------------------------- sub frames
     def _build_population_config_frame(self, frame: ttk.Frame) -> None:
@@ -447,9 +547,11 @@ class ExperimentLauncher(tk.Tk):
         ttk.Button(buttons, text="Eliminar seleccionada", command=self._remove_selected_pop).pack(side=tk.LEFT)
         ttk.Button(buttons, text="Limpiar lista", command=self._clear_pops).pack(side=tk.RIGHT)
 
-    def _build_filter_frame(self, parent: ttk.Frame) -> None:
-        frame = ttk.LabelFrame(parent, text="Filtros dinamicos")
-        frame.pack(fill=tk.X, padx=6, pady=(6, 0))
+    def _build_filter_frame(self, parent: ttk.Frame, row: int) -> None:
+        frame = ttk.LabelFrame(parent, text="Filtros dinámicos")
+        frame.grid(row=row, column=0, sticky="nwe", pady=(8, 0))
+        parent.columnconfigure(0, weight=1)
+        frame.columnconfigure(1, weight=1)
 
         ttk.Checkbutton(
             frame,
@@ -461,7 +563,7 @@ class ExperimentLauncher(tk.Tk):
             "Activa para agregar una poblacion filtrada. Configura cardinalidades, span en semitonos, "
             "pitch classes (0-11) y patrones de intervalos (por ejemplo, 3,3; 5,2)."
         )
-        ttk.Label(frame, text=help_text, foreground="#555", wraplength=460, justify="left").grid(
+        ttk.Label(frame, text=help_text, foreground="#555", wraplength=520, justify="left").grid(
             row=1, column=0, columnspan=2, sticky="w", pady=(4, 2)
         )
 
@@ -483,9 +585,7 @@ class ExperimentLauncher(tk.Tk):
         ttk.Entry(span_frame, textvariable=self.filter_span_max_var, width=6).grid(row=0, column=2)
 
         ttk.Label(frame, text="Pitch classes (0-11):").grid(row=4, column=0, sticky="w", pady=(6, 0))
-        ttk.Entry(frame, textvariable=self.filter_include_pcs_var).grid(
-            row=4, column=1, sticky="we", pady=(6, 0)
-        )
+        ttk.Entry(frame, textvariable=self.filter_include_pcs_var).grid(row=4, column=1, sticky="we", pady=(6, 0))
         ttk.Label(
             frame,
             text="Separadas por coma. Ejemplo: 0,2,3",
@@ -502,14 +602,10 @@ class ExperimentLauncher(tk.Tk):
         ).grid(row=6, column=1, sticky="w", pady=(6, 0))
 
         ttk.Label(frame, text="Excluir pitch classes (opcional):").grid(row=7, column=0, sticky="w", pady=(6, 0))
-        ttk.Entry(frame, textvariable=self.filter_exclude_pcs_var).grid(
-            row=7, column=1, sticky="we", pady=(6, 0)
-        )
+        ttk.Entry(frame, textvariable=self.filter_exclude_pcs_var).grid(row=7, column=1, sticky="we", pady=(6, 0))
 
         ttk.Label(frame, text="Patrones intervalares (por ejemplo, 3,3; 5,2):").grid(row=8, column=0, sticky="w", pady=(6, 0))
-        ttk.Entry(frame, textvariable=self.filter_interval_var).grid(
-            row=8, column=1, sticky="we", pady=(6, 0)
-        )
+        ttk.Entry(frame, textvariable=self.filter_interval_var).grid(row=8, column=1, sticky="we", pady=(6, 0))
         ttk.Label(
             frame,
             text="Separa patrones con ';'. Dentro de cada patron usa comas.",
@@ -600,8 +696,13 @@ class ExperimentLauncher(tk.Tk):
         actions.pack(fill=tk.X, padx=6, pady=(4,6))
         self.compare_run_button = ttk.Button(actions, text="Ejecutar comparación", command=self._on_compare_run_clicked)
         self.compare_run_button.pack(side=tk.LEFT)
-        self.compare_open_button = ttk.Button(actions, text="Abrir reporte", command=self._on_compare_open_clicked, state=tk.DISABLED)
-        self.compare_open_button.pack(side=tk.LEFT, padx=(8,0))
+        self.compare_open_folder_button = ttk.Button(
+            actions,
+            text="Abrir carpeta",
+            command=self._on_compare_open_folder_clicked,
+            state=tk.DISABLED,
+        )
+        self.compare_open_folder_button.pack(side=tk.LEFT, padx=(6,0))
         self.compare_status_var = tk.StringVar(value="—")
         self._bind_state_var(self.compare_status_var, self.state.set_comparison_status)
         ttk.Label(actions, textvariable=self.compare_status_var, foreground="#555").pack(side=tk.RIGHT)
@@ -667,8 +768,13 @@ class ExperimentLauncher(tk.Tk):
         actions.pack(fill=tk.X, padx=6, pady=(4,6))
         self.reduction_run_button = ttk.Button(actions, text="Comparar reducciones", command=self._on_reduction_run_clicked)
         self.reduction_run_button.pack(side=tk.LEFT)
-        self.reduction_open_button = ttk.Button(actions, text="Abrir reporte", command=self._on_reduction_open_clicked, state=tk.DISABLED)
-        self.reduction_open_button.pack(side=tk.LEFT, padx=(8,0))
+        self.reduction_open_folder_button = ttk.Button(
+            actions,
+            text="Abrir carpeta",
+            command=self._on_reduction_open_folder_clicked,
+            state=tk.DISABLED,
+        )
+        self.reduction_open_folder_button.pack(side=tk.LEFT, padx=(6,0))
         self.reduction_status_var = tk.StringVar(value="—")
         ttk.Label(actions, textvariable=self.reduction_status_var, foreground="#555").pack(side=tk.RIGHT)
 
@@ -1332,7 +1438,7 @@ class ExperimentLauncher(tk.Tk):
             f"Propuestas: {prop_titles} | Métricas: {metric_titles} | Reducciones: {reductions_arg} | Semillas: {self.compare_seeds_var.get().strip()}\n"
         )
         try:
-            self.compare_open_button.configure(state=tk.DISABLED)
+            self.compare_open_folder_button.configure(state=tk.DISABLED)
         except Exception:
             pass
         args = [
@@ -1401,17 +1507,15 @@ class ExperimentLauncher(tk.Tk):
         finally:
             self.log_queue.put(("done", None))
 
-    def _on_compare_open_clicked(self) -> None:
+    def _on_compare_open_folder_clicked(self) -> None:
         if not self.compare_last_report:
-            messagebox.showwarning("Nada que abrir", "Aún no hay reporte de comparación disponible.")
+            messagebox.showwarning("Nada que abrir", "Aún no hay carpeta disponible.")
             return
-        if not self.compare_last_report.exists():
-            messagebox.showerror("Reporte no encontrado", f"No se encontró el archivo:\n{self.compare_last_report}")
+        parent = self.compare_last_report.parent
+        if not parent.exists():
+            messagebox.showerror("Carpeta no encontrada", f"No se encontró la carpeta:\n{parent}")
             return
-        try:
-            webbrowser.open_new_tab(str(self.compare_last_report))
-        except Exception as exc:  # pylint: disable=broad-except
-            messagebox.showerror("No se pudo abrir", str(exc))
+        self._open_path(parent)
 
     def _on_reduction_run_clicked(self) -> None:
         if self.running_thread and self.running_thread.is_alive():
@@ -1457,6 +1561,10 @@ class ExperimentLauncher(tk.Tk):
         sub = out_dir / f"compare_reductions_{_dt.datetime.now().strftime('%Y%m%d_%H%M%S')}"
         self.reduction_last_report = None
         self.reduction_expected_report = sub / "report.html"
+        try:
+            self.reduction_open_folder_button.configure(state=tk.DISABLED)
+        except Exception:
+            pass
 
         proposal_display = self.reduction_compare_prop_var.get().strip()
         proposal_id = self.proposal_display_inverse.get(proposal_display, proposal_display.split('(')[-1].split(')')[0].strip())
@@ -1553,19 +1661,28 @@ class ExperimentLauncher(tk.Tk):
         finally:
             self.log_queue.put(("done", None))
 
-    def _on_reduction_open_clicked(self) -> None:
+    def _on_reduction_open_folder_clicked(self) -> None:
         if not self.reduction_last_report:
-            messagebox.showwarning("Nada que abrir", "Aún no hay reporte disponible.")
+            messagebox.showwarning("Nada que abrir", "Aún no hay carpeta disponible.")
             return
-        if not self.reduction_last_report.exists():
-            messagebox.showerror("Reporte no encontrado", f"No se encontró el archivo:\n{self.reduction_last_report}")
+        parent = self.reduction_last_report.parent
+        if not parent.exists():
+            messagebox.showerror("Carpeta no encontrada", f"No se encontró la carpeta:\n{parent}")
             return
-        try:
-            webbrowser.open_new_tab(str(self.reduction_last_report))
-        except Exception as exc:  # pylint: disable=broad-except
-            messagebox.showerror("No se pudo abrir", str(exc))
+        self._open_path(parent)
 
     # ---------------------------------------------------------------- actions
+    def _open_path(self, path: Path) -> None:
+        try:
+            if sys.platform.startswith("darwin"):
+                subprocess.run(["open", str(path)], check=False)
+            elif os.name == "nt":  # pragma: no cover - Windows only
+                os.startfile(str(path))  # type: ignore[attr-defined]
+            else:
+                subprocess.run(["xdg-open", str(path)], check=False)
+        except Exception as exc:  # pragma: no cover - platform dependent
+            messagebox.showerror("No se pudo abrir", str(exc))
+
     def _default_output_dir(self) -> Path:
         timestamp = dt.datetime.now().strftime("%Y%m%d_%H%M%S")
         return Path("outputs") / "gui_runs" / timestamp
@@ -1700,11 +1817,11 @@ class ExperimentLauncher(tk.Tk):
                 if getattr(self, "compare_last_report", None):
                     try:
                         if self.compare_last_report.exists():
-                            self.compare_open_button.configure(state=tk.NORMAL)
+                            self.compare_open_folder_button.configure(state=tk.NORMAL)
                             if self.compare_status_var.get() == "Ejecutando…":
                                 self.compare_status_var.set("Listo.")
                         else:
-                            self.compare_open_button.configure(state=tk.DISABLED)
+                            self.compare_open_folder_button.configure(state=tk.DISABLED)
                             if self.compare_status_var.get() != "Error":
                                 self.compare_status_var.set("Reporte no encontrado")
                     except Exception:
@@ -1712,11 +1829,11 @@ class ExperimentLauncher(tk.Tk):
                 if getattr(self, "reduction_last_report", None):
                     try:
                         if self.reduction_last_report.exists():
-                            self.reduction_open_button.configure(state=tk.NORMAL)
+                            self.reduction_open_folder_button.configure(state=tk.NORMAL)
                             if self.reduction_status_var.get() == "Ejecutando…":
                                 self.reduction_status_var.set("Listo.")
                         else:
-                            self.reduction_open_button.configure(state=tk.DISABLED)
+                            self.reduction_open_folder_button.configure(state=tk.DISABLED)
                             if self.reduction_status_var.get() != "Error":
                                 self.reduction_status_var.set("Reporte no encontrado")
                     except Exception:
@@ -1740,4 +1857,3 @@ def main() -> None:
 
 if __name__ == "__main__":
     main()
-

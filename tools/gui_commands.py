@@ -125,6 +125,7 @@ class CommandRegistry:
 
     def __init__(self) -> None:
         self._commands: MutableMapping[str, ExperimentCommand] = {}
+        self._order: list[str] = []
 
     def register(self, name: str, command: ExperimentCommand) -> None:
         """Register a new command under ``name``.
@@ -140,11 +141,16 @@ class CommandRegistry:
         if not name:
             raise ValueError("El nombre del comando no puede estar vacío.")
         self._commands[name] = command
+        if name not in self._order:
+            self._order.append(name)
 
     def unregister(self, name: str) -> None:
         """Remove a previously registered command if present."""
 
-        self._commands.pop(name, None)
+        if name in self._commands:
+            self._commands.pop(name, None)
+        if name in self._order:
+            self._order.remove(name)
 
     def get(self, name: str) -> ExperimentCommand:
         """Retrieve a command by name, raising ``KeyError`` if missing."""
@@ -162,5 +168,4 @@ class CommandRegistry:
     def available(self) -> Iterable[str]:
         """Return an iterable with the registered command names."""
 
-        return tuple(self._commands.keys())
-
+        return tuple(name for name in self._order if name in self._commands)
