@@ -16,8 +16,8 @@ class DummyGateway(ExperimentDataGateway):
     def __init__(self) -> None:
         self.received = []
 
-    def run(self, args, df_override=None, descriptor=None):  # type: ignore[override]
-        self.received.append((args, df_override, descriptor))
+    def run(self, args, df_override=None, descriptor=None, progress_callback=None):  # type: ignore[override]
+        self.received.append((args, df_override, descriptor, progress_callback))
         return {"output_dir": "/tmp/out"}
 
 

@@ -27,6 +27,8 @@ class LauncherState:
     ponderation: str = "ninguna"
     execution_mode: str = "deterministic"
     n_jobs: Optional[str] = None
+    transpose_enabled: bool = False
+    transpose_steps: str = "0-11"
     selected_proposals: Set[str] = field(default_factory=set)
     selected_metrics: Set[str] = field(default_factory=set)
     selected_reductions: Set[str] = field(default_factory=set)

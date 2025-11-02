@@ -25,7 +25,7 @@ from __future__ import annotations
 
 import argparse
 from pathlib import Path
-from typing import List, Optional
+from typing import Callable, List, Optional
 
 import numpy as np
 import pandas as pd
@@ -426,9 +426,20 @@ def run_experiment_with_args(
     args: argparse.Namespace,
     df_override: Optional[pd.DataFrame] = None,
     descriptor: Optional[str] = None,
+    progress_callback: Optional[Callable[[float, Optional[str]], None]] = None,
 ) -> dict:
+    def _report(percent: float, message: Optional[str] = None) -> None:
+        if progress_callback is None:
+            return
+        try:
+            progress_callback(float(percent), None if message is None else str(message))
+        except Exception:  # pragma: no cover - defensive
+            pass
+
+    _report(0.0, "Preparando experimento…")
     out_dir = Path(getattr(args, "out", Path("outputs/inversions_experiment"))).resolve()
     out_dir.mkdir(parents=True, exist_ok=True)
+    _report(5.0, f"Directorio listo: {out_dir}")
 
     override_used = df_override is not None
 
@@ -496,6 +507,8 @@ def run_experiment_with_args(
     if df_pop is None or df_pop.empty:
         raise ValueError("La población resultante está vacía. Verifica la selección o consulta utilizada.")
 
+    _report(40.0, f"Población lista: {len(df_pop)} acordes")
+
     if override_used:
         df_pop = df_pop.reset_index(drop=True)
     elif pops_specs:
@@ -505,6 +518,7 @@ def run_experiment_with_args(
 
     acordes = acordes_from_df(df_pop)
     lab = LaboratorioAcordes(acordes)
+    _report(55.0, "Ejecutando modelo de rugosidad…")
     # Seleccionar modelo
     model_key = str(getattr(args, "model", "Sethares")).strip()
     if model_key in {"Sethares", "SetharesVec"}:
@@ -528,9 +542,11 @@ def run_experiment_with_args(
     # Métrica de distancia
     metric = str(getattr(args, "metric", "euclidean")).strip().lower()
     res = lab.ejecutar_experimento(modelo, ponderacion=ponderacion, metrica=metric, reduccion=args.reduction)
+    _report(80.0, "Calculando visualizaciones…")
 
     np.save(out_dir / "embeddings.npy", res.embeddings)
     np.save(out_dir / "distances.npy", res.matriz_distancias)
+    _report(90.0, "Guardando artefactos…")
 
     if pops_specs:
         experiment_descriptor = " | ".join(pops_specs)
@@ -567,6 +583,7 @@ def run_experiment_with_args(
         f.write(f"Distancias: {res.matriz_distancias.shape}\n")
 
     print("Listo. Artefactos en:", out_dir)
+    _report(100.0, "Experimento completado")
     return {
         "output_dir": out_dir,
         "pops": pops_specs,

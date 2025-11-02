@@ -6,7 +6,7 @@ import argparse
 import contextlib
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Optional
+from typing import Callable, Optional
 
 import pandas as pd
 
@@ -39,11 +39,13 @@ class ExperimentDataGateway:
         args: argparse.Namespace,
         df_override: Optional[pd.DataFrame] = None,
         descriptor: Optional[str] = None,
+        progress_callback: Optional[Callable[[float, Optional[str]], None]] = None,
     ) -> dict:
         return experiment_inversions.run_experiment_with_args(
             args,
             df_override=df_override,
             descriptor=descriptor,
+            progress_callback=progress_callback,
         )
 
 
@@ -116,7 +118,12 @@ class ExperimentLauncherController:
         )
 
     # ------------------------------------------------------------------ run
-    def run_experiment(self, request: ExperimentRunRequest) -> dict:
+    def run_experiment(
+        self,
+        request: ExperimentRunRequest,
+        *,
+        progress_callback: Optional[Callable[[float, Optional[str]], None]] = None,
+    ) -> dict:
         writer = QueueWriter(self.state.log_queue, category="exp_log")
         try:
             with contextlib.redirect_stdout(writer), contextlib.redirect_stderr(writer):
@@ -128,6 +135,7 @@ class ExperimentLauncherController:
                     request.args,
                     df_override=request.df_override,
                     descriptor=request.descriptor,
+                    progress_callback=progress_callback,
                 )
         finally:
             writer.flush()

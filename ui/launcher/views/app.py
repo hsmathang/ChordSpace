@@ -32,6 +32,7 @@ import datetime as _dt
 import pandas as pd
 import time
 from config import MODELO_OPTIONS_LIST, METRICA_OPTIONS_LIST, PONDERACION_OPTIONS_LIST
+from synth_tools import transpose_row
 
 from ui.launcher.controllers import (
     ExperimentLauncherController,
@@ -129,6 +130,11 @@ class ExperimentLauncher(tk.Tk):
         self.log_queue: queue.Queue = self.state.log_queue
         self._running_thread: threading.Thread | None = None
         self.pops_entries: list[str] = []
+        self.progress_var = tk.DoubleVar(value=0.0)
+        self.progress_text_var = tk.StringVar(value="0.0%")
+        self.progress_message_var = tk.StringVar(value="Listo.")
+        self._progress_reset_job: str | None = None
+        self._transpose_entry: ttk.Entry | None = None
 
         self._load_queries()
         self._init_state_vars()
@@ -140,6 +146,7 @@ class ExperimentLauncher(tk.Tk):
         self._create_layout()
 
         self.after(100, self._process_log_queue)
+        self._update_progress(0.0, "Listo.")
 
     # ------------------------------------------------------------------ props
     @property
@@ -182,6 +189,22 @@ class ExperimentLauncher(tk.Tk):
         self.pop_type_var = tk.StringVar(value="A")
         pop_default_query = options[1] if len(options) > 1 else "<Ninguna>"
         self.pop_query_var = tk.StringVar(value=pop_default_query)
+
+        self.transpose_enable_var = tk.BooleanVar(value=bool(self.state.transpose_enabled))
+        self._bind_state_var(
+            self.transpose_enable_var,
+            lambda value: self.state.update(transpose_enabled=bool(value)),
+            transform=lambda raw: bool(raw),
+        )
+        default_steps = self.state.transpose_steps or "0-11"
+        self.transpose_steps_var = tk.StringVar(value=default_steps)
+        self._bind_state_var(
+            self.transpose_steps_var,
+            lambda value: self.state.update(transpose_steps=value.strip()),
+            transform=lambda raw: raw.strip(),
+        )
+        self.transpose_enable_var.trace_add("write", self._on_transpose_toggle)
+        self.transpose_steps_var.trace_add("write", self._on_transpose_steps_changed)
 
         self.exec_mode_label_to_value = {
             "Determinista (semilla fija)": "deterministic",
@@ -471,6 +494,27 @@ class ExperimentLauncher(tk.Tk):
         self.log_widget = ScrolledText(log_frame, height=10, state=tk.DISABLED, font=("Consolas", 10))
         self.log_widget.pack(fill=tk.BOTH, expand=True)
 
+        progress_container = ttk.Frame(log_frame, padding=(6, 2, 6, 6))
+        progress_container.pack(fill=tk.X, expand=False)
+        bar_row = ttk.Frame(progress_container)
+        bar_row.pack(fill=tk.X, expand=True)
+        self.progress_bar = ttk.Progressbar(
+            bar_row,
+            variable=self.progress_var,
+            maximum=100.0,
+            mode="determinate",
+        )
+        self.progress_bar.pack(side=tk.LEFT, fill=tk.X, expand=True)
+        ttk.Label(bar_row, textvariable=self.progress_text_var, width=7, anchor="e").pack(
+            side=tk.LEFT, padx=(6, 0)
+        )
+        ttk.Label(
+            progress_container,
+            textvariable=self.progress_message_var,
+            anchor="w",
+            foreground="#555",
+        ).pack(fill=tk.X, pady=(2, 0))
+
         self.status_var = tk.StringVar(value="Listo.")
         self._bind_state_var(self.status_var, self.state.set_status)
         status_label = ttk.Label(main, textvariable=self.status_var, foreground="#555", anchor="w")
@@ -502,6 +546,149 @@ class ExperimentLauncher(tk.Tk):
         self.base_query_combo.grid(row=1, column=1, sticky="we", padx=(4,4), pady=(6,0))
         self.base_query_combo.bind("<<ComboboxSelected>>", lambda *_: self._mark_population_dirty())
         frame.columnconfigure(1, weight=1)
+
+        transpose_frame = ttk.LabelFrame(frame, text="Transposición sintética")
+        transpose_frame.grid(row=2, column=0, columnspan=3, sticky="we", pady=(8, 0))
+        transpose_frame.columnconfigure(1, weight=1)
+        ttk.Checkbutton(
+            transpose_frame,
+            text="Expandir población mediante transposiciones",
+            variable=self.transpose_enable_var,
+            command=self._on_transpose_toggle,
+        ).grid(row=0, column=0, columnspan=2, sticky="w")
+        ttk.Label(transpose_frame, text="Semitonos (ej. 0-11 o 1,4,7):").grid(row=1, column=0, sticky="w", pady=(6, 0))
+        entry = ttk.Entry(transpose_frame, textvariable=self.transpose_steps_var, width=26)
+        entry.grid(row=1, column=1, sticky="we", padx=(6, 0), pady=(6, 0))
+        self._transpose_entry = entry
+        self._update_transpose_entry_state()
+        ttk.Label(
+            transpose_frame,
+            text=(
+                "Se aplica después de combinar las fuentes y antes de deduplicar. "
+                "Los acordes fuera de [0,24] se omiten."
+            ),
+            foreground="#555",
+            wraplength=520,
+            justify="left",
+        ).grid(row=2, column=0, columnspan=2, sticky="w", pady=(4, 2))
+
+    def _on_transpose_toggle(self, *_args) -> None:
+        self._update_transpose_entry_state()
+        self._mark_population_dirty()
+
+    def _on_transpose_steps_changed(self, *_args) -> None:
+        if self.transpose_enable_var.get():
+            self._mark_population_dirty()
+
+    def _update_transpose_entry_state(self) -> None:
+        entry = getattr(self, "_transpose_entry", None)
+        if entry is None:
+            return
+        state = tk.NORMAL if self.transpose_enable_var.get() else tk.DISABLED
+        try:
+            entry.configure(state=state)
+        except Exception:
+            pass
+
+    def _parse_transposition_steps(self) -> List[int]:
+        raw = (self.transpose_steps_var.get() or "").strip()
+        if not raw:
+            return []
+        tokens = [token.strip() for token in re.split(r"[;,]", raw) if token.strip()]
+        if not tokens:
+            return []
+        steps: List[int] = []
+        for token in tokens:
+            if "-" in token:
+                parts = token.split("-", 1)
+                if len(parts) != 2:
+                    raise ValueError(f"Transposición: rango inválido '{token}'. Usa formato a-b.")
+                try:
+                    start = int(parts[0].strip())
+                    end = int(parts[1].strip())
+                except ValueError as exc:
+                    raise ValueError(f"Transposición: rango inválido '{token}'.") from exc
+                if start > end:
+                    start, end = end, start
+                for val in range(start, end + 1):
+                    if val not in steps:
+                        steps.append(val)
+            else:
+                try:
+                    value = int(token)
+                except ValueError as exc:
+                    raise ValueError("Transposición: ingresa semitonos como enteros o rangos a-b.") from exc
+                if value not in steps:
+                    steps.append(value)
+        filtered = [val for val in steps if -24 <= val <= 24]
+        if not filtered:
+            return []
+        if len(filtered) < len(steps):
+            self._append_pop_log("[población] Algunos semitonos quedaron fuera de [-24,24] y se omitieron.\n")
+        return filtered
+
+    def _apply_population_transpositions(self, df: pd.DataFrame) -> pd.DataFrame:
+        steps = self._parse_transposition_steps()
+        if not steps:
+            self._append_pop_log("[población] Transposición habilitada sin valores válidos; se omite.\n")
+            return df
+        base = df.copy()
+        if "__source__" not in base.columns:
+            base["__source__"] = "BASE"
+        if "__transposition__" not in base.columns:
+            base["__transposition__"] = 0
+        frames: List[pd.DataFrame] = [base]
+        total_added = 0
+        skipped = 0
+        error_samples: List[str] = []
+        applied_steps: List[int] = []
+        for step in steps:
+            if step == 0:
+                continue
+            applied_steps.append(step)
+            records: List[dict] = []
+            for _, row in base.iterrows():
+                row_dict = row.to_dict()
+                try:
+                    transposed = transpose_row(row_dict, step)
+                except Exception as exc:  # pylint: disable=broad-except
+                    skipped += 1
+                    if len(error_samples) < 5:
+                        error_samples.append(str(exc))
+                    continue
+                new_row = dict(row_dict)
+                new_row.update(transposed)
+                new_row["__transposition__"] = step
+                src = row_dict.get("__source__")
+                if isinstance(src, str) and src.strip():
+                    new_row["__source__"] = f"{src}+T{step:+03d}"
+                else:
+                    new_row["__source__"] = f"TRANSPOSE+T{step:+03d}"
+                records.append(new_row)
+            if records:
+                trans_df = pd.DataFrame.from_records(records)
+                for col in base.columns:
+                    if col not in trans_df.columns:
+                        trans_df[col] = pd.NA
+                trans_df = trans_df[base.columns]
+                frames.append(trans_df)
+                total_added += len(records)
+        if not applied_steps:
+            self._append_pop_log("[población] Transposición: solo se incluyó 0; no se generaron acordes nuevos.\n")
+            return base
+        result = pd.concat(frames, ignore_index=True, sort=False)
+        step_desc = ", ".join(f"{step:+d}" for step in applied_steps)
+        self._append_pop_log(
+            f"[población] Transposición aplicada (pasos {step_desc}). Filas añadidas: {total_added}.\n"
+        )
+        if skipped:
+            self._append_pop_log(
+                f"[población] Transposición: {skipped} registros omitidos por salir del rango permitido.\n"
+            )
+        if error_samples:
+            sample_text = "\n".join(error_samples)
+            self._append_log("[población] Advertencia durante transposición:\n" + sample_text + "\n")
+        return result
 
     def _build_experiment_params_frame(self, frame: ttk.Frame) -> None:
         ttk.Label(frame, text="Reducción dimensional:").grid(row=0, column=0, sticky="w")
@@ -897,7 +1084,10 @@ class ExperimentLauncher(tk.Tk):
         if not frames:
             raise ValueError("No hay fuentes configuradas. Agrega al menos una población conjunta o selecciona una consulta base.")
 
-        return pd.concat(frames, ignore_index=True)
+        combined = pd.concat(frames, ignore_index=True)
+        if self.transpose_enable_var.get():
+            combined = self._apply_population_transpositions(combined)
+        return combined
 
     def _append_tab_log(self, widget: ScrolledText, text: str) -> None:
         if widget is None:
@@ -1341,6 +1531,7 @@ class ExperimentLauncher(tk.Tk):
             if log_parts:
                 self._append_exp_log("[experimento] " + " | ".join(log_parts) + "\n")
 
+        self._update_progress(0.0, "Preparando experimento…")
         self._append_log("\n--- Ejecutando experimento ---\n")
         self._append_exp_log(
             f"[experimento] Modelo={request.args.model}, Métrica={request.args.metric}, "
@@ -1357,13 +1548,17 @@ class ExperimentLauncher(tk.Tk):
         self.running_thread.start()
 
     def _run_experiment_thread(self, request: ExperimentRunRequest) -> None:
+        def progress_cb(percent: float, message: Optional[str] = None) -> None:
+            self.log_queue.put(("progress", (percent, message)))
+
         try:
-            result = self.controller.run_experiment(request)
+            result = self.controller.run_experiment(request, progress_callback=progress_cb)
             self.log_queue.put(("exp_log", f"[experimento] Completado. Artefactos en: {result['output_dir']}\n"))
             self.log_queue.put(("exp_status", f"Experimento completado. Artefactos en: {result['output_dir']}"))
         except Exception as exc:  # pylint: disable=broad-except
             self.log_queue.put(("exp_error", str(exc)))
             self.log_queue.put(("error", str(exc)))
+            self.log_queue.put(("progress", (100.0, "Error en experimento")))
         finally:
             self.log_queue.put(("done", None))
 
@@ -1479,6 +1674,7 @@ class ExperimentLauncher(tk.Tk):
         mode_log = self.exec_mode_var.get()
         jobs_log = jobs_value if jobs_value else ("1" if exec_value == "deterministic" else "auto")
         self._append_compare_log(f"Modo: {mode_log} \u00B7 n_jobs={jobs_log}\n")
+        self._update_progress(0.0, "Preparando comparación…")
         self._append_log("\n--- Ejecutando reporte de comparación ---\n")
         try:
             cmd_preview = subprocess.list2cmdline(args)
@@ -1499,6 +1695,7 @@ class ExperimentLauncher(tk.Tk):
         try:
             with subprocess.Popen(proc_args, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True) as proc:
                 assert proc.stdout is not None
+                self.log_queue.put(("progress", (15.0, "Comparación en ejecución…")))
                 for line in proc.stdout:
                     self.log_queue.put(("compare_log", line))
                     m = report_re.search(line)
@@ -1506,6 +1703,7 @@ class ExperimentLauncher(tk.Tk):
                         path = m.group(1).strip()
                         try:
                             self.compare_last_report = Path(path)
+                            self.log_queue.put(("progress", (90.0, f"Reporte: {self.compare_last_report.name}")))
                         except Exception:
                             self.compare_last_report = None
             # Si no se detectó por regex, intentar la esperada
@@ -1516,10 +1714,12 @@ class ExperimentLauncher(tk.Tk):
             except Exception:
                 pass
             t1 = time.perf_counter()
+            self.log_queue.put(("progress", (100.0, "Comparación completada")))
             self.log_queue.put(("compare_status", f"Comparación completada en {(t1 - t0):.2f}s."))
         except Exception as exc:  # pylint: disable=broad-except
             self.log_queue.put(("compare_error", str(exc)))
             self.log_queue.put(("error", str(exc)))
+            self.log_queue.put(("progress", (100.0, "Error en comparación")))
         finally:
             self.log_queue.put(("done", None))
 
@@ -1606,6 +1806,7 @@ class ExperimentLauncher(tk.Tk):
         except Exception:
             pass
 
+        self._update_progress(0.0, "Preparando comparación de reducciones…")
         args = [
             sys.executable,
             "-m",
@@ -1657,6 +1858,7 @@ class ExperimentLauncher(tk.Tk):
         try:
             with subprocess.Popen(proc_args, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True) as proc:
                 assert proc.stdout is not None
+                self.log_queue.put(("progress", (15.0, "Comparación de reducciones en ejecución…")))
                 for line in proc.stdout:
                     self.log_queue.put(("reduction_log", line))
                     m = report_re.search(line)
@@ -1664,16 +1866,19 @@ class ExperimentLauncher(tk.Tk):
                         path = m.group(1).strip()
                         try:
                             self.reduction_last_report = Path(path)
+                            self.log_queue.put(("progress", (90.0, f"Reporte: {self.reduction_last_report.name}")))
                         except Exception:
                             self.reduction_last_report = None
             expected = getattr(self, "reduction_expected_report", None)
             if self.reduction_last_report is None and expected and expected.exists():
                 self.reduction_last_report = expected
             t1 = time.perf_counter()
+            self.log_queue.put(("progress", (100.0, "Comparación de reducciones completada")))
             self.log_queue.put(("reduction_status", f"Comparación completada en {(t1 - t0):.2f}s."))
         except Exception as exc:  # pylint: disable=broad-except
             self.log_queue.put(("reduction_error", str(exc)))
             self.log_queue.put(("error", str(exc)))
+            self.log_queue.put(("progress", (100.0, "Error en comparación de reducciones")))
         finally:
             self.log_queue.put(("done", None))
 
@@ -1796,6 +2001,17 @@ class ExperimentLauncher(tk.Tk):
             elif kind == "reduction_log":
                 self._append_log(payload)
                 self._append_reduction_log(payload)
+            elif kind == "progress":
+                percent = 0.0
+                message = None
+                if isinstance(payload, tuple):
+                    if payload:
+                        percent = payload[0]
+                    if len(payload) > 1:
+                        message = payload[1]
+                else:
+                    percent = payload
+                self._update_progress(percent, message)
             elif kind == "exp_status":
                 self._append_log(f"{payload}\n")
                 self.status_var.set(payload)
@@ -1812,12 +2028,15 @@ class ExperimentLauncher(tk.Tk):
                 self._append_reduction_log(f"{payload}\n")
             elif kind == "exp_error":
                 self._append_exp_log(f"Error: {payload}\n")
+                self._update_progress(100.0, "Error en experimento")
             elif kind == "compare_error":
                 self._append_compare_log(f"Error: {payload}\n")
                 self.compare_status_var.set("Error")
+                self._update_progress(100.0, "Error en comparación")
             elif kind == "reduction_error":
                 self._append_reduction_log(f"Error: {payload}\n")
                 self.reduction_status_var.set("Error")
+                self._update_progress(100.0, "Error en comparación de reducciones")
             elif kind == "status":
                 self._append_log(f"{payload}\n")
                 self.status_var.set(payload)
@@ -1826,9 +2045,12 @@ class ExperimentLauncher(tk.Tk):
                 self._append_log(f"{message}\n")
                 self.status_var.set("Error durante la ejecución.")
                 messagebox.showerror("Error en el experimento", payload)
+                self._update_progress(100.0, "Error")
             elif kind == "done":
                 self._set_controls_state(tk.NORMAL)
                 self._cleanup_temp_payloads()
+                if float(self.progress_var.get()) < 99.0:
+                    self._update_progress(100.0)
                 # Como salvaguarda, habilitar abrir si hay reporte
                 if getattr(self, "compare_last_report", None):
                     try:
@@ -1854,6 +2076,7 @@ class ExperimentLauncher(tk.Tk):
                                 self.reduction_status_var.set("Reporte no encontrado")
                     except Exception:
                         pass
+                self._schedule_progress_reset()
         self.after(120, self._process_log_queue)
 
 
