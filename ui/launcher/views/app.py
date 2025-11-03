@@ -374,6 +374,7 @@ class ExperimentLauncher(tk.Tk):
         self.filter_exclude_pcs_var = tk.StringVar(value="")
         self.filter_interval_var = tk.StringVar(value="")
         self.filter_code_var = tk.StringVar(value="")
+        self.filter_max_internal_interval_var = tk.StringVar(value="")
         self.filter_scale_expand_var = tk.BooleanVar(value=False)
         # Nuevos modos para filtros avanzados
         self.filter_pc_mode_labels = [
@@ -405,6 +406,9 @@ class ExperimentLauncher(tk.Tk):
         self.filter_mode_var = tk.StringVar(value=default_pop_mode)
         self.filter_mode_var.trace_add("write", lambda *_: self._mark_population_dirty())
         self.filter_scale_expand_var.trace_add("write", lambda *_: self._mark_population_dirty())
+        self.filter_max_internal_interval_var.trace_add(
+            "write", lambda *_: self._mark_population_dirty()
+        )
 
     def _create_layout(self) -> None:
         main = ttk.Frame(self, padding=14)
@@ -843,63 +847,86 @@ class ExperimentLauncher(tk.Tk):
         ttk.Label(span_frame, text="max:").grid(row=0, column=1, padx=(8, 4))
         ttk.Entry(span_frame, textvariable=self.filter_span_max_var, width=6).grid(row=0, column=2)
 
-        ttk.Label(frame, text="Pitch classes (0-11):").grid(row=4, column=0, sticky="w", pady=(6, 0))
-        ttk.Entry(frame, textvariable=self.filter_include_pcs_var).grid(row=4, column=1, sticky="we", pady=(6, 0))
+        ttk.Label(frame, text="Máx. intervalo interno (≤ semitonos):").grid(
+            row=4, column=0, sticky="w", pady=(6, 0)
+        )
+        ttk.Entry(frame, textvariable=self.filter_max_internal_interval_var, width=8).grid(
+            row=4, column=1, sticky="w", pady=(6, 0)
+        )
+
+        row_offset = 1
+
+        ttk.Label(frame, text="Pitch classes (0-11):").grid(row=4 + row_offset, column=0, sticky="w", pady=(6, 0))
+        ttk.Entry(frame, textvariable=self.filter_include_pcs_var).grid(
+            row=4 + row_offset, column=1, sticky="we", pady=(6, 0)
+        )
         ttk.Label(
             frame,
             text="Separadas por coma. Ejemplo: 0,2,3",
             foreground="#555",
-        ).grid(row=5, column=0, columnspan=2, sticky="w")
+        ).grid(row=5 + row_offset, column=0, columnspan=2, sticky="w")
 
-        ttk.Label(frame, text="Modo PC:").grid(row=6, column=0, sticky="w", pady=(6, 0))
+        ttk.Label(frame, text="Modo PC:").grid(row=6 + row_offset, column=0, sticky="w", pady=(6, 0))
         ttk.Combobox(
             frame,
             textvariable=self.filter_pc_mode_var,
             values=self.filter_pc_mode_labels,
             state="readonly",
             width=24,
-        ).grid(row=6, column=1, sticky="w", pady=(6, 0))
+        ).grid(row=6 + row_offset, column=1, sticky="w", pady=(6, 0))
 
         ttk.Checkbutton(
             frame,
             text="Expandir escala con transposiciones (usa pitch classes incluidas)",
             variable=self.filter_scale_expand_var,
             command=self._mark_population_dirty,
-        ).grid(row=7, column=0, columnspan=2, sticky="w", pady=(4, 0))
+        ).grid(row=7 + row_offset, column=0, columnspan=2, sticky="w", pady=(4, 0))
 
-        ttk.Label(frame, text="Excluir pitch classes (opcional):").grid(row=8, column=0, sticky="w", pady=(6, 0))
-        ttk.Entry(frame, textvariable=self.filter_exclude_pcs_var).grid(row=8, column=1, sticky="we", pady=(6, 0))
+        ttk.Label(frame, text="Excluir pitch classes (opcional):").grid(
+            row=8 + row_offset, column=0, sticky="w", pady=(6, 0)
+        )
+        ttk.Entry(frame, textvariable=self.filter_exclude_pcs_var).grid(
+            row=8 + row_offset, column=1, sticky="we", pady=(6, 0)
+        )
 
-        ttk.Label(frame, text="Patrones intervalares (por ejemplo, 3,3; 5,2):").grid(row=9, column=0, sticky="w", pady=(6, 0))
-        ttk.Entry(frame, textvariable=self.filter_interval_var).grid(row=9, column=1, sticky="we", pady=(6, 0))
+        ttk.Label(frame, text="Patrones intervalares (por ejemplo, 3,3; 5,2):").grid(
+            row=9 + row_offset, column=0, sticky="w", pady=(6, 0)
+        )
+        ttk.Entry(frame, textvariable=self.filter_interval_var).grid(
+            row=9 + row_offset, column=1, sticky="we", pady=(6, 0)
+        )
         ttk.Label(
             frame,
             text="Separa patrones con ';'. Dentro de cada patron usa comas.",
             foreground="#555",
-        ).grid(row=10, column=0, columnspan=2, sticky="w")
+        ).grid(row=10 + row_offset, column=0, columnspan=2, sticky="w")
 
-        ttk.Label(frame, text="Modo intervalos:").grid(row=11, column=0, sticky="w", pady=(6, 0))
+        ttk.Label(frame, text="Modo intervalos:").grid(row=11 + row_offset, column=0, sticky="w", pady=(6, 0))
         ttk.Combobox(
             frame,
             textvariable=self.filter_interval_mode_var,
             values=self.filter_interval_mode_labels,
             state="readonly",
             width=24,
-        ).grid(row=11, column=1, sticky="w", pady=(6, 0))
+        ).grid(row=11 + row_offset, column=1, sticky="w", pady=(6, 0))
 
-        ttk.Label(frame, text="Codigos absolutos (ej. 0135679AB0):").grid(row=12, column=0, sticky="w", pady=(6, 0))
+        ttk.Label(frame, text="Codigos absolutos (ej. 0135679AB0):").grid(
+            row=12 + row_offset, column=0, sticky="w", pady=(6, 0)
+        )
         ttk.Entry(frame, textvariable=self.filter_code_var).grid(
-            row=12, column=1, sticky="we", pady=(6, 0)
+            row=12 + row_offset, column=1, sticky="we", pady=(6, 0)
         )
 
-        ttk.Label(frame, text="Modo para filtros (A/B/C):").grid(row=13, column=0, sticky="w", pady=(8, 0))
+        ttk.Label(frame, text="Modo para filtros (A/B/C):").grid(
+            row=13 + row_offset, column=0, sticky="w", pady=(8, 0)
+        )
         ttk.Combobox(
             frame,
             textvariable=self.filter_mode_var,
             values=["A", "B", "C"],
             state="readonly",
             width=6,
-        ).grid(row=13, column=1, sticky="w", pady=(8, 0))
+        ).grid(row=13 + row_offset, column=1, sticky="w", pady=(8, 0))
 
         frame.columnconfigure(1, weight=1)
 
@@ -1224,6 +1251,16 @@ class ExperimentLauncher(tk.Tk):
         if filters.span_max is not None and filters.span_max == 0:
             filters.span_max = None
 
+        max_internal_raw = self.filter_max_internal_interval_var.get().strip()
+        if max_internal_raw:
+            try:
+                max_internal = int(max_internal_raw)
+            except ValueError as exc:
+                raise ValueError("Máximo intervalo interno debe ser un entero.") from exc
+            if max_internal < 0:
+                raise ValueError("Máximo intervalo interno no puede ser negativo.")
+            filters.max_internal_interval = max_internal
+
         def _parse_pc_list(raw: str, field: str) -> List[int]:
             items: List[int] = []
             for token in [t.strip() for t in raw.replace(";", ",").split(",") if t.strip()]:
@@ -1294,6 +1331,7 @@ class ExperimentLauncher(tk.Tk):
             selected_card,
             filters.span_min is not None,
             filters.span_max is not None,
+            filters.max_internal_interval is not None,
             filters.include_pitch_classes,
             filters.exclude_pitch_classes,
             filters.interval_exact,
@@ -1313,6 +1351,8 @@ class ExperimentLauncher(tk.Tk):
             summary_parts.append("pc+" + ",".join(str(v) for v in filters.include_pitch_classes))
         if filters.exclude_pitch_classes:
             summary_parts.append("pc-" + ",".join(str(v) for v in filters.exclude_pitch_classes))
+        if filters.max_internal_interval is not None:
+            summary_parts.append(f"int≤{filters.max_internal_interval}")
         if getattr(filters, "include_pc_mode", None) and filters.include_pc_mode != "contains_all":
             summary_parts.append(f"pc_mode={filters.include_pc_mode}")
         if filters.interval_exact:

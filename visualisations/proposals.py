@@ -231,6 +231,7 @@ def _build_filter_metadata(
         return "[" + ", ".join(str(v) for v in pattern) + "]"
 
     interval_sequences = [_interval_sequence(entry) for entry in entries]
+    max_internal_values: List[int] = []
     pattern_registry: Dict[str, Dict[str, Any]] = {}
     interval_values: List[str] = []
     for pattern in interval_sequences:
@@ -244,6 +245,11 @@ def _build_filter_metadata(
             },
         )
         info["count"] = info.get("count", 0) + 1
+        try:
+            max_internal = max(int(step) for step in pattern) if pattern else 0
+        except ValueError:
+            max_internal = 0
+        max_internal_values.append(max_internal)
 
     def _pitch_classes(entry: "ChordEntry") -> List[int]:
         acorde = getattr(entry, "acorde", None)
@@ -285,6 +291,18 @@ def _build_filter_metadata(
         },
     }
 
+    if max_internal_values:
+        max_allowed = int(max(max_internal_values))
+        min_allowed = int(min(max_internal_values))
+        filter_definitions["maxInternalInterval"] = {
+            "label": "Máximo intervalo interno (semitonos)",
+            "type": "numeric",
+            "min": min_allowed,
+            "max": max_allowed,
+            "default": max_allowed,
+            "step": 1,
+        }
+
     if pattern_registry:
         options = [
             {
@@ -322,6 +340,7 @@ def _build_filter_metadata(
         "cardinality": cardinalities,
         "intervalPattern": interval_values,
         "pitchClass": pitch_class_values,
+        "maxInternalInterval": max_internal_values,
         "family": list(family_tags),
     }
     return filter_definitions, field_values
@@ -662,6 +681,7 @@ def apply_scatter_filters(
     cardinality: Optional[Sequence[int]] = None,
     interval_pattern: Optional[Sequence[str]] = None,
     pitch_class: Optional[Sequence[int]] = None,
+    max_internal_interval: Optional[int] = None,
 ) -> Dict[str, Any]:
     """Return a filtered copy of a scatter payload.
 
@@ -676,6 +696,8 @@ def apply_scatter_filters(
     pitch_class:
         Allowed pitch classes. If provided, a chord must include at least one of the
         selected pitch classes to remain visible.
+    max_internal_interval:
+        Upper bound (inclusive) for the largest adjacent interval inside a chord.
     """
 
     dataset = payload.get("meta", {}).get("filterDataset")
@@ -685,6 +707,12 @@ def apply_scatter_filters(
     cardinality_set = _normalise_filter_values(cardinality)
     interval_set = _normalise_filter_values(interval_pattern)
     pitch_class_set = _normalise_filter_values(pitch_class)
+    max_internal_value = None
+    if max_internal_interval is not None:
+        try:
+            max_internal_value = int(max_internal_interval)
+        except (TypeError, ValueError):
+            max_internal_value = None
 
     filtered_traces: List[Dict[str, Any]] = []
     original_traces = payload.get("data", [])
@@ -705,6 +733,7 @@ def apply_scatter_filters(
         cardinality_values = [str(v) for v in filter_values.get("cardinality", [])]
         interval_values = [str(v) for v in filter_values.get("intervalPattern", [])]
         pitch_values_raw = filter_values.get("pitchClass", [])
+        max_internal_raw = filter_values.get("maxInternalInterval", [])
 
         selected_indices: List[int] = []
         for idx in range(len(x_source)):
@@ -719,6 +748,16 @@ def apply_scatter_filters(
                 else:
                     pitch_as_set = {str(pitch_values)} if pitch_values is not None else set()
                 if not (pitch_as_set & pitch_class_set):
+                    continue
+            if max_internal_value is not None:
+                try:
+                    current_max = max_internal_raw[idx]
+                    if isinstance(current_max, (list, tuple)):
+                        current_max = current_max[0] if current_max else None
+                    current_val = int(current_max)
+                except (ValueError, TypeError, IndexError):
+                    current_val = None
+                if current_val is None or current_val > max_internal_value:
                     continue
             selected_indices.append(idx)
 
@@ -744,6 +783,7 @@ def apply_scatter_filters(
         "cardinality": sorted(cardinality_set) if cardinality_set else None,
         "intervalPattern": sorted(interval_set) if interval_set else None,
         "pitchClass": sorted(pitch_class_set) if pitch_class_set else None,
+        "maxInternalInterval": max_internal_value,
     }
     new_payload["meta"] = meta
     if "layout" in new_payload:

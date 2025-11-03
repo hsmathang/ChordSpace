@@ -1748,7 +1748,7 @@ def build_report_html_v2(
 
       function ensureSourceCache(source) {
         if (!source) {
-          return {cardinality: [], intervalPattern: [], pitchClass: []};
+          return {cardinality: [], intervalPattern: [], pitchClass: [], maxInternalInterval: []};
         }
         if (!source._filterCache) {
           const filterValues = source.filterValues || {};
@@ -1771,10 +1771,17 @@ def build_report_html_v2(
                 return [String(entry)];
               })
             : [];
+          const maxInternalInterval = Array.isArray(filterValues.maxInternalInterval)
+            ? filterValues.maxInternalInterval.map(value => {
+                const num = Number(value);
+                return Number.isFinite(num) ? num : null;
+              })
+            : [];
           source._filterCache = {
             cardinality,
             intervalPattern,
             pitchClass,
+            maxInternalInterval,
           };
         }
         return source._filterCache;
@@ -1786,7 +1793,10 @@ def build_report_html_v2(
         const cardinalFilter = filters.cardinality && filters.cardinality.size ? filters.cardinality : null;
         const intervalFilter = filters.intervalPattern && filters.intervalPattern.size ? filters.intervalPattern : null;
         const pitchFilter = filters.pitchClass && filters.pitchClass.size ? filters.pitchClass : null;
-        const noFilters = !cardinalFilter && !intervalFilter && !pitchFilter;
+        const internalFilter = Number.isFinite(filters.maxInternalInterval)
+          ? Number(filters.maxInternalInterval)
+          : null;
+        const noFilters = !cardinalFilter && !intervalFilter && !pitchFilter && internalFilter === null;
 
         const updates = {
           x: [],
@@ -1822,6 +1832,7 @@ def build_report_html_v2(
           const cardinalVals = cache.cardinality;
           const intervalVals = cache.intervalPattern;
           const pitchVals = cache.pitchClass;
+          const internalVals = cache.maxInternalInterval;
 
           const selected = [];
           for (let i = 0; i < xSource.length; i++) {
@@ -1840,6 +1851,11 @@ def build_report_html_v2(
                 }
               }
               if (!intersects) continue;
+            }
+            if (internalFilter !== null) {
+              const rawInternal = internalVals[i];
+              const numericInternal = Number(rawInternal);
+              if (!Number.isFinite(numericInternal) || numericInternal > internalFilter) continue;
             }
             selected.push(i);
           }
@@ -1880,25 +1896,110 @@ def build_report_html_v2(
           cardinality: new Set(),
           intervalPattern: new Set(),
           pitchClass: new Set(),
+          maxInternalInterval: null,
         };
         const metadata = {
           cardinality: new Set(),
           intervalPattern: new Set(),
           pitchClass: new Set(),
+          maxInternalInterval: null,
         };
         const controls = {
           cardinality: new Map(),
           intervalPattern: new Map(),
           pitchClass: new Map(),
+          maxInternalInterval: null,
         };
 
-        function ensureOptionGroup(def, field) {
-          if (!def || !Array.isArray(def.options) || !def.options.length) return;
+        function ensureFilterControl(def, field) {
+          if (!def) return;
           const fieldset = document.createElement('fieldset');
           fieldset.className = 'filter-group';
           const legend = document.createElement('legend');
           legend.textContent = def.label || field;
           fieldset.appendChild(legend);
+
+          if (def.type === 'numeric') {
+            const min = Number.isFinite(def.min) ? Number(def.min) : 0;
+            const max = Number.isFinite(def.max) ? Number(def.max) : min;
+            const step = Number.isFinite(def.step) && def.step > 0 ? Number(def.step) : 1;
+            const defaultValue = Number.isFinite(def.default) ? Number(def.default) : max;
+
+            metadata[field] = { min, max, step, defaultValue };
+
+            const wrapper = document.createElement('div');
+            wrapper.className = 'filter-numeric';
+
+            const slider = document.createElement('input');
+            slider.type = 'range';
+            slider.min = String(min);
+            slider.max = String(max);
+            slider.step = String(step);
+            slider.value = String(defaultValue);
+
+            const numberInput = document.createElement('input');
+            numberInput.type = 'number';
+            numberInput.min = String(min);
+            numberInput.max = String(max);
+            numberInput.step = String(step);
+            numberInput.value = String(defaultValue);
+
+            const clearButton = document.createElement('button');
+            clearButton.type = 'button';
+            clearButton.textContent = 'Limpiar';
+            clearButton.className = 'filter-clear';
+
+            const applyValue = value => {
+              if (value === null) {
+                state[field] = null;
+                numberInput.value = '';
+                slider.value = String(defaultValue);
+              } else {
+                const bounded = Math.max(min, Math.min(max, value));
+                slider.value = String(bounded);
+                numberInput.value = String(bounded);
+                state[field] = bounded;
+              }
+              applyAll();
+            };
+
+            slider.addEventListener('input', () => {
+              const val = Number(slider.value);
+              if (Number.isFinite(val)) {
+                numberInput.value = slider.value;
+                state[field] = val;
+                applyAll();
+              }
+            });
+
+            numberInput.addEventListener('change', () => {
+              const raw = numberInput.value.trim();
+              if (!raw) {
+                applyValue(null);
+                return;
+              }
+              const parsed = Number(raw);
+              if (Number.isFinite(parsed)) {
+                applyValue(parsed);
+              } else {
+                numberInput.value = state[field] === null ? '' : String(state[field]);
+              }
+            });
+
+            clearButton.addEventListener('click', () => applyValue(null));
+
+            wrapper.appendChild(slider);
+            wrapper.appendChild(numberInput);
+            wrapper.appendChild(clearButton);
+            fieldset.appendChild(wrapper);
+
+            controls[field] = { slider, numberInput, clearButton };
+            state[field] = defaultValue;
+            container.appendChild(fieldset);
+            return;
+          }
+
+          if (!Array.isArray(def.options) || !def.options.length) return;
 
           const fieldMetadata = metadata[field] || new Set();
           metadata[field] = fieldMetadata;
@@ -2032,7 +2133,7 @@ def build_report_html_v2(
               subgroup.className = 'filter-subgroup';
               const keyNum = parseInt(key, 10);
               const isNumeric = !Number.isNaN(keyNum);
-              const defaultOpen = isNumeric ? keyNum <= 4 : false;
+              const defaultOpen = false;
               subgroup.open = defaultOpen;
               subgroup.dataset.defaultOpen = defaultOpen ? '1' : '0';
 
@@ -2081,6 +2182,20 @@ def build_report_html_v2(
               });
             };
             searchInput.addEventListener('input', handleSearch);
+          } else if (field === 'pitchClass') {
+            const details = document.createElement('details');
+            details.className = 'filter-subgroup';
+            details.open = false;
+            details.dataset.defaultOpen = '0';
+            const summary = document.createElement('summary');
+            const totalOptions = Array.isArray(def.options) ? def.options.length : 0;
+            summary.textContent = `Opciones (${totalOptions})`;
+            details.appendChild(summary);
+            const optionsContainer = document.createElement('div');
+            optionsContainer.className = 'filter-options-vertical';
+            def.options.forEach(opt => registerOption(optionsContainer, opt, details));
+            details.appendChild(optionsContainer);
+            fieldset.appendChild(details);
           } else {
             const optionsContainer = document.createElement('div');
             optionsContainer.className = 'filter-options-vertical';
@@ -2092,6 +2207,15 @@ def build_report_html_v2(
         }
 
         const getEffectiveFilter = field => {
+          if (field === 'maxInternalInterval') {
+            const value = state[field];
+            if (!Number.isFinite(value)) return null;
+            const info = metadata[field];
+            if (info && Number.isFinite(info.defaultValue) && value >= info.defaultValue) {
+              return null;
+            }
+            return value;
+          }
           const selected = state[field];
           if (!selected || !selected.size) return null;
           const available = metadata[field];
@@ -2102,21 +2226,28 @@ def build_report_html_v2(
           return selected;
         };
 
-        const buildSignature = filters =>
-          ['cardinality', 'intervalPattern', 'pitchClass']
-            .map(field => {
-              const set = filters[field];
-              if (!set || !set.size) return `${field}:*`;
+        const buildSignature = filters => {
+          const parts = [];
+          ['cardinality', 'intervalPattern', 'pitchClass'].forEach(field => {
+            const set = filters[field];
+            if (!set || !set.size) {
+              parts.push(`${field}:*`);
+            } else {
               const values = Array.from(set).sort();
-              return `${field}:${values.join(',')}`;
-            })
-            .join('|');
+              parts.push(`${field}:${values.join(',')}`);
+            }
+          });
+          const numeric = filters.maxInternalInterval;
+          parts.push(`maxInternalInterval:${numeric === null || numeric === undefined ? '*' : numeric}`);
+          return parts.join('|');
+        };
 
         const applyAll = () => {
           const filters = {
             cardinality: getEffectiveFilter('cardinality'),
             intervalPattern: getEffectiveFilter('intervalPattern'),
             pitchClass: getEffectiveFilter('pitchClass'),
+            maxInternalInterval: getEffectiveFilter('maxInternalInterval'),
           };
           const signature = buildSignature(filters);
           figures.forEach(gd => {
@@ -2128,9 +2259,10 @@ def build_report_html_v2(
 
         const attachUI = dataset => {
           const fields = dataset && dataset.fields ? dataset.fields : {};
-          ensureOptionGroup(fields.cardinality, 'cardinality');
-          ensureOptionGroup(fields.intervalPattern, 'intervalPattern');
-          ensureOptionGroup(fields.pitchClass, 'pitchClass');
+          ensureFilterControl(fields.cardinality, 'cardinality');
+          ensureFilterControl(fields.maxInternalInterval, 'maxInternalInterval');
+          ensureFilterControl(fields.intervalPattern, 'intervalPattern');
+          ensureFilterControl(fields.pitchClass, 'pitchClass');
         };
 
         let pending = figures.length;
@@ -2266,6 +2398,11 @@ def build_report_html_v2(
     .filter-controls .filter-group .filter-subgroup summary {{ cursor: pointer; font-weight: 600; font-size: 0.8rem; color: #1f2a44; }}
     .filter-controls .filter-group .filter-options-grid {{ display: grid; grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap: 4px 10px; padding: 4px 0 2px 2px; }}
     .filter-controls .filter-group .filter-options-vertical {{ display: flex; flex-direction: column; gap: 4px; }}
+    .filter-controls .filter-group .filter-numeric {{ display: flex; align-items: center; gap: 8px; flex-wrap: nowrap; }}
+    .filter-controls .filter-group .filter-numeric input[type='range'] {{ flex: 1 1 auto; min-width: 120px; }}
+    .filter-controls .filter-group .filter-numeric input[type='number'] {{ width: 64px; padding: 2px 4px; font-size: 0.8rem; }}
+    .filter-controls .filter-group .filter-numeric .filter-clear {{ font-size: 0.74rem; padding: 2px 8px; border-radius: 4px; border: 1px solid #95a2d8; background: #f5f7ff; color: #2b3a6f; cursor: pointer; transition: background 0.15s ease; }}
+    .filter-controls .filter-group .filter-numeric .filter-clear:hover {{ background: #e9edff; }}
     .highlight-note {{ font-size: 0.82rem; color: #1f4c5c; margin: 6px 0 10px 0; }}
     .highlight-note.muted {{ color: #6a6f7a; font-style: italic; }}
     .detail-panel {{ margin: 8px 0 10px 0; padding: 10px 12px; background: #fffbe6; border: 1px solid #f0d98c; border-radius: 8px; font-size: 0.88rem; min-height: 56px; line-height: 1.35; }}

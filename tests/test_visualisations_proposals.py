@@ -240,3 +240,8 @@ def test_apply_scatter_filters_supports_interval_and_pitch_filters():
     filtered_pitch = apply_scatter_filters(payload, pitch_class=[6])
     total_pitch = sum(len(trace.get("x", [])) for trace in filtered_pitch["data"])
     assert total_pitch == 1, "pitch-class filter should isolate diminished triad"
+
+    # Limit the maximum internal interval to triads with close spacing (≤3)
+    filtered_internal = apply_scatter_filters(payload, max_internal_interval=3)
+    total_internal = sum(len(trace.get("x", [])) for trace in filtered_internal["data"])
+    assert total_internal == 1, "max internal interval filter should keep only tightly spaced chords"

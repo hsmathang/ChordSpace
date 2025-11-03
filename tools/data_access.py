@@ -106,6 +106,7 @@ class ChordFilters:
     interval_mode: Optional[str] = None  # one of: exact, subseq, any_value
     interval_patterns: Optional[List[List[int]]] = None  # multiple patterns
     interval_values: Optional[List[int]] = None  # for any_value mode
+    max_internal_interval: Optional[int] = None  # constrain largest adjacent interval
 
 
 @dataclass
@@ -299,6 +300,11 @@ def build_sql(filters: ChordFilters, profile: ColumnProfile) -> str:
         conditions.append(f"span_semitones >= {int(filters.span_min)}")
     if filters.span_max is not None:
         conditions.append(f"span_semitones <= {int(filters.span_max)}")
+    if filters.max_internal_interval is not None:
+        max_internal = int(filters.max_internal_interval)
+        conditions.append(
+            "COALESCE((SELECT MAX(i) FROM unnest(interval) AS i), 0) <= " + str(max_internal)
+        )
     if filters.interval_exact:
         conditions.append(f"interval = {_format_interval(filters.interval_exact)}")
     if filters.codes:
