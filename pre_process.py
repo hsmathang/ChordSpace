@@ -520,10 +520,26 @@ class ModeloSetharesVec(ModeloRugosidad):
         self.C2 = config.get('C2', SETHARES_C2)
         self.A1 = config.get('A1', SETHARES_A1)
         self.A2 = config.get('A2', SETHARES_A2)
+        self._cached_n_harmonics: Optional[int] = None
+        self._cached_decay: Optional[float] = None
+        self._cached_K: Optional[np.ndarray] = None
+        self._cached_A: Optional[np.ndarray] = None
 
-    def _pair_total(self, f1: float, f2: float, n_harmonics: int, decay: float) -> float:
-        K = np.arange(1, int(n_harmonics) + 1, dtype=float)
-        A = decay ** (K - 1)
+    def _get_harmonic_arrays(self, n_harmonics: int, decay: float) -> Tuple[np.ndarray, np.ndarray]:
+        """Return cached harmonic indices and amplitudes for the given parameters."""
+        if (
+            self._cached_K is None
+            or self._cached_A is None
+            or self._cached_n_harmonics != int(n_harmonics)
+            or not np.isclose(self._cached_decay, float(decay))
+        ):
+            self._cached_n_harmonics = int(n_harmonics)
+            self._cached_decay = float(decay)
+            self._cached_K = np.arange(1, self._cached_n_harmonics + 1, dtype=float)
+            self._cached_A = self._cached_decay ** (self._cached_K - 1)
+        return self._cached_K, self._cached_A
+
+    def _pair_total(self, f1: float, f2: float, K: np.ndarray, A: np.ndarray) -> float:
         P1 = f1 * K
         P2 = f2 * K
         P1g = P1[:, None]
@@ -539,6 +555,7 @@ class ModeloSetharesVec(ModeloRugosidad):
         base_freq = self.config.get('base_freq', SETHARES_BASE_FREQ)
         n_harmonics = int(self.config.get('n_armonicos', SETHARES_N_HARMONICS))
         decay = float(self.config.get('decaimiento', SETHARES_DECAY))
+        K, A = self._get_harmonic_arrays(n_harmonics, decay)
 
         semitonos_rel = np.array(np.cumsum([0] + acorde.intervals))
         n_notes = len(semitonos_rel)
@@ -561,7 +578,7 @@ class ModeloSetharesVec(ModeloRugosidad):
                 intervalo = int((semitonos_rel[j] - semitonos_rel[i]) % 12)
                 bin_idx = interval_to_ui_bin(intervalo)
                 f1, f2 = float(fundamentals[i]), float(fundamentals[j])
-                pair_total = self._pair_total(f1, f2, n_harmonics, decay)
+                pair_total = self._pair_total(f1, f2, K, A)
                 histograma[bin_idx] += pair_total
                 total_roughness_pairs += pair_total
 
