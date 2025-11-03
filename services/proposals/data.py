@@ -2,14 +2,16 @@
 
 from __future__ import annotations
 
+import ast
+import numbers
 from dataclasses import dataclass
-from typing import Iterable, List, Optional, Sequence, Tuple
+from typing import Any, Callable, Dict, Iterable, List, Optional, Sequence, Tuple
 
 import numpy as np
 import pandas as pd
 
 from config import config_db
-from pre_process import ChordAdapter, ModeloSetharesVec, get_chord_type_from_intervals
+from pre_process import Acorde, ChordAdapter, ModeloSetharesVec, get_chord_type_from_intervals
 from tools.query_registry import resolve_query_sql
 
 try:  # pragma: no cover - optional dependency
@@ -43,12 +45,114 @@ class PopulationLoader:
     def __init__(self, executor: Optional[QueryExecutor] = None) -> None:
         self._executor = executor
         self._modelo = ModeloSetharesVec(config={})
+        self._roughness_cache: Dict[
+            Tuple[Tuple[int, ...], Optional[Tuple[Any, ...]]], Tuple[np.ndarray, float]
+        ] = {}
+        self._interval_cache: Dict[
+            Tuple[int, ...], Tuple[np.ndarray, float, int, Optional[int]]
+        ] = {}
 
     @property
     def executor(self) -> QueryExecutor:
         if self._executor is None:
             self._executor = QueryExecutor(**config_db)
         return self._executor
+
+    @staticmethod
+    def _safe_literal_eval(value: Any, fallback_factory: Callable[[], Any]) -> Any:
+        if isinstance(value, str):
+            try:
+                return ast.literal_eval(value)
+            except (ValueError, SyntaxError):
+                return fallback_factory()
+        if value is None:
+            return fallback_factory()
+        try:
+            if pd.isna(value):
+                return fallback_factory()
+        except (TypeError, ValueError):
+            pass
+        return value
+
+    @staticmethod
+    def _prepare_literal_column(
+        dataframe: pd.DataFrame,
+        column: str,
+        fallback_factory: Callable[[], Any],
+    ) -> List[Any]:
+        if column not in dataframe.columns:
+            return [fallback_factory() for _ in range(len(dataframe))]
+        series = dataframe[column]
+        return [
+            PopulationLoader._safe_literal_eval(value, fallback_factory)
+            for value in series
+        ]
+
+    @staticmethod
+    def _prepare_scalar_column(
+        dataframe: pd.DataFrame, column: str, default: Any
+    ) -> List[Any]:
+        if column not in dataframe.columns:
+            return [default for _ in range(len(dataframe))]
+        values: List[Any] = []
+        series = dataframe[column]
+        for value in series:
+            if value is None:
+                values.append(default)
+                continue
+            try:
+                if pd.isna(value):
+                    values.append(default)
+                    continue
+            except (TypeError, ValueError):
+                pass
+            values.append(value)
+        return values
+
+    @staticmethod
+    def _flatten_iterable(value: Any) -> Iterable[Any]:
+        if isinstance(value, np.ndarray):
+            for item in value.flat:
+                yield item
+        elif isinstance(value, (list, tuple)):
+            for item in value:
+                yield from PopulationLoader._flatten_iterable(item)
+        else:
+            yield value
+
+    def _roughness_from_cache(self, acorde: "Acorde") -> Tuple[np.ndarray, float]:
+        interval_key = tuple(int(i) for i in acorde.intervals)
+        freq_key: Optional[Tuple[Any, ...]] = None
+        if acorde.frequencies is not None:
+            freq_key = tuple(
+                float(item) if isinstance(item, numbers.Number) else item
+                for item in self._flatten_iterable(acorde.frequencies)
+            )
+        cache_key = (interval_key, freq_key)
+        cached = self._roughness_cache.get(cache_key)
+        if cached is not None:
+            hist, total = cached
+            return hist.copy(), total
+        hist, total = self._modelo.calcular(acorde)
+        hist = np.asarray(hist, dtype=float)
+        result = (hist, float(total))
+        self._roughness_cache[cache_key] = result
+        return hist.copy(), float(total)
+
+    def _interval_metadata(
+        self, intervals: Sequence[int]
+    ) -> Tuple[np.ndarray, float, int, Optional[int]]:
+        key = tuple(int(i) for i in intervals)
+        cached = self._interval_cache.get(key)
+        if cached is not None:
+            counts, total_pairs, n_notes, dyad_bin = cached
+            return counts.copy(), total_pairs, n_notes, dyad_bin
+        counts = compute_interval_counts(intervals)
+        total_pairs = float(np.sum(counts))
+        n_notes = len(intervals) + 1
+        dyad_bin = determine_dyad_bin(intervals) if n_notes == 2 else None
+        self._interval_cache[key] = (counts, total_pairs, n_notes, dyad_bin)
+        return counts.copy(), total_pairs, n_notes, dyad_bin
 
     def from_queries(
         self,
@@ -73,38 +177,64 @@ class PopulationLoader:
         has_inv_source = "__inv_source_id" in dataframe.columns
         has_inv_rotation = "__inv_rotation" in dataframe.columns
 
+        dataframe = dataframe.copy()
+        if dataframe.empty:
+            return []
+
+        intervals_col = self._prepare_literal_column(
+            dataframe, "interval", lambda: []
+        )
+        chroma_col = self._prepare_literal_column(
+            dataframe, "chroma", lambda: [0] * 12
+        )
+        frequencies_col = self._prepare_literal_column(
+            dataframe, "frequencies", lambda: None
+        )
+        notes_col = self._prepare_literal_column(dataframe, "notes", lambda: None)
+        codes = self._prepare_scalar_column(dataframe, "code", "Sin nombre")
+        inv_flags = self._prepare_scalar_column(dataframe, "__inv_flag", False)
+        family_ids = self._prepare_scalar_column(dataframe, "__family_id", None)
+        inv_sources = self._prepare_scalar_column(dataframe, "__inv_source_id", None)
+        inv_rotations = self._prepare_scalar_column(dataframe, "__inv_rotation", None)
+        ids = self._prepare_scalar_column(dataframe, "id", None)
+
         entries: List[ChordEntry] = []
-        for _, row in dataframe.iterrows():
-            acorde = ChordAdapter.from_csv_row(row)
+        for idx in range(len(dataframe)):
+            row_payload = {
+                "code": codes[idx],
+                "interval": intervals_col[idx],
+                "chroma": chroma_col[idx],
+                "frequencies": frequencies_col[idx],
+                "notes": notes_col[idx],
+            }
+            acorde = ChordAdapter.from_csv_row(row_payload)
             identity_obj = get_chord_type_from_intervals(acorde.intervals, with_alias=True)
             identity_name = getattr(identity_obj, "name", str(identity_obj))
             identity_aliases = tuple(getattr(identity_obj, "aliases", ()))
             is_named = bool(identity_name and identity_name != "Unknown")
-            hist, total = self._modelo.calcular(acorde)
-            hist = np.asarray(hist, dtype=float)
-            counts = compute_interval_counts(acorde.intervals)
-            total_pairs = float(np.sum(counts))
-            n_notes = len(acorde.intervals) + 1
-            dyad_bin = determine_dyad_bin(acorde.intervals) if n_notes == 2 else None
-            inv_flag = bool(row.get("__inv_flag")) if has_inv_flag else False
+            hist, total = self._roughness_from_cache(acorde)
+            counts, total_pairs, n_notes, dyad_bin = self._interval_metadata(
+                acorde.intervals
+            )
+            inv_flag = bool(inv_flags[idx]) if has_inv_flag else False
 
             family_id: Optional[object] = None
             if has_family:
-                raw_family = row.get("__family_id")
+                raw_family = family_ids[idx]
                 if pd.notna(raw_family):
                     try:
                         family_id = int(raw_family)
                     except (TypeError, ValueError):
                         family_id = str(raw_family)
             if family_id is None and has_inv_source:
-                raw_family = row.get("__inv_source_id")
+                raw_family = inv_sources[idx]
                 if pd.notna(raw_family):
                     try:
                         family_id = int(raw_family)
                     except (TypeError, ValueError):
                         family_id = str(raw_family)
             if family_id is None:
-                raw_id = row.get("id")
+                raw_id = ids[idx]
                 if pd.notna(raw_id):
                     try:
                         family_id = int(raw_id)
@@ -113,7 +243,7 @@ class PopulationLoader:
 
             inv_rotation: Optional[int] = None
             if has_inv_rotation:
-                raw_rot = row.get("__inv_rotation")
+                raw_rot = inv_rotations[idx]
                 if pd.notna(raw_rot):
                     try:
                         inv_rotation = int(raw_rot)
