@@ -199,8 +199,9 @@ def pairwise_dist_hist_mod12(midi_list: Sequence[int]) -> np.ndarray:
     distances = pairwise_dist_list_semitones(midi_list)
     hist = np.zeros(12, dtype=int)
     for d in distances:
-        hist[d % 12] += 1
-    hist[0] = 0  # policy: no unisons are expected
+        if d > 0:
+            bin_idx = interval_to_ui_bin(d)
+            hist[bin_idx] += 1
     return hist
 
 

@@ -44,3 +44,13 @@ def test_rotation_bass_up_preserves_structure():
     rotated = rotation_bass_up(chord)
     assert rotated == (64, 67, 72)
     assert struct_id_of(chord).as_key() == struct_id_of(rotated).as_key()
+
+
+def test_pairwise_hist_mod12_binning_is_correct():
+    # Major triad: intervals are 4 (M3), 3 (m3), and 7 (P5) semitones.
+    # The bins should be at index d-1: 3, 2, and 6.
+    chord = (60, 64, 67)
+    hist = pairwise_dist_hist_mod12(chord)
+    expected = np.zeros(12, dtype=int)
+    expected[[2, 3, 6]] = 1
+    np.testing.assert_array_equal(hist, expected)
