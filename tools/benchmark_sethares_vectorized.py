@@ -26,6 +26,8 @@ from typing import List, Tuple
 
 import numpy as np
 
+from core import interval_to_ui_bin
+
 # Importar pre_process con fallback si no existe chordcodex
 try:
     from pre_process import Acorde
@@ -60,13 +62,6 @@ from config import (
     SETHARES_BASE_FREQ,
     CHORD_TYPE_INTERVALS,
 )
-
-
-def interval_to_ui_bin(intervalo: int) -> int:
-    """Replica la convención del repo: 0->11, 1..11->0..10."""
-    return (intervalo - 1) % 12
-
-
 def sethares_pair_total_vectorized(f1: float, f2: float, n_h: int, decay: float) -> float:
     """Suma de disonancia entre todos los parciales de dos notas (vectorizado HxH).
 
