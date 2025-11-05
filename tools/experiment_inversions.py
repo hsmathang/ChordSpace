@@ -52,6 +52,7 @@ from visualization import (
     graficar_shepard,
 )
 from tools.query_registry import resolve_query_sql
+from services.data_gateway import GeneratorRequest, create_data_gateway
 
 
 def load_chords_from_db(query_const: str = "QUERY_CHORDS_WITH_NAME") -> pd.DataFrame:
@@ -392,6 +393,36 @@ def _collect_pops_specs(args: argparse.Namespace) -> list[str]:
     return ordered
 
 
+def _collect_generator_settings(args: argparse.Namespace) -> dict[str, object]:
+    if getattr(args, "generator_settings", None):
+        base = dict(args.generator_settings)
+    else:
+        base: dict[str, object] = {}
+        for attr, key in [
+            ("generator_mode", "mode"),
+            ("generator_alphabet", "alphabet"),
+            ("generator_octaves", "octaves"),
+            ("generator_cardinalities", "cardinalities"),
+            ("generator_max_span", "max_span"),
+            ("generator_must_have", "must_have"),
+            ("generator_must_avoid", "must_avoid"),
+            ("generator_interval", "interval_pattern"),
+            ("generator_limit", "limit"),
+            ("generator_max_struct_span", "max_struct_span"),
+            ("generator_label", "label"),
+            ("generator_tag", "tag"),
+        ]:
+            value = getattr(args, attr, None)
+            if value not in (None, ""):
+                base[key] = value
+        if getattr(args, "generator_edge_pc0", False):
+            base["edge_pc0"] = True
+        batch = getattr(args, "generator_batch_size", None)
+        if batch not in (None, ""):
+            base["batch_size"] = batch
+    return {key: value for key, value in base.items() if value not in (None, "")}
+
+
 def build_arg_parser() -> argparse.ArgumentParser:
     ap = argparse.ArgumentParser()
     ap.add_argument("--out", type=Path, default=Path("outputs/inversions_experiment"))
@@ -424,6 +455,38 @@ def build_arg_parser() -> argparse.ArgumentParser:
                     help="Lista separada por comas de pops, ej: A:QUERY1,B:QUERY2")
     ap.add_argument("--pops-file", dest="pops_file", type=Path, default=None,
                     help="Archivo de texto con especificaciones por línea (comentarios con #)")
+    ap.add_argument(
+        "--data-source",
+        dest="data_source",
+        choices=["database", "generator"],
+        default="database",
+        help="Fuente de datos base: database usa Postgres, generator usa el motor procedimental.",
+    )
+    ap.add_argument("--generator-mode", dest="generator_mode", default=None)
+    ap.add_argument("--generator-alphabet", dest="generator_alphabet", default=None)
+    ap.add_argument("--generator-octaves", dest="generator_octaves", default=None)
+    ap.add_argument("--generator-cardinalities", dest="generator_cardinalities", default=None)
+    ap.add_argument(
+        "--generator-edge-pc0",
+        dest="generator_edge_pc0",
+        action="store_true",
+        help="Extiende el universo una octava para incluir pc0 en el límite superior.",
+    )
+    ap.add_argument("--generator-max-span", dest="generator_max_span", default=None)
+    ap.add_argument("--generator-must-have", dest="generator_must_have", default=None)
+    ap.add_argument("--generator-must-avoid", dest="generator_must_avoid", default=None)
+    ap.add_argument("--generator-interval", dest="generator_interval", default=None)
+    ap.add_argument("--generator-limit", dest="generator_limit", default=None)
+    ap.add_argument("--generator-max-struct-span", dest="generator_max_struct_span", default=None)
+    ap.add_argument("--generator-label", dest="generator_label", default=None)
+    ap.add_argument("--generator-tag", dest="generator_tag", default=None)
+    ap.add_argument(
+        "--generator-batch-size",
+        dest="generator_batch_size",
+        type=int,
+        default=None,
+        help="Tamaño de lote para el streaming del generador (por defecto 4096).",
+    )
     return ap
 
 
@@ -448,7 +511,13 @@ def run_experiment_with_args(
 
     override_used = df_override is not None
 
-    pops_specs = [] if override_used else _collect_pops_specs(args)
+    data_source = str(getattr(args, "data_source", "database")).strip().lower()
+    generator_settings: dict[str, object] = {}
+    if data_source == "generator":
+        generator_settings = _collect_generator_settings(args)
+        args.generator_settings = generator_settings
+
+    pops_specs = [] if override_used or data_source == "generator" else _collect_pops_specs(args)
 
     if pops_specs:
         combined_frames: list[pd.DataFrame] = []
@@ -497,6 +566,32 @@ def run_experiment_with_args(
     else:
         if override_used:
             df_pop = df_override.copy()
+        elif data_source == "generator":
+            if not generator_settings:
+                raise ValueError(
+                    "Configura los parámetros del generador (--generator-*) para usar data-source=generator."
+                )
+            gateway_kwargs: dict[str, object] = {}
+            batch_size = generator_settings.get("batch_size")
+            if batch_size not in (None, ""):
+                try:
+                    gateway_kwargs["batch_size"] = int(batch_size)  # type: ignore[arg-type]
+                except (TypeError, ValueError) as exc:
+                    raise ValueError("generator-batch-size debe ser entero positivo.") from exc
+            gateway = create_data_gateway("generator", **gateway_kwargs)
+            spec = GeneratorRequest.from_any(generator_settings)
+            result = gateway.fetch_population([spec], dedupe=False)
+            df_pop = result.dataframe.copy()
+            raw_count = result.stats.get("raw_count") if isinstance(result.stats, dict) else None
+            if raw_count is not None:
+                print(f"Generador streaming → {int(raw_count)} acordes (sin dedupe)")
+            specs_meta = result.stats.get("generator_specs") if isinstance(result.stats, dict) else None
+            if specs_meta:
+                first_spec = specs_meta[0] if isinstance(specs_meta, (list, tuple)) else specs_meta
+                if isinstance(first_spec, dict):
+                    label = first_spec.get("label")
+                    mode = first_spec.get("mode")
+                    print(f"  Spec principal: modo={mode}, label={label}")
         else:
             query_name = getattr(args, "query", None) or QUERY_CHORDS_WITH_NAME
             df_src = load_chords_from_db(query_name)

@@ -153,6 +153,7 @@ class ExperimentLauncher(tk.Tk):
         self.population_selected_rows: set[int] = set()
         self.population_row_ids: dict[int, int | None] = {}
         self._temp_payloads: list[Path] = []
+        self._last_generator_stats: dict[str, object] | None = None
         self._create_layout()
 
         self.after(100, self._process_log_queue)
@@ -227,11 +228,38 @@ class ExperimentLauncher(tk.Tk):
         setter(transform(tk_var.get()))
         tk_var.trace_add("write", _update)
 
+    def _bind_generator_var(self, tk_var: tk.Variable, key: str, transform=lambda value: value) -> None:
+        def _store(value: object) -> None:
+            settings = dict(self.state.generator_settings)
+            if value in ("", None):
+                settings.pop(key, None)
+            else:
+                settings[key] = value
+            self.state.update(generator_settings=settings)
+
+        _store(transform(tk_var.get()))
+
+        def _on_change(*_args):
+            _store(transform(tk_var.get()))
+            self._mark_population_dirty()
+
+        tk_var.trace_add("write", _on_change)
+
     def _init_state_vars(self) -> None:
         self.type_var = tk.StringVar(value="B")
         self._bind_state_var(self.type_var, lambda value: self.state.update(chord_type=value))
         self.reduction_var = tk.StringVar(value="MDS")
         self._bind_state_var(self.reduction_var, lambda value: self.state.update(reduction=value))
+
+        default_source = (self.state.data_source or "database").strip().lower()
+        self.data_source_var = tk.StringVar(value=default_source)
+        self._bind_state_var(
+            self.data_source_var,
+            lambda value: self.state.update(data_source=value),
+            transform=lambda raw: (raw or "database").strip().lower(),
+        )
+        self.data_source_var.trace_add("write", self._on_data_source_changed)
+
         options = ["<Ninguna>"] + sorted(self.query_registry.keys())
         # Por defecto usar QUERY_DYADS_REFERENCE si existe (sigue siendo opcional)
         default_base = "QUERY_DYADS_REFERENCE" if "QUERY_DYADS_REFERENCE" in self.query_registry else "<Ninguna>"
@@ -239,6 +267,119 @@ class ExperimentLauncher(tk.Tk):
         self._bind_state_var(self.base_query_var, lambda value: self.state.update(base_query=value))
         self.output_var = tk.StringVar(value=str(self._default_output_dir()))
         self._bind_state_var(self.output_var, self.state.set_output_dir)
+
+        gen_defaults = dict(self.state.generator_settings)
+
+        def _fmt_sequence(raw_value, fallback="") -> str:
+            value = raw_value
+            if value in (None, ""):
+                return fallback
+            if isinstance(value, (list, tuple, set)):
+                return ",".join(str(v) for v in value)
+            return str(value)
+
+        self.generator_mode_var = tk.StringVar(
+            value=_fmt_sequence(gen_defaults.get("mode"), "total").strip().lower() or "total"
+        )
+        self._bind_generator_var(
+            self.generator_mode_var,
+            "mode",
+            transform=lambda raw: (raw or "total").strip().lower(),
+        )
+        self.generator_alphabet_var = tk.StringVar(
+            value=_fmt_sequence(gen_defaults.get("alphabet"), "0,2,4,5,7,9,11")
+        )
+        self._bind_generator_var(
+            self.generator_alphabet_var,
+            "alphabet",
+            transform=lambda raw: raw.strip(),
+        )
+        self.generator_octaves_var = tk.StringVar(
+            value=_fmt_sequence(gen_defaults.get("octaves"), "4-5")
+        )
+        self._bind_generator_var(
+            self.generator_octaves_var,
+            "octaves",
+            transform=lambda raw: raw.strip(),
+        )
+        self.generator_cardinalities_var = tk.StringVar(
+            value=_fmt_sequence(gen_defaults.get("cardinalities"), "3")
+        )
+        self._bind_generator_var(
+            self.generator_cardinalities_var,
+            "cardinalities",
+            transform=lambda raw: raw.strip(),
+        )
+        self.generator_edge_var = tk.BooleanVar(value=bool(gen_defaults.get("edge_pc0", False)))
+        self._bind_generator_var(
+            self.generator_edge_var,
+            "edge_pc0",
+            transform=lambda raw: bool(raw),
+        )
+        self.generator_max_span_var = tk.StringVar(
+            value=_fmt_sequence(gen_defaults.get("max_span"), "")
+        )
+        self._bind_generator_var(
+            self.generator_max_span_var,
+            "max_span",
+            transform=lambda raw: raw.strip(),
+        )
+        self.generator_must_have_var = tk.StringVar(
+            value=_fmt_sequence(gen_defaults.get("must_have") or gen_defaults.get("must_have_pcs"), "")
+        )
+        self._bind_generator_var(
+            self.generator_must_have_var,
+            "must_have",
+            transform=lambda raw: raw.strip(),
+        )
+        self.generator_must_avoid_var = tk.StringVar(
+            value=_fmt_sequence(gen_defaults.get("must_avoid") or gen_defaults.get("must_avoid_pcs"), "")
+        )
+        self._bind_generator_var(
+            self.generator_must_avoid_var,
+            "must_avoid",
+            transform=lambda raw: raw.strip(),
+        )
+        self.generator_interval_var = tk.StringVar(
+            value=_fmt_sequence(gen_defaults.get("interval_pattern") or gen_defaults.get("interval"), "")
+        )
+        self._bind_generator_var(
+            self.generator_interval_var,
+            "interval_pattern",
+            transform=lambda raw: raw.strip(),
+        )
+        self.generator_limit_var = tk.StringVar(
+            value=_fmt_sequence(gen_defaults.get("limit"), "")
+        )
+        self._bind_generator_var(
+            self.generator_limit_var,
+            "limit",
+            transform=lambda raw: raw.strip(),
+        )
+        self.generator_max_struct_span_var = tk.StringVar(
+            value=_fmt_sequence(gen_defaults.get("max_struct_span"), "12")
+        )
+        self._bind_generator_var(
+            self.generator_max_struct_span_var,
+            "max_struct_span",
+            transform=lambda raw: raw.strip(),
+        )
+        self.generator_label_var = tk.StringVar(
+            value=_fmt_sequence(gen_defaults.get("label"), "")
+        )
+        self._bind_generator_var(
+            self.generator_label_var,
+            "label",
+            transform=lambda raw: raw.strip(),
+        )
+        self.generator_tag_var = tk.StringVar(
+            value=_fmt_sequence(gen_defaults.get("tag"), "")
+        )
+        self._bind_generator_var(
+            self.generator_tag_var,
+            "tag",
+            transform=lambda raw: raw.strip(),
+        )
 
         self.pop_type_var = tk.StringVar(value="A")
         pop_default_query = options[1] if len(options) > 1 else "<Ninguna>"
@@ -440,6 +581,7 @@ class ExperimentLauncher(tk.Tk):
         config_frame = ttk.LabelFrame(controls, text="Fuente base y salida")
         config_frame.grid(row=0, column=0, sticky="nwe")
         self._build_population_config_frame(config_frame)
+        self._on_data_source_changed()
 
         pops_frame = ttk.LabelFrame(controls, text="Poblaciones conjuntas (A/B/C)")
         pops_frame.grid(row=1, column=0, sticky="nwe", pady=(8, 0))
@@ -600,15 +742,118 @@ class ExperimentLauncher(tk.Tk):
         out_entry.grid(row=0, column=1, sticky="we", padx=(4, 4), pady=(4, 0))
         ttk.Button(frame, text="Examinar…", command=self._choose_output_dir).grid(row=0, column=2, sticky="e", pady=(4, 0))
 
-        ttk.Label(frame, text="Consulta base (opcional):").grid(row=1, column=0, sticky="w", pady=(6, 0))
+        ttk.Label(frame, text="Fuente de datos:").grid(row=1, column=0, sticky="w", pady=(6, 0))
+        source_values = ["database", "generator"]
+        self.data_source_combo = ttk.Combobox(
+            frame,
+            textvariable=self.data_source_var,
+            values=source_values,
+            state="readonly",
+            width=18,
+        )
+        self.data_source_combo.grid(row=1, column=1, sticky="w", padx=(4, 4), pady=(6, 0))
+        ttk.Label(
+            frame,
+            text="database = Postgres, generator = motor procedimental",
+            foreground="#555",
+        ).grid(row=1, column=2, sticky="w", pady=(6, 0))
+
+        ttk.Label(frame, text="Consulta base (opcional):").grid(row=2, column=0, sticky="w", pady=(6, 0))
         base_values = ["<Ninguna>"] + sorted(self.query_registry.keys())
-        self.base_query_combo = ttk.Combobox(frame, textvariable=self.base_query_var, values=base_values, state="readonly", width=44)
-        self.base_query_combo.grid(row=1, column=1, sticky="we", padx=(4,4), pady=(6,0))
+        self.base_query_combo = ttk.Combobox(
+            frame,
+            textvariable=self.base_query_var,
+            values=base_values,
+            state="readonly",
+            width=44,
+        )
+        self.base_query_combo.grid(row=2, column=1, sticky="we", padx=(4, 4), pady=(6, 0))
         self.base_query_combo.bind("<<ComboboxSelected>>", lambda *_: self._mark_population_dirty())
         frame.columnconfigure(1, weight=1)
 
+        generator_frame = ttk.LabelFrame(frame, text="Generador streaming (modo 'generator')")
+        generator_frame.grid(row=3, column=0, columnspan=3, sticky="we", pady=(8, 0))
+        generator_frame.columnconfigure(1, weight=1)
+        self.generator_frame = generator_frame
+
+        ttk.Label(generator_frame, text="Modo:").grid(row=0, column=0, sticky="w")
+        ttk.Combobox(
+            generator_frame,
+            textvariable=self.generator_mode_var,
+            values=["total", "struct"],
+            state="readonly",
+            width=10,
+        ).grid(row=0, column=1, sticky="w", padx=(4, 8))
+
+        ttk.Label(generator_frame, text="Alfabeto (PCs):").grid(row=1, column=0, sticky="w", pady=(4, 0))
+        ttk.Entry(generator_frame, textvariable=self.generator_alphabet_var).grid(
+            row=1, column=1, sticky="we", padx=(4, 4), pady=(4, 0)
+        )
+
+        ttk.Label(generator_frame, text="Octavas [min-max]:").grid(row=2, column=0, sticky="w", pady=(4, 0))
+        ttk.Entry(generator_frame, textvariable=self.generator_octaves_var).grid(
+            row=2, column=1, sticky="we", padx=(4, 4), pady=(4, 0)
+        )
+
+        ttk.Label(generator_frame, text="Cardinalidades (N):").grid(row=3, column=0, sticky="w", pady=(4, 0))
+        ttk.Entry(generator_frame, textvariable=self.generator_cardinalities_var).grid(
+            row=3, column=1, sticky="we", padx=(4, 4), pady=(4, 0)
+        )
+
+        ttk.Checkbutton(
+            generator_frame,
+            text="Incluir pc=0 en la octava superior (edge_pc0)",
+            variable=self.generator_edge_var,
+        ).grid(row=4, column=0, columnspan=2, sticky="w", pady=(4, 0))
+
+        ttk.Label(generator_frame, text="Span máximo (opcional):").grid(row=5, column=0, sticky="w", pady=(4, 0))
+        ttk.Entry(generator_frame, textvariable=self.generator_max_span_var, width=10).grid(
+            row=5, column=1, sticky="w", padx=(4, 4), pady=(4, 0)
+        )
+
+        ttk.Label(generator_frame, text="PC obligatorios:").grid(row=6, column=0, sticky="w", pady=(4, 0))
+        ttk.Entry(generator_frame, textvariable=self.generator_must_have_var).grid(
+            row=6, column=1, sticky="we", padx=(4, 4), pady=(4, 0)
+        )
+
+        ttk.Label(generator_frame, text="PC prohibidos:").grid(row=7, column=0, sticky="w", pady=(4, 0))
+        ttk.Entry(generator_frame, textvariable=self.generator_must_avoid_var).grid(
+            row=7, column=1, sticky="we", padx=(4, 4), pady=(4, 0)
+        )
+
+        ttk.Label(generator_frame, text="Patrón intervalos:").grid(row=8, column=0, sticky="w", pady=(4, 0))
+        ttk.Entry(generator_frame, textvariable=self.generator_interval_var).grid(
+            row=8, column=1, sticky="we", padx=(4, 4), pady=(4, 0)
+        )
+
+        ttk.Label(generator_frame, text="Límite filas (opcional):").grid(row=9, column=0, sticky="w", pady=(4, 0))
+        ttk.Entry(generator_frame, textvariable=self.generator_limit_var, width=10).grid(
+            row=9, column=1, sticky="w", padx=(4, 4), pady=(4, 0)
+        )
+
+        ttk.Label(generator_frame, text="Span estructural (struct):").grid(row=10, column=0, sticky="w", pady=(4, 0))
+        ttk.Entry(generator_frame, textvariable=self.generator_max_struct_span_var, width=10).grid(
+            row=10, column=1, sticky="w", padx=(4, 4), pady=(4, 0)
+        )
+
+        ttk.Label(generator_frame, text="Etiqueta fuente (__source__):").grid(row=11, column=0, sticky="w", pady=(4, 0))
+        ttk.Entry(generator_frame, textvariable=self.generator_label_var).grid(
+            row=11, column=1, sticky="we", padx=(4, 4), pady=(4, 0)
+        )
+
+        ttk.Label(generator_frame, text="Tag (columna tag):").grid(row=12, column=0, sticky="w", pady=(4, 0))
+        ttk.Entry(generator_frame, textvariable=self.generator_tag_var).grid(
+            row=12, column=1, sticky="we", padx=(4, 4), pady=(4, 0)
+        )
+
+        ttk.Label(
+            generator_frame,
+            text="Separar valores con comas. Ejemplo alfabeto: 0,2,4,7,9",
+            foreground="#555",
+        ).grid(row=13, column=0, columnspan=2, sticky="w", pady=(4, 2))
+
         transpose_frame = ttk.LabelFrame(frame, text="Transposición sintética")
-        transpose_frame.grid(row=2, column=0, columnspan=3, sticky="we", pady=(8, 0))
+        transpose_frame.grid(row=4, column=0, columnspan=3, sticky="we", pady=(8, 0))
         transpose_frame.columnconfigure(1, weight=1)
         ttk.Checkbutton(
             transpose_frame,
@@ -649,6 +894,50 @@ class ExperimentLauncher(tk.Tk):
             entry.configure(state=state)
         except Exception:
             pass
+
+    def _on_data_source_changed(self, *_args) -> None:
+        mode = (self.data_source_var.get() or "database").strip().lower()
+        if hasattr(self, "generator_frame") and self.generator_frame is not None:
+            try:
+                if mode == "generator":
+                    self.generator_frame.grid()
+                else:
+                    self.generator_frame.grid_remove()
+            except Exception:
+                pass
+
+        base_state = tk.DISABLED if mode == "generator" else "readonly"
+        if hasattr(self, "base_query_combo") and self.base_query_combo is not None:
+            try:
+                self.base_query_combo.configure(state=base_state)
+            except Exception:
+                pass
+        if hasattr(self, "data_source_combo") and self.data_source_combo is not None:
+            try:
+                self.data_source_combo.configure(state="readonly")
+            except Exception:
+                pass
+        if hasattr(self, "pop_query_combo") and self.pop_query_combo is not None:
+            try:
+                self.pop_query_combo.configure(state="readonly" if mode != "generator" else tk.DISABLED)
+            except Exception:
+                pass
+        button_state = tk.NORMAL if mode != "generator" else tk.DISABLED
+        for attr in ["pop_add_button", "pop_remove_button", "pop_clear_button"]:
+            widget = getattr(self, attr, None)
+            if widget is not None:
+                try:
+                    widget.configure(state=button_state)
+                except Exception:
+                    pass
+        if hasattr(self, "pops_listbox") and self.pops_listbox is not None:
+            try:
+                self.pops_listbox.configure(state=tk.NORMAL if mode != "generator" else tk.DISABLED)
+            except Exception:
+                pass
+        if mode == "generator" and self.filter_enable_var.get():
+            self.filter_enable_var.set(False)
+        self._mark_population_dirty()
 
     def _parse_transposition_steps(self) -> List[int]:
         raw = (self.transpose_steps_var.get() or "").strip()
@@ -795,7 +1084,8 @@ class ExperimentLauncher(tk.Tk):
         self.pop_query_combo.grid(row=0, column=3, padx=(4, 12), sticky="we")
         selector.columnconfigure(3, weight=1)
 
-        ttk.Button(selector, text="Agregar población", command=self._add_population).grid(row=0, column=4, sticky="e")
+        self.pop_add_button = ttk.Button(selector, text="Agregar población", command=self._add_population)
+        self.pop_add_button.grid(row=0, column=4, sticky="e")
 
         list_frame = ttk.Frame(frame)
         list_frame.pack(fill=tk.BOTH, expand=True, padx=6, pady=(0, 6))
@@ -807,8 +1097,10 @@ class ExperimentLauncher(tk.Tk):
 
         buttons = ttk.Frame(frame)
         buttons.pack(fill=tk.X, padx=6, pady=(0, 6))
-        ttk.Button(buttons, text="Eliminar seleccionada", command=self._remove_selected_pop).pack(side=tk.LEFT)
-        ttk.Button(buttons, text="Limpiar lista", command=self._clear_pops).pack(side=tk.RIGHT)
+        self.pop_remove_button = ttk.Button(buttons, text="Eliminar seleccionada", command=self._remove_selected_pop)
+        self.pop_remove_button.pack(side=tk.LEFT)
+        self.pop_clear_button = ttk.Button(buttons, text="Limpiar lista", command=self._clear_pops)
+        self.pop_clear_button.pack(side=tk.RIGHT)
 
     def _build_filter_frame(self, parent: ttk.Frame, row: int) -> None:
         frame = ttk.LabelFrame(parent, text="Filtros dinámicos")
@@ -1115,6 +1407,26 @@ class ExperimentLauncher(tk.Tk):
             f"[población] Previsualización cargada en {(t1 - t0):.3f}s.",
             f"Total acordes: {len(self.population_df)}",
         ]
+        data_source = (self.state.data_source or "database").strip().lower()
+        if data_source == "generator":
+            log_lines.append("Fuente: generador streaming")
+            stats = self._last_generator_stats or {}
+            raw_count = stats.get("raw_count")
+            if raw_count is not None:
+                log_lines.append(f"Acordes generados (sin dedupe): {int(raw_count)}")
+            specs_meta = stats.get("generator_specs")
+            if specs_meta:
+                first_spec = specs_meta[0] if isinstance(specs_meta, (list, tuple)) else specs_meta
+                if isinstance(first_spec, dict):
+                    mode = first_spec.get("mode")
+                    label = first_spec.get("label")
+                    desc_parts = []
+                    if mode:
+                        desc_parts.append(f"modo={mode}")
+                    if label:
+                        desc_parts.append(f"label={label}")
+                    if desc_parts:
+                        log_lines.append("Spec principal: " + ", ".join(desc_parts))
         base_selected = self.base_query_var.get().strip()
         if base_selected and base_selected != "<Ninguna>":
             log_lines.append(f"Consulta base: {base_selected}")
@@ -1139,50 +1451,71 @@ class ExperimentLauncher(tk.Tk):
         self._append_log(f"[población] Cargada en {(t1 - t0):.3f}s. {stats_text}\n")
 
     def _load_population(self) -> pd.DataFrame:
-        executor = data_access.get_executor()
-        frames: list[pd.DataFrame] = []
         profile = data_access.ColumnProfile.VISUAL
-        base = self.base_query_var.get().strip()
-        if base and base != "<Ninguna>":
-            df_base = data_access.fetch_population_by_name(base, profile=profile, executor=executor).copy()
-            df_base["__source__"] = f"BASE:{base}"
-            frames.append(df_base)
+        data_source = (self.state.data_source or "database").strip().lower()
+        frames: list[pd.DataFrame] = []
+        self._last_generator_stats = None
 
-        for spec in self.pops_entries:
-            df_p = data_access.fetch_population_with_source(
-                spec,
-                profile=profile,
-                source_label=spec,
-                executor=executor,
-            )
-            frames.append(df_p)
-
-        custom_filters = self._collect_custom_filters()
-        if custom_filters is not None:
-            df_filters = data_access.fetch_population(
-                custom_filters.filters,
-                profile=profile,
-                executor=executor,
-            ).copy()
-            label = custom_filters.label
-            if custom_filters.expand_scale and custom_filters.scale_pitch_classes:
-                constraint = ScaleConstraint(tuple(custom_filters.scale_pitch_classes))
-                df_filters = generate_scale_population(df_filters, constraint, source_label=label)
-                label = f"{label} [escala]"
-            # Aplicar modo A/B/C definido para los filtros personalizados
+        if data_source == "generator":
+            settings = dict(self.state.generator_settings)
+            required = {
+                "alphabet": settings.get("alphabet"),
+                "octaves": settings.get("octaves"),
+                "cardinalities": settings.get("cardinalities"),
+            }
+            missing = [key for key, value in required.items() if value in (None, "")]
+            if missing:
+                raise ValueError(
+                    "Parámetros del generador incompletos: " + ", ".join(missing)
+                )
             try:
-                filt_mode = (self.filter_mode_var.get() or "A").strip().upper()
-                df_filters = data_access.apply_population_mode(df_filters, filt_mode)
-                label = f"{label} [{filt_mode}]"
-            except Exception:
-                pass
-            df_filters["__source__"] = label
-            frames.append(df_filters)
+                result = data_access.generate_population(settings, dedupe=False)
+            except Exception as exc:  # pylint: disable=broad-except
+                raise ValueError(f"Error al generar población: {exc}") from exc
+            self._last_generator_stats = result.stats
+            frames.append(result.dataframe.copy())
+        else:
+            executor = data_access.get_executor()
+            base = self.base_query_var.get().strip()
+            if base and base != "<Ninguna>":
+                df_base = data_access.fetch_population_by_name(base, profile=profile, executor=executor).copy()
+                df_base["__source__"] = f"BASE:{base}"
+                frames.append(df_base)
+
+            for spec in self.pops_entries:
+                df_p = data_access.fetch_population_with_source(
+                    spec,
+                    profile=profile,
+                    source_label=spec,
+                    executor=executor,
+                )
+                frames.append(df_p)
+
+            custom_filters = self._collect_custom_filters()
+            if custom_filters is not None:
+                df_filters = data_access.fetch_population(
+                    custom_filters.filters,
+                    profile=profile,
+                    executor=executor,
+                ).copy()
+                label = custom_filters.label
+                if custom_filters.expand_scale and custom_filters.scale_pitch_classes:
+                    constraint = ScaleConstraint(tuple(custom_filters.scale_pitch_classes))
+                    df_filters = generate_scale_population(df_filters, constraint, source_label=label)
+                    label = f"{label} [escala]"
+                try:
+                    filt_mode = (self.filter_mode_var.get() or "A").strip().upper()
+                    df_filters = data_access.apply_population_mode(df_filters, filt_mode)
+                    label = f"{label} [{filt_mode}]"
+                except Exception:
+                    pass
+                df_filters["__source__"] = label
+                frames.append(df_filters)
 
         if not frames:
             raise ValueError("No hay fuentes configuradas. Agrega al menos una población conjunta o selecciona una consulta base.")
 
-        combined = pd.concat(frames, ignore_index=True)
+        combined = pd.concat(frames, ignore_index=True, sort=False)
         if self.transpose_enable_var.get():
             combined = self._apply_population_transpositions(combined)
         return combined
@@ -2078,6 +2411,7 @@ class ExperimentLauncher(tk.Tk):
         self.population_df = None
         self.population_selected_rows.clear()
         self.population_row_ids.clear()
+        self._last_generator_stats = None
 
         tree = getattr(self, "pop_tree", None)
         if tree is not None:

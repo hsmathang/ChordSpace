@@ -9,6 +9,7 @@ Herramientas, notebooks y GUI para explorar rugosidad y consonancia en acordes u
 - PostgreSQL 16 con la tabla `public.chords` completa (interval como `integer[]`).
 - Popular la base con `python -m tools.populate_db --mode full` y validar ~2 579 129 filas.
 - Lanzar la GUI con `python -m tools.gui_experiment_launcher`.
+- Alternativa sin Postgres: usar la fuente `generator` (nuevo backend procedimental en CLI/GUI).
 
 ---
 
@@ -94,8 +95,17 @@ DB_NAME=ChordCodex
 - Consultas rapidas: `python -m tools.run_sql --query QUERY_CHORDS_WITH_NAME --limit 10`.
 - GUI: `python -m tools.gui_experiment_launcher` (lee [docs/GUI.md](docs/GUI.md)).
 - Pipelines CLI: revisa `tools/populate_db.py` y `tools/run_sql.py` para ejemplos reproducibles.
+- Generador streaming: `python -m tools.experiment_inversions --data-source generator --generator-alphabet 0,4,7 --generator-octaves 4-5 --generator-cardinalities 3`.
 
 Los componentes leyeran credenciales desde `.env`. Si necesitas usar variables del sistema, exportalas antes de lanzar el proceso.
+
+### Generador streaming (sin Postgres)
+
+El backend `generator` permite construir poblaciones a partir de parámetros musicales sin depender de la base `ChordCodex`.
+
+- GUI: selecciona "generator" en *Fuente de datos* y completa alfabeto (pitch classes), rango de octavas y cardinalidades. Los filtros SQL se deshabilitan y el generador trabaja en streaming para evitar picos de memoria.
+- CLI: añade `--data-source generator` y describe el universo con `--generator-alphabet`, `--generator-octaves`, `--generator-cardinalities` y filtros opcionales (`--generator-max-span`, `--generator-must-have`, etc.).
+- El motor produce columnas compatibles con la base histórica (`abs_mask_int`, `notes_abs_json`, `__source__`) para que deduplicación y pipelines descendentes sigan funcionando sin cambios.
 
 ---
 

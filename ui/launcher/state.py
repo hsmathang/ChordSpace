@@ -21,6 +21,8 @@ class LauncherState:
     base_query: Optional[str] = None
     output_dir: Optional[Path] = None
     population_sources: list[str] = field(default_factory=list)
+    data_source: str = "database"
+    generator_settings: dict[str, Any] = field(default_factory=dict)
     filters_enabled: bool = False
     model: str = "Sethares"
     metric: str = "euclidean"

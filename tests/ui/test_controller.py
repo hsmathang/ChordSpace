@@ -52,6 +52,7 @@ def test_build_experiment_request_includes_state(tmp_path):
     assert request.args.pops == ["A:foo"]
     assert request.args.model == "sethares"
     assert request.descriptor == "preview"
+    assert request.args.data_source == "database"
 
 
 def test_build_experiment_request_requires_parameters(tmp_path):
@@ -93,3 +94,25 @@ def test_run_experiment_uses_gateway_and_logs(tmp_path):
     category, message = state.log_queue.get_nowait()
     assert category == "exp_log"
     assert "Iniciando" in message
+
+
+def test_build_experiment_request_generator(tmp_path):
+    state = LauncherState()
+    state.update(data_source="generator")
+    state.update(generator_settings={
+        "alphabet": "0,4,7",
+        "octaves": "4-4",
+        "cardinalities": "3",
+    })
+    controller = ExperimentLauncherController(state)
+
+    request = controller.build_experiment_request(
+        default_output_dir=tmp_path / "default",
+        selected_ids=[],
+        df_override=None,
+        descriptor=None,
+    )
+
+    assert request.args.data_source == "generator"
+    assert request.args.generator_settings["alphabet"] == "0,4,7"
+    assert request.args.generator_settings["octaves"] == "4-4"

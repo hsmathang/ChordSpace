@@ -10,13 +10,18 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from enum import Enum
-from typing import Dict, Iterable, List, Optional, Tuple
+from typing import Any, Dict, Iterable, List, Mapping, Optional, Tuple, Union
 
 import pandas as pd
 
 import config as cfg
 from tools.query_registry import get_all_queries, resolve_query_sql
 from tools.experiment_inversions import _parse_pop_spec, _build_population
+from services.data_gateway import (
+    GeneratorRequest,
+    create_data_gateway,
+    PopulationResult,
+)
 
 try:  # pragma: no cover - prefer packaged executor
     from chordcodex.model import QueryExecutor  # type: ignore
@@ -520,6 +525,42 @@ def fetch_population_with_source(
 def build_sql_for_ids(ids: Iterable[int], profile: ColumnProfile = ColumnProfile.FULL) -> str:
     filters = ChordFilters(include_ids=[int(i) for i in ids], order_by="id")
     return build_sql(filters, profile)
+
+
+def normalize_generator_settings(
+    settings: Union[GeneratorRequest, Mapping[str, Any], str]
+) -> GeneratorRequest:
+    """Return a :class:`GeneratorRequest` instance from user-provided settings."""
+
+    return GeneratorRequest.from_any(settings)
+
+
+def generate_population(
+    settings: Union[GeneratorRequest, Mapping[str, Any], str],
+    *,
+    dedupe: bool = False,
+    batch_size: Optional[int] = None,
+) -> PopulationResult:
+    """Materialise a population using the streaming generator backend."""
+
+    kwargs: Dict[str, Any] = {}
+    if batch_size is not None:
+        kwargs["batch_size"] = int(batch_size)
+    gateway = create_data_gateway("generator", **kwargs)
+    spec = normalize_generator_settings(settings)
+    return gateway.fetch_population([spec], dedupe=dedupe)
+
+
+def generate_population_dataframe(
+    settings: Union[GeneratorRequest, Mapping[str, Any], str],
+    *,
+    dedupe: bool = False,
+    batch_size: Optional[int] = None,
+) -> pd.DataFrame:
+    """Return only the dataframe component of :func:`generate_population`."""
+
+    result = generate_population(settings, dedupe=dedupe, batch_size=batch_size)
+    return result.dataframe
 
 
 # --------------------------------------------------------------------------- #
