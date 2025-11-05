@@ -12,6 +12,8 @@ from functools import lru_cache
 from itertools import combinations
 from typing import Iterable, Sequence, Tuple
 
+import json
+
 import numpy as np
 
 
@@ -60,6 +62,12 @@ def pc_tuple(midi_list: Sequence[int]) -> Tuple[int, ...]:
     """
 
     return tuple(int(m) % 12 for m in midi_list)
+
+
+def interval_to_ui_bin(interval_semitones: int) -> int:
+    """Map semitone distances to the 12-bin UI convention."""
+
+    return (int(interval_semitones) - 1) % 12
 
 
 def pc_set_sorted(midi_list: Sequence[int]) -> Tuple[int, ...]:
@@ -256,3 +264,135 @@ def rotation_bass_up(midi_list: Sequence[int]) -> Tuple[int, ...]:
     rotated = list(ordered[1:]) + [ordered[0] + 12]
     rotated.sort()
     return tuple(rotated)
+
+
+# ---------------------------------------------------------------------------
+# DB-aligned encodings
+# ---------------------------------------------------------------------------
+
+def midi_tuple_sorted(midi_list: Sequence[int]) -> Tuple[int, ...]:
+    """Return a sorted MIDI tuple with unique entries."""
+
+    ordered = tuple(sorted(int(m) for m in midi_list))
+    if not ordered:
+        raise ValueError("midi_list cannot be empty")
+    for i in range(1, len(ordered)):
+        if ordered[i] == ordered[i - 1]:
+            raise ValueError("Chord contains unisons (duplicated MIDI numbers)")
+    return ordered
+
+
+def pitch_class_strings(midi_list: Sequence[int]) -> Tuple[str, ...]:
+    """Return pitch-class strings in ascending MIDI order."""
+
+    ordered = midi_tuple_sorted(midi_list)
+    return tuple(str(pc) for pc in pc_tuple(ordered))
+
+
+def chord_code_hex(midi_list: Sequence[int]) -> str:
+    """Return the hexadecimal pitch-class code used by the historical DB."""
+
+    ordered = midi_tuple_sorted(midi_list)
+    pcs = pc_tuple(ordered)
+    return "".join(HEX_PITCH_CLASS[int(pc) % 12] for pc in pcs)
+
+
+def bass_pitch_class(midi_list: Sequence[int]) -> str:
+    """Return the bass pitch class as a string."""
+
+    pcs = pitch_class_strings(midi_list)
+    return pcs[0] if pcs else "0"
+
+
+def base_octave_number(midi_list: Sequence[int]) -> int:
+    """Return the DB-style octave number (C4 == 4)."""
+
+    ordered = midi_tuple_sorted(midi_list)
+    if not ordered:
+        return 4
+    return 4 + ordered[0] // 12
+
+
+def abs_mask_hex_of(midi_list: Sequence[int]) -> str:
+    """Return the hexadecimal absolute mask representation."""
+
+    mask = abs_mask_bigint_of(midi_list)
+    return format(mask, "07X")
+
+
+def notes_abs_json(midi_list: Sequence[int]) -> str:
+    """Return the JSON representation of the absolute MIDI notes."""
+
+    ordered = midi_tuple_sorted(midi_list)
+    return json.dumps(list(ordered))
+
+
+def fundamental_frequencies(midi_list: Sequence[int]) -> Tuple[float, ...]:
+    """Return the fundamental frequencies mirroring ``calculate_row``."""
+
+    ordered = midi_tuple_sorted(midi_list)
+    freqs = []
+    for midi in ordered:
+        pc = midi % 12
+        base = PITCH_CLASS_BASE_FREQUENCIES.get(pc)
+        if base is None:
+            raise ValueError(f"Unsupported pitch class: {pc}")
+        octave = midi // 12
+        freqs.append(base * (2 ** octave))
+    return tuple(freqs)
+
+
+def chord_dataframe_payload(
+    midi_list: Sequence[int],
+    *,
+    tag: str = "ABS_V2",
+) -> dict:
+    """Return a dictionary aligned with the historical chord DataFrame."""
+
+    ordered = midi_tuple_sorted(midi_list)
+    intervals = (
+        list(adjacent_intervals_semitones(ordered))
+        if len(ordered) > 1
+        else []
+    )
+    return {
+        "n": len(ordered),
+        "interval": intervals,
+        "notes": list(pitch_class_strings(ordered)),
+        "bass": bass_pitch_class(ordered),
+        "octave": base_octave_number(ordered),
+        "frequencies": list(fundamental_frequencies(ordered)),
+        "chroma": chroma01(ordered).astype(int).tolist(),
+        "tag": tag,
+        "code": chord_code_hex(ordered),
+        "span_semitones": ordered[-1] - ordered[0] if len(ordered) > 1 else 0,
+        "abs_mask_int": abs_mask_bigint_of(ordered),
+        "abs_mask_hex": abs_mask_hex_of(ordered),
+        "notes_abs_json": notes_abs_json(ordered),
+    }
+# ---------------------------------------------------------------------------
+# Public constants
+# ---------------------------------------------------------------------------
+
+HEX_PITCH_CLASS = "0123456789AB"
+
+# Fundamental frequencies for pitch classes anchored at octave 4.  These
+# values mirror the fallback implementation used by ``synth_tools.calculate_row``
+# so that adapters relying on :mod:`core.encoding` stay aligned with historical
+# chord codification.
+PITCH_CLASS_BASE_FREQUENCIES = {
+    0: 261.63,
+    1: 277.18,
+    2: 293.66,
+    3: 311.13,
+    4: 329.63,
+    5: 349.23,
+    6: 369.99,
+    7: 391.99,
+    8: 415.30,
+    9: 440.00,
+    10: 466.16,
+    11: 493.88,
+}
+
+

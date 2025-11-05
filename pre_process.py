@@ -12,6 +12,8 @@ import logging
 from dataclasses import dataclass
 from abc import ABC, abstractmethod
 
+from core import chroma01, interval_to_ui_bin
+
 try:
     from chordcodex.model import QueryExecutor  # type: ignore
 except Exception:  # pragma: no cover
@@ -83,22 +85,6 @@ def safe_normalize(vec: np.ndarray, eps: float = 1e-8) -> np.ndarray:
     if norm < eps:
         return vec
     return vec / norm
-
-
-def interval_to_ui_bin(intervalo: int) -> int:
-    """
-    Mapea un intervalo en semitonos (mod 12) al índice de bin usado en el vector 12‑D.
-
-    Convención de UI actual: la "posición 12" (índice 11) representa el intervalo 0 (unísono/octava).
-    Para el resto, 1..11 -> índices 0..10.
-
-    Args:
-        intervalo: entero en [0..11]
-
-    Returns:
-        int: índice de bin en [0..11]
-    """
-    return (intervalo - 1) % 12  # 0 -> 11, 1..11 -> 0..10
 
 
 from config import CHORD_TYPE_INTERVALS
@@ -194,13 +180,8 @@ class Acorde:
         """
         if self.chroma is not None:
             return self.chroma
-        if not self.intervals:
-            return np.zeros(12, dtype=int)
         semitonos = np.cumsum([0] + self.intervals)
-        pitch_classes = np.mod(semitonos, 12)
-        chroma = np.zeros(12, dtype=int)
-        chroma[np.unique(pitch_classes)] = 1
-        return chroma
+        return chroma01(semitonos).astype(int)
 
 
 class ChordAdapter:
@@ -524,6 +505,7 @@ class ModeloSetharesVec(ModeloRugosidad):
         self._cached_decay: Optional[float] = None
         self._cached_K: Optional[np.ndarray] = None
         self._cached_A: Optional[np.ndarray] = None
+        self._cached_Aprod: Optional[np.ndarray] = None
 
     def _get_harmonic_arrays(self, n_harmonics: int, decay: float) -> Tuple[np.ndarray, np.ndarray]:
         """Return cached harmonic indices and amplitudes for the given parameters."""
@@ -537,6 +519,7 @@ class ModeloSetharesVec(ModeloRugosidad):
             self._cached_decay = float(decay)
             self._cached_K = np.arange(1, self._cached_n_harmonics + 1, dtype=float)
             self._cached_A = self._cached_decay ** (self._cached_K - 1)
+            self._cached_Aprod = self._cached_A[:, None] * self._cached_A[None, :]
         return self._cached_K, self._cached_A
 
     def _pair_total(self, f1: float, f2: float, K: np.ndarray, A: np.ndarray) -> float:
@@ -547,7 +530,10 @@ class ModeloSetharesVec(ModeloRugosidad):
         Fmin = np.minimum(P1g, P2g)
         DF = np.abs(P2g - P1g)
         S = self.Dstar / (self.S1 * Fmin + self.S2)
-        Aprod = (A[:, None] * A[None, :])
+        if A is self._cached_A and self._cached_Aprod is not None:
+            Aprod = self._cached_Aprod
+        else:
+            Aprod = (A[:, None] * A[None, :])
         Dmat = Aprod * (self.C1 * np.exp(self.A1 * S * DF) + self.C2 * np.exp(self.A2 * S * DF))
         return float(np.sum(Dmat))
 
