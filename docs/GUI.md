@@ -27,6 +27,21 @@ python -m tools.gui_experiment_launcher
 
 > Sugerencia: inicia con consultas como `QUERY_CHORDS_WITH_NAME` o `QUERY_CHORDS_WITH_NAME_AND_RANDOM_CHORDS_POBLATION` que regresan subconjuntos razonables.
 
+### Fuente `generator`
+
+La pestaña "Fuente base y salida" incluye ahora un selector "Fuente de datos" con dos opciones:
+
+- **database** (por defecto): replica el comportamiento tradicional cargando consultas desde PostgreSQL.
+- **generator**: usa el motor procedimental de `gen.generate` para construir acordes en streaming.
+
+Al elegir `generator` se despliega un formulario con los parámetros musicales principales:
+
+- **Modo** (`total`/`struct`), **alfabeto** (pitch classes separados por comas), **rango de octavas** y **cardinalidades**.
+- Filtros tempranos (`max_span`, pitch classes obligatorios/prohibidos, patrón intervalar) y límite máximo de filas.
+- Etiqueta `__source__` y `tag` para mantener compatibilidad con pipelines existentes.
+
+Los filtros SQL (sección "Filtros dinámicos") se deshabilitan automáticamente para evitar mezclas inconsistente entre fuentes. El generador emite las mismas columnas que la base (`abs_mask_int`, `notes_abs_json`, `__source__`), por lo que la deduplicación y los pasos posteriores funcionan sin ajustes adicionales.
+
 ---
 
 ## Salidas

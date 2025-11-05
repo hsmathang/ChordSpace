@@ -84,6 +84,8 @@ class ExperimentLauncherController:
         if not isinstance(output_dir, Path):
             output_dir = Path(output_dir)
 
+        data_source = (self.state.data_source or "database").strip().lower()
+
         base_query = self.state.base_query
         if base_query == "<Ninguna>":
             base_query = None
@@ -92,7 +94,7 @@ class ExperimentLauncherController:
         filters_enabled = self.state.filters_enabled
 
         if not selected_ids and df_override is None:
-            if not pops and not base_query and not filters_enabled:
+            if data_source != "generator" and not pops and not base_query and not filters_enabled:
                 raise MissingParametersError(
                     "Selecciona una consulta base, poblaciones adicionales o activa los filtros personalizados.",
                 )
@@ -109,6 +111,14 @@ class ExperimentLauncherController:
             metric=self.state.metric,
             ponderation=self.state.ponderation,
         )
+
+        args.data_source = data_source
+
+        if data_source == "generator":
+            args.query = None
+            args.pops = None
+            generator_settings = dict(self.state.generator_settings)
+            args.generator_settings = generator_settings
 
         return ExperimentRunRequest(
             args=args,
