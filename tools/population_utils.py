@@ -65,6 +65,12 @@ def dedupe_population(df: pd.DataFrame) -> Tuple[pd.DataFrame, str]:
         key_series = work["abs_mask_int"].apply(
             lambda v: f"mask:{int(v)}" if pd.notnull(v) else None
         )
+        if "__root_midi" in work.columns:
+            try:
+                root_series = work["__root_midi"].fillna(-1).astype(int)
+                key_series = key_series + root_series.map(lambda r: f"|root:{r}")
+            except Exception:  # pragma: no cover - defensivo
+                pass
         missing = key_series.isna()
         if missing.any():
             key_series[missing] = _fallback_key(work.loc[missing]).apply(

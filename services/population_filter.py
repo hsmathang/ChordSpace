@@ -8,8 +8,26 @@ from tools.data_access import ChordFilters
 
 def _parse_interval(interval_str):
     if isinstance(interval_str, list):
-        return interval_str
-    return [int(i) for i in interval_str.strip('{}').split(',') if i]
+        return [int(v) for v in interval_str]
+    if interval_str is None or (isinstance(interval_str, float) and pd.isna(interval_str)):
+        return []
+    text = str(interval_str).strip("{}[]() ")
+    if not text:
+        return []
+    return [int(i) for i in text.split(',') if i.strip()]
+
+
+def _contains_subsequence(sequence, pattern):
+    if not pattern:
+        return True
+    seq_len = len(sequence)
+    pat_len = len(pattern)
+    if pat_len > seq_len:
+        return False
+    for idx in range(seq_len - pat_len + 1):
+        if tuple(sequence[idx : idx + pat_len]) == tuple(pattern):
+            return True
+    return False
 
 def filter_dataframe(df: pd.DataFrame, filters: ChordFilters) -> pd.DataFrame:
     """
@@ -57,6 +75,42 @@ def filter_dataframe(df: pd.DataFrame, filters: ChordFilters) -> pd.DataFrame:
         exclude_pcs = set(filters.exclude_pitch_classes)
         pitch_classes_set = filtered_df['notes_abs_json'].apply(lambda x: set(n % 12 for n in json.loads(x)))
         mask = pitch_classes_set.apply(lambda pcs: pcs.isdisjoint(exclude_pcs))
+        filtered_df = filtered_df[mask]
+
+    intervals_series = filtered_df['interval'].apply(_parse_interval)
+
+    # 5. Filtro por patrones de intervalos
+    patterns: list[list[int]] = []
+    if filters.interval_exact:
+        patterns.append([int(x) for x in filters.interval_exact])
+    if filters.interval_patterns:
+        patterns.extend([[int(x) for x in pattern] for pattern in filters.interval_patterns])
+
+    if filters.interval_mode == "exact" and patterns:
+        mask = intervals_series.apply(
+            lambda seq: any(tuple(seq) == tuple(pattern) for pattern in patterns)
+        )
+        filtered_df = filtered_df[mask]
+        intervals_series = intervals_series[mask]
+    elif filters.interval_mode == "subseq" and patterns:
+        mask = intervals_series.apply(
+            lambda seq: any(_contains_subsequence(seq, pattern) for pattern in patterns)
+        )
+        filtered_df = filtered_df[mask]
+        intervals_series = intervals_series[mask]
+
+    # 6. Filtro por valores individuales de intervalos
+    if filters.interval_mode == "any_value" and filters.interval_values:
+        values = set(int(v) for v in filters.interval_values)
+        mask = intervals_series.apply(lambda seq: any(val in values for val in seq))
+        filtered_df = filtered_df[mask]
+        intervals_series = intervals_series[mask]
+
+    # 7. Filtro por códigos absolutos
+    if filters.codes:
+        codes = {code.upper() for code in filters.codes}
+        code_series = filtered_df['code'].astype(str).str.upper()
+        mask = code_series.apply(lambda c: c in codes)
         filtered_df = filtered_df[mask]
 
     return filtered_df

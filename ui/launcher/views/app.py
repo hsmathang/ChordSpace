@@ -59,6 +59,25 @@ class CustomFilterSpec:
     expand_scale: bool = False
 
 
+@dataclass(frozen=True)
+class PopulationJobRequest:
+    mode: str  # 'db' or 'combinatorial'
+    base_query: str | None = None
+    pops_entries: Tuple[str, ...] = ()
+    custom_filters: CustomFilterSpec | None = None
+    filter_mode: str | None = None
+    transpose_enabled: bool = False
+    transpose_steps_text: str = ""
+    alphabet: Tuple[int, ...] = ()
+    octave_min: int = 0
+    octave_max: int = 0
+    cardinalities: Tuple[int, ...] = ()
+    apply_post_filters: bool = False
+
+
+_MISSING = object()
+
+
 class ScrollableFrame(ttk.Frame):
     """Wrapper that provides a vertical scrollbar for large tab content."""
 
@@ -141,12 +160,16 @@ class ExperimentLauncher(tk.Tk):
 
         self.log_queue: queue.Queue = self.state.log_queue
         self._running_thread: threading.Thread | None = None
+        self.population_queue: queue.Queue = queue.Queue()
+        self._population_worker: threading.Thread | None = None
         self.pops_entries: list[str] = []
         self.progress_var = tk.DoubleVar(value=0.0)
         self.progress_text_var = tk.StringVar(value="0.0%")
         self.progress_message_var = tk.StringVar(value="Listo.")
         self._progress_reset_job: str | None = None
         self._transpose_entry: ttk.Entry | None = None
+        self.population_dirty = False
+        self.final_stats_text: str | None = None
 
         self._load_queries()
         self._init_state_vars()
@@ -160,6 +183,7 @@ class ExperimentLauncher(tk.Tk):
         self._create_layout()
 
         self.after(100, self._process_log_queue)
+        self.after(150, self._process_population_queue)
         self._update_progress(0.0, "Listo.")
 
     # ----------------------------------------------------------- progress utils
@@ -487,10 +511,26 @@ class ExperimentLauncher(tk.Tk):
 
         preview_row = ttk.Frame(controls)
         preview_row.grid(row=3, column=0, sticky="w", pady=(10, 6))
-        ttk.Button(preview_row, text="Generar Población Temporal", command=self._on_generate_temporal_population).pack(side=tk.LEFT)
+        self.generate_population_button = ttk.Button(
+            preview_row,
+            text="Generar Población Temporal",
+            command=self._on_generate_temporal_population,
+        )
+        self.generate_population_button.pack(side=tk.LEFT)
 
-        add_button = ttk.Button(preview_row, text="=> Añadir a Población Final", command=self._on_add_to_final_population)
-        add_button.pack(side=tk.LEFT, padx=(10, 0))
+        self.add_population_button = ttk.Button(
+            preview_row,
+            text="=> Añadir a Población Final",
+            command=self._on_add_to_final_population,
+        )
+        self.add_population_button.pack(side=tk.LEFT, padx=(10, 0))
+
+        self.clear_final_button = ttk.Button(
+            preview_row,
+            text="Limpiar Población Final",
+            command=self._clear_final_population,
+        )
+        self.clear_final_button.pack(side=tk.LEFT, padx=(10, 0))
 
         pop_bottom = ttk.Frame(population_paned, padding=6)
         population_paned.add(pop_bottom, weight=5)
@@ -498,8 +538,14 @@ class ExperimentLauncher(tk.Tk):
         pop_bottom.rowconfigure(1, weight=1)
         pop_bottom.rowconfigure(3, weight=1)
 
-        self.pop_stats_var = tk.StringVar(value="—")
+        self.pop_stats_var = tk.StringVar(value="(sin población)")
         ttk.Label(pop_bottom, textvariable=self.pop_stats_var, foreground="#555").grid(row=0, column=0, sticky="w")
+        self.pop_progress_text_var = tk.StringVar(value="")
+        self.pop_progress = ttk.Progressbar(pop_bottom, mode="indeterminate", length=160, maximum=100)
+        self.pop_progress.grid(row=0, column=1, sticky="w", padx=(12, 0))
+        self.pop_progress.grid_remove()
+        self.pop_progress_label = ttk.Label(pop_bottom, textvariable=self.pop_progress_text_var, foreground="#777")
+        self.pop_progress_label.grid(row=0, column=2, sticky="w", padx=(8, 0))
 
         table_frame = ttk.Frame(pop_bottom)
         table_frame.grid(row=1, column=0, sticky="nsew", pady=(4, 4))
@@ -690,8 +736,14 @@ class ExperimentLauncher(tk.Tk):
         except Exception:
             pass
 
-    def _parse_transposition_steps(self) -> List[int]:
-        raw = (self.transpose_steps_var.get() or "").strip()
+    def _parse_transposition_steps(
+        self,
+        *,
+        steps_text: str | None = None,
+        log_callback=None,
+    ) -> List[int]:
+        raw_value = steps_text if steps_text is not None else (self.transpose_steps_var.get() or "")
+        raw = raw_value.strip()
         if not raw:
             return []
         tokens = [token.strip() for token in re.split(r"[;,]", raw) if token.strip()]
@@ -724,13 +776,23 @@ class ExperimentLauncher(tk.Tk):
         if not filtered:
             return []
         if len(filtered) < len(steps):
-            self._append_pop_log("[población] Algunos semitonos quedaron fuera de [-24,24] y se omitieron.\n")
+            callback = log_callback or self._append_pop_log
+            callback("[población] Algunos semitonos quedaron fuera de [-24,24] y se omitieron.\n")
         return filtered
 
-    def _apply_population_transpositions(self, df: pd.DataFrame) -> pd.DataFrame:
-        steps = self._parse_transposition_steps()
+    def _apply_population_transpositions(
+        self,
+        df: pd.DataFrame,
+        *,
+        steps: List[int] | None = None,
+        log_callback=None,
+        steps_text: str | None = None,
+    ) -> pd.DataFrame:
+        log = log_callback or self._append_pop_log
+        if steps is None:
+            steps = self._parse_transposition_steps(steps_text=steps_text, log_callback=log)
         if not steps:
-            self._append_pop_log("[población] Transposición habilitada sin valores válidos; se omite.\n")
+            log("[población] Transposición habilitada sin valores válidos; se omite.\n")
             return df
         base = df.copy()
         if "__source__" not in base.columns:
@@ -774,20 +836,19 @@ class ExperimentLauncher(tk.Tk):
                 frames.append(trans_df)
                 total_added += len(records)
         if not applied_steps:
-            self._append_pop_log("[población] Transposición: solo se incluyó 0; no se generaron acordes nuevos.\n")
+            log("[población] Transposición: solo se incluyó 0; no se generaron acordes nuevos.\n")
             return base
         result = pd.concat(frames, ignore_index=True, sort=False)
         step_desc = ", ".join(f"{step:+d}" for step in applied_steps)
-        self._append_pop_log(
-            f"[población] Transposición aplicada (pasos {step_desc}). Filas añadidas: {total_added}.\n"
-        )
+        log(f"[población] Transposición aplicada (pasos {step_desc}). Filas añadidas: {total_added}.\n")
         if skipped:
-            self._append_pop_log(
-                f"[población] Transposición: {skipped} registros omitidos por salir del rango permitido.\n"
-            )
+            log(f"[población] Transposición: {skipped} registros omitidos por salir del rango permitido.\n")
         if error_samples:
             sample_text = "\n".join(error_samples)
-            self._append_log("[población] Advertencia durante transposición:\n" + sample_text + "\n")
+            if log_callback is not None:
+                log(f"[población] Advertencia durante transposición:\n{sample_text}\n")
+            else:
+                self._append_log("[población] Advertencia durante transposición:\n" + sample_text + "\n")
         return result
 
     def _build_experiment_params_frame(self, frame: ttk.Frame) -> None:
@@ -1115,55 +1176,201 @@ class ExperimentLauncher(tk.Tk):
 
     # ------------------------ comparison logic
     def _on_generate_temporal_population(self) -> None:
+        if self._population_worker and self._population_worker.is_alive():
+            messagebox.showinfo(
+                "Generación en curso",
+                "Ya se está generando una población. Espera a que finalice.",
+            )
+            return
+
+        try:
+            request = self._build_population_job_request()
+        except Exception as exc:
+            messagebox.showerror("Error al preparar generación", str(exc))
+            return
+
+        self._start_population_job(request)
+
+    def _build_population_job_request(self) -> PopulationJobRequest:
+        mode = (self.generation_mode_var.get() or "db").strip().lower()
+        filters_active = bool(self.filter_enable_var.get())
+        custom_filters = self._collect_custom_filters() if filters_active else None
+        filter_mode = (self.filter_mode_var.get() or "A").strip().upper() or "A"
+        transpose_enabled = bool(self.transpose_enable_var.get())
+        transpose_steps_text = self.transpose_steps_var.get() or ""
+
+        if mode == "db":
+            base_query = self.base_query_var.get().strip()
+            pops_entries = tuple(self.pops_entries)
+            return PopulationJobRequest(
+                mode="db",
+                base_query=base_query,
+                pops_entries=pops_entries,
+                custom_filters=custom_filters,
+                filter_mode=filter_mode,
+                transpose_enabled=transpose_enabled,
+                transpose_steps_text=transpose_steps_text,
+                apply_post_filters=bool(custom_filters),
+            )
+
+        alphabet_str = self.combinatorial_alphabet_var.get()
+        oct_min_str = self.combinatorial_octave_min_var.get()
+        oct_max_str = self.combinatorial_octave_max_var.get()
+        card_str = self.combinatorial_cardinalities_var.get()
+
+        if not all([alphabet_str, oct_min_str, oct_max_str, card_str]):
+            raise ValueError("Todos los parámetros combinatorios son requeridos.")
+
+        try:
+            alphabet = tuple(int(pc.strip()) for pc in alphabet_str.split(',') if pc.strip())
+            if not alphabet:
+                raise ValueError("Ingresa al menos una pitch class para el alfabeto.")
+            oct_min = int(oct_min_str)
+            oct_max = int(oct_max_str)
+            if oct_min > oct_max:
+                raise ValueError("Octava mínima no puede ser mayor que la máxima.")
+            cardinalities = tuple(int(c.strip()) for c in card_str.split(',') if c.strip())
+            if not cardinalities:
+                raise ValueError("Ingresa al menos una cardinalidad.")
+        except ValueError as exc:
+            raise ValueError("Parámetros combinatorios inválidos.") from exc
+
+        return PopulationJobRequest(
+            mode="combinatorial",
+            alphabet=alphabet,
+            octave_min=oct_min,
+            octave_max=oct_max,
+            cardinalities=cardinalities,
+            custom_filters=custom_filters,
+            apply_post_filters=bool(custom_filters),
+        )
+
+    def _set_generation_button_state(self, state: str) -> None:
+        try:
+            if getattr(self, "generate_population_button", None):
+                self.generate_population_button.configure(state=state)
+        except Exception:
+            pass
+
+    def _set_population_busy(self, busy: bool, message: str | None = None) -> None:
+        if busy:
+            if message:
+                self.pop_progress_text_var.set(message)
+            try:
+                self.pop_progress.grid()
+                self.pop_progress.start(15)
+            except Exception:
+                pass
+        else:
+            try:
+                self.pop_progress.stop()
+                self.pop_progress.grid_remove()
+            except Exception:
+                pass
+            if message is not None:
+                self.pop_progress_text_var.set(message)
+            else:
+                self.pop_progress_text_var.set("")
+
+    def _start_population_job(self, request: PopulationJobRequest) -> None:
+        self._set_generation_button_state(tk.DISABLED)
+        self._set_population_busy(True, f"Generando ({request.mode})...")
+        self.pop_stats_var.set("Generando población temporal...")
+        self._append_pop_log(f"[población] Iniciando generación ({request.mode}).\n")
+        self._population_worker = threading.Thread(
+            target=self._run_population_job,
+            args=(request,),
+            daemon=True,
+        )
+        self._population_worker.start()
+
+    def _run_population_job(self, request: PopulationJobRequest) -> None:
+        log_messages: list[str] = []
+        log_cb = lambda msg: log_messages.append(msg)
         try:
             t0 = time.perf_counter()
-            mode = self.generation_mode_var.get()
+            if request.mode == "db":
+                df = self._load_population(
+                    base_query=request.base_query,
+                    pops_entries=list(request.pops_entries),
+                    custom_filters=request.custom_filters,
+                    filter_mode=request.filter_mode,
+                    transpose_enabled=request.transpose_enabled,
+                    transpose_steps_text=request.transpose_steps_text,
+                    log_callback=log_cb,
+                )
+            else:
+                df = generate_combinatorial_chords(
+                    list(request.alphabet),
+                    request.octave_min,
+                    request.octave_max,
+                    list(request.cardinalities),
+                )
 
-            if mode == 'db':
-                df = self._load_population()
-            else: # combinatorial
-                alphabet_str = self.combinatorial_alphabet_var.get()
-                oct_min_str = self.combinatorial_octave_min_var.get()
-                oct_max_str = self.combinatorial_octave_max_var.get()
-                card_str = self.combinatorial_cardinalities_var.get()
+            if request.apply_post_filters and request.custom_filters:
+                df = filter_dataframe(df, request.custom_filters.filters)
+                log_cb(f"[población] Filtros aplicados. {len(df)} acordes restantes.\n")
 
-                if not all([alphabet_str, oct_min_str, oct_max_str, card_str]):
-                    raise ValueError("Todos los parámetros combinatorios son requeridos.")
+            dedup_df, _ = dedupe_population(df)
+            dedup_df.reset_index(drop=True, inplace=True)
+            elapsed = time.perf_counter() - t0
+            self.population_queue.put(
+                {
+                    "status": "ok",
+                    "df": dedup_df,
+                    "elapsed": elapsed,
+                    "log_messages": log_messages,
+                }
+            )
+        except Exception as exc:  # pylint: disable=broad-except
+            self.population_queue.put(
+                {
+                    "status": "error",
+                    "error": exc,
+                    "log_messages": log_messages,
+                }
+            )
 
-                alphabet = [int(pc.strip()) for pc in alphabet_str.split(',')]
-                oct_min = int(oct_min_str)
-                oct_max = int(oct_max_str)
-                cardinalities = [int(c.strip()) for c in card_str.split(',')]
+    def _process_population_queue(self) -> None:
+        try:
+            while True:
+                payload = self.population_queue.get_nowait()
+                for msg in payload.get("log_messages", []):
+                    self._append_pop_log(msg)
+                if payload.get("status") != "ok":
+                    error = payload.get("error")
+                    if error is not None:
+                        messagebox.showerror("Error al generar población", str(error))
+                    self._set_population_busy(False, "Listo.")
+                    self._set_generation_button_state(tk.NORMAL)
+                    self._population_worker = None
+                    continue
 
-                df = generate_combinatorial_chords(alphabet, oct_min, oct_max, cardinalities)
-
-            t1 = time.perf_counter()
-        except Exception as exc:
-            messagebox.showerror("Error al generar población", str(exc))
-            return
-
-        if df is None or df.empty:
-            messagebox.showwarning("Población vacía", "No se obtuvieron filas. Ajusta los parámetros y vuelve a intentar.")
-            return
-
-        # Aplicar filtros si están habilitados
-        if self.filter_enable_var.get():
-            try:
-                custom_filters = self._collect_custom_filters()
-                if custom_filters:
-                    df = filter_dataframe(df, custom_filters.filters)
-                    self._append_pop_log(f"[población] Filtros aplicados. {len(df)} acordes restantes.\n")
-            except Exception as exc:
-                messagebox.showerror("Error al aplicar filtros", str(exc))
-                return
-
-        dedup_df, _ = dedupe_population(df)
-        self.temporal_population_df = dedup_df.reset_index(drop=True)
-        self._fill_population_tree(self.temporal_population_df)
-
-        stats_text = self._compute_population_stats(self.temporal_population_df)
-        self.pop_stats_var.set(f"Temporal: {stats_text}")
-        self._append_pop_log(f"[población] Población temporal generada en {(t1-t0):.3f}s. {stats_text}\n")
+                df: pd.DataFrame = payload["df"]
+                if df is None or df.empty:
+                    self.temporal_population_df = None
+                    self.pop_stats_var.set("Temporal: (sin acordes)")
+                    messagebox.showwarning(
+                        "Población vacía",
+                        "No se obtuvieron filas. Ajusta los parámetros y vuelve a intentar.",
+                    )
+                else:
+                    self.temporal_population_df = df
+                    self.population_dirty = False
+                    self._fill_population_tree(self.temporal_population_df)
+                    stats_text = self._compute_population_stats(self.temporal_population_df)
+                    self.pop_stats_var.set(f"Temporal: {stats_text}")
+                    elapsed = payload.get("elapsed", 0.0)
+                    self._append_pop_log(
+                        f"[población] Población temporal generada en {elapsed:.3f}s. {stats_text}\n"
+                    )
+                self._set_population_busy(False, "Listo.")
+                self._set_generation_button_state(tk.NORMAL)
+                self._population_worker = None
+        except queue.Empty:
+            pass
+        finally:
+            self.after(150, self._process_population_queue)
 
     def _on_add_to_final_population(self) -> None:
         if self.temporal_population_df is None or self.temporal_population_df.empty:
@@ -1184,21 +1391,60 @@ class ExperimentLauncher(tk.Tk):
             self.pop_tree.delete(item)
 
         final_stats = self._compute_population_stats(self.final_population_df)
+        self.final_stats_text = final_stats
         self.pop_stats_var.set(f"Final: {final_stats}")
         self._append_pop_log(f"[población] Añadido a población final. {final_stats}\n")
 
+    def _clear_final_population(self) -> None:
+        if self.final_population_df is None or self.final_population_df.empty:
+            self.final_population_df = None
+            self.final_stats_text = None
+            self.pop_stats_var.set("Final: (sin acordes)")
+            self._append_pop_log("[población] La población final ya estaba vacía.\n")
+            return
 
-    def _load_population(self) -> pd.DataFrame:
+        answer = messagebox.askyesno(
+            "Limpiar población final",
+            "¿Seguro que deseas borrar la población final almacenada?",
+            icon="warning",
+        )
+        if not answer:
+            return
+
+        self.final_population_df = None
+        self.final_stats_text = None
+        self.population_selected_rows.clear()
+        self.population_row_ids.clear()
+        tree = getattr(self, "pop_tree", None)
+        if tree is not None:
+            for item in tree.get_children():
+                tree.delete(item)
+        self.pop_stats_var.set("Final: (sin acordes)")
+        self._append_pop_log("[población] Población final limpiada por el usuario.\n")
+
+
+    def _load_population(
+        self,
+        *,
+        base_query: str | None = None,
+        pops_entries: list[str] | None = None,
+        custom_filters: CustomFilterSpec | None | object = _MISSING,
+        filter_mode: str | None = None,
+        transpose_enabled: bool | None = None,
+        transpose_steps_text: str | None = None,
+        log_callback=None,
+    ) -> pd.DataFrame:
         executor = data_access.get_executor()
         frames: list[pd.DataFrame] = []
         profile = data_access.ColumnProfile.VISUAL
-        base = self.base_query_var.get().strip()
+        base = base_query if base_query is not None else self.base_query_var.get().strip()
         if base and base != "<Ninguna>":
             df_base = data_access.fetch_population_by_name(base, profile=profile, executor=executor).copy()
             df_base["__source__"] = f"BASE:{base}"
             frames.append(df_base)
 
-        for spec in self.pops_entries:
+        sources = pops_entries if pops_entries is not None else list(self.pops_entries)
+        for spec in sources:
             df_p = data_access.fetch_population_with_source(
                 spec,
                 profile=profile,
@@ -1207,34 +1453,48 @@ class ExperimentLauncher(tk.Tk):
             )
             frames.append(df_p)
 
-        custom_filters = self._collect_custom_filters()
-        if custom_filters is not None:
+        filters_spec: CustomFilterSpec | None
+        if custom_filters is _MISSING:
+            filters_spec = self._collect_custom_filters()
+        else:
+            filters_spec = custom_filters
+        if filters_spec is not None:
             df_filters = data_access.fetch_population(
-                custom_filters.filters,
+                filters_spec.filters,
                 profile=profile,
                 executor=executor,
             ).copy()
-            label = custom_filters.label
-            if custom_filters.expand_scale and custom_filters.scale_pitch_classes:
-                constraint = ScaleConstraint(tuple(custom_filters.scale_pitch_classes))
+            label = filters_spec.label
+            if filters_spec.expand_scale and filters_spec.scale_pitch_classes:
+                constraint = ScaleConstraint(tuple(filters_spec.scale_pitch_classes))
                 df_filters = generate_scale_population(df_filters, constraint, source_label=label)
                 label = f"{label} [escala]"
-            # Aplicar modo A/B/C definido para los filtros personalizados
+            mode_value = (
+                (filter_mode or (self.filter_mode_var.get() or "A")).strip().upper()
+                if filter_mode is not None or hasattr(self, "filter_mode_var")
+                else "A"
+            )
             try:
-                filt_mode = (self.filter_mode_var.get() or "A").strip().upper()
-                df_filters = data_access.apply_population_mode(df_filters, filt_mode)
-                label = f"{label} [{filt_mode}]"
+                df_filters = data_access.apply_population_mode(df_filters, mode_value)
+                label = f"{label} [{mode_value}]"
             except Exception:
                 pass
             df_filters["__source__"] = label
             frames.append(df_filters)
 
         if not frames:
-            raise ValueError("No hay fuentes configuradas. Agrega al menos una población conjunta o selecciona una consulta base.")
+            raise ValueError(
+                "No hay fuentes configuradas. Agrega al menos una población conjunta o selecciona una consulta base."
+            )
 
         combined = pd.concat(frames, ignore_index=True)
-        if self.transpose_enable_var.get():
-            combined = self._apply_population_transpositions(combined)
+        transpose_flag = transpose_enabled if transpose_enabled is not None else bool(self.transpose_enable_var.get())
+        if transpose_flag:
+            combined = self._apply_population_transpositions(
+                combined,
+                log_callback=log_callback,
+                steps_text=transpose_steps_text,
+            )
         return combined
 
     def _append_tab_log(self, widget: ScrolledText, text: str) -> None:
@@ -1573,6 +1833,13 @@ class ExperimentLauncher(tk.Tk):
     def _needs_population_payload(self, df: pd.DataFrame) -> tuple[bool, str | None]:
         if df is None or df.empty:
             return False, None
+        if "__source__" in df.columns:
+            try:
+                source_series = df["__source__"].fillna("").astype(str)
+                if source_series.str.startswith("GENERATED:").all():
+                    return True, "Población generada; se envía como archivo."
+            except Exception:
+                return True, "Población con fuente no reconocida; se envía como archivo."
         if "id" not in df.columns or df["id"].isna().any():
             return True, "La población carece de IDs válidos."
         if "__family_size" in df.columns:
@@ -2123,12 +2390,12 @@ class ExperimentLauncher(tk.Tk):
         self._mark_population_dirty()
 
     def _mark_population_dirty(self) -> None:
-        """Invalida la previsualizacin para reconstruirla con la configuracin actual."""
+        """Invalida la previsualización para reconstruirla con la configuración actual."""
 
         self.temporal_population_df = None
-        self.final_population_df = None
         self.population_selected_rows.clear()
         self.population_row_ids.clear()
+        self.population_dirty = True
 
         tree = getattr(self, "pop_tree", None)
         if tree is not None:
@@ -2136,10 +2403,13 @@ class ExperimentLauncher(tk.Tk):
                 tree.delete(item)
 
         if hasattr(self, "pop_stats_var"):
-            self.pop_stats_var.set("(poblacin pendiente; pulsa 'Construir / Previsualizar')")
+            status = "Temporal pendiente; pulsa 'Generar Población Temporal'"
+            if self.final_stats_text:
+                status = f"{status} | Final: {self.final_stats_text}"
+            self.pop_stats_var.set(status)
 
-        # Informar en el log de poblacin para facilitar depuracin
-        self._append_pop_log("[poblacin] La configuracin cambi; vuelve a previsualizar.\n")
+        # Informar en el log de población para facilitar depuración
+        self._append_pop_log("[población] La configuración cambió; vuelve a previsualizar.\n")
 
     def _cleanup_temp_payloads(self) -> None:
         if not getattr(self, "_temp_payloads", None):
