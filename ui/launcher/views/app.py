@@ -35,6 +35,8 @@ import time
 from config import MODELO_OPTIONS_LIST, METRICA_OPTIONS_LIST, PONDERACION_OPTIONS_LIST
 from synth_tools import transpose_row
 
+from services.combinatorial_generator import generate_combinatorial_chords
+from services.population_filter import filter_dataframe
 from ui.launcher.controllers import (
     ExperimentLauncherController,
     ExperimentRunRequest,
@@ -148,8 +150,10 @@ class ExperimentLauncher(tk.Tk):
 
         self._load_queries()
         self._init_state_vars()
+        self._init_combinatorial_vars()
         # Estado para la nueva pestaña de población/preview
-        self.population_df: pd.DataFrame | None = None
+        self.temporal_population_df: pd.DataFrame | None = None
+        self.final_population_df: pd.DataFrame | None = None
         self.population_selected_rows: set[int] = set()
         self.population_row_ids: dict[int, int | None] = {}
         self._temp_payloads: list[Path] = []
@@ -410,6 +414,15 @@ class ExperimentLauncher(tk.Tk):
             "write", lambda *_: self._mark_population_dirty()
         )
 
+    def _init_combinatorial_vars(self) -> None:
+        self.generation_mode_var = tk.StringVar(value="db") # 'db' or 'combinatorial'
+
+        # Vars for combinatorial generator controls
+        self.combinatorial_alphabet_var = tk.StringVar(value="0,2,4,5,7,9,11") # Diatonic
+        self.combinatorial_octave_min_var = tk.StringVar(value="3")
+        self.combinatorial_octave_max_var = tk.StringVar(value="4")
+        self.combinatorial_cardinalities_var = tk.StringVar(value="3,4")
+
     def _create_layout(self) -> None:
         main = ttk.Frame(self, padding=14)
         main.pack(fill=tk.BOTH, expand=True)
@@ -437,20 +450,47 @@ class ExperimentLauncher(tk.Tk):
         controls = pop_controls_scroll.content
         controls.columnconfigure(0, weight=1)
 
-        config_frame = ttk.LabelFrame(controls, text="Fuente base y salida")
+        # --- Selector de Modo de Generación ---
+        mode_frame = ttk.LabelFrame(controls, text="Modo de Generación de Población")
+        mode_frame.grid(row=0, column=0, sticky="nwe", pady=(0, 8))
+
+        db_radio = ttk.Radiobutton(mode_frame, text="Desde Base de Datos", variable=self.generation_mode_var, value="db", command=self._on_generation_mode_change)
+        db_radio.pack(side=tk.LEFT, padx=10, pady=5)
+
+        combinatorial_radio = ttk.Radiobutton(mode_frame, text="Generación Combinatoria", variable=self.generation_mode_var, value="combinatorial", command=self._on_generation_mode_change)
+        combinatorial_radio.pack(side=tk.LEFT, padx=10, pady=5)
+
+        # --- Frame para Controles de DB ---
+        self.db_controls_frame = ttk.Frame(controls)
+        self.db_controls_frame.grid(row=1, column=0, sticky="nwe")
+        self.db_controls_frame.columnconfigure(0, weight=1)
+
+        config_frame = ttk.LabelFrame(self.db_controls_frame, text="Fuente base y salida")
         config_frame.grid(row=0, column=0, sticky="nwe")
         self._build_population_config_frame(config_frame)
 
-        pops_frame = ttk.LabelFrame(controls, text="Poblaciones conjuntas (A/B/C)")
+        pops_frame = ttk.LabelFrame(self.db_controls_frame, text="Poblaciones conjuntas (A/B/C)")
         pops_frame.grid(row=1, column=0, sticky="nwe", pady=(8, 0))
         self._build_pops_frame(pops_frame)
 
+        # --- Frame para Controles Combinatorios ---
+        self.combinatorial_controls_frame = ttk.Frame(controls)
+        self.combinatorial_controls_frame.grid(row=1, column=0, sticky="nwe")
+        self.combinatorial_controls_frame.columnconfigure(0, weight=1)
+
+        self._build_combinatorial_frame(self.combinatorial_controls_frame)
+
         self._build_filter_frame(controls, row=2)
+
+        # Inicializar visibilidad
+        self._on_generation_mode_change()
 
         preview_row = ttk.Frame(controls)
         preview_row.grid(row=3, column=0, sticky="w", pady=(10, 6))
-        ttk.Button(preview_row, text="Construir / Previsualizar", command=self._on_population_preview_clicked).pack(side=tk.LEFT)
-        ttk.Label(preview_row, text="(usa la lista A/B/C y la consulta base opcional)").pack(side=tk.LEFT, padx=(8, 0))
+        ttk.Button(preview_row, text="Generar Población Temporal", command=self._on_generate_temporal_population).pack(side=tk.LEFT)
+
+        add_button = ttk.Button(preview_row, text="=> Añadir a Población Final", command=self._on_add_to_final_population)
+        add_button.pack(side=tk.LEFT, padx=(10, 0))
 
         pop_bottom = ttk.Frame(population_paned, padding=6)
         population_paned.add(pop_bottom, weight=5)
@@ -1074,69 +1114,79 @@ class ExperimentLauncher(tk.Tk):
         self.reduction_last_report: Path | None = None
 
     # ------------------------ comparison logic
-    def _on_population_preview_clicked(self) -> None:
+    def _on_generate_temporal_population(self) -> None:
         try:
             t0 = time.perf_counter()
-            df = self._load_population()
+            mode = self.generation_mode_var.get()
+
+            if mode == 'db':
+                df = self._load_population()
+            else: # combinatorial
+                alphabet_str = self.combinatorial_alphabet_var.get()
+                oct_min_str = self.combinatorial_octave_min_var.get()
+                oct_max_str = self.combinatorial_octave_max_var.get()
+                card_str = self.combinatorial_cardinalities_var.get()
+
+                if not all([alphabet_str, oct_min_str, oct_max_str, card_str]):
+                    raise ValueError("Todos los parámetros combinatorios son requeridos.")
+
+                alphabet = [int(pc.strip()) for pc in alphabet_str.split(',')]
+                oct_min = int(oct_min_str)
+                oct_max = int(oct_max_str)
+                cardinalities = [int(c.strip()) for c in card_str.split(',')]
+
+                df = generate_combinatorial_chords(alphabet, oct_min, oct_max, cardinalities)
+
             t1 = time.perf_counter()
-        except Exception as exc:  # pylint: disable=broad-except
-            messagebox.showerror("Error al cargar población", str(exc))
+        except Exception as exc:
+            messagebox.showerror("Error al generar población", str(exc))
             return
+
         if df is None or df.empty:
-            messagebox.showwarning("Población vacía", "No se obtuvieron filas. Ajusta la fuente y vuelve a intentar.")
+            messagebox.showwarning("Población vacía", "No se obtuvieron filas. Ajusta los parámetros y vuelve a intentar.")
             return
-        # Reporte por fuente (antes del dedupe)
-        try:
-            if "__source__" in df.columns:
-                counts_raw = df["__source__"].value_counts()
-                self._append_pop_log("[población] Conteo por fuente (antes de dedupe):\n" +
-                                     "\n".join(f"  {k}: {v}" for k, v in counts_raw.items()) + "\n")
-        except Exception:
-            pass
-        dedup_df, dedupe_key = dedupe_population(df)
-        try:
-            if "__source__" in dedup_df.columns:
-                counts_dedup = dedup_df["__source__"].value_counts()
-                self._append_pop_log("[población] Conteo por fuente (después de dedupe):\n" +
-                                     "\n".join(f"  {k}: {v}" for k, v in counts_dedup.items()) + "\n")
-                self._append_pop_log(f"[población] Clave de dedupe usada: {dedupe_key}\n")
-        except Exception:
-            pass
-        self.population_df = dedup_df.reset_index(drop=True)
-        self._fill_population_tree()
-        # Stats y log
-        stats_text = self._compute_population_stats(self.population_df)
-        self.pop_stats_var.set(stats_text)
-        cardinality_summary = ""
-        if "n" in self.population_df.columns:
-            counts = self.population_df["n"].value_counts().sort_index()
-            cardinality_summary = ", ".join(f"n={int(idx)}:{int(val)}" for idx, val in counts.items())
-        log_lines = [
-            f"[población] Previsualización cargada en {(t1 - t0):.3f}s.",
-            f"Total acordes: {len(self.population_df)}",
-        ]
-        base_selected = self.base_query_var.get().strip()
-        if base_selected and base_selected != "<Ninguna>":
-            log_lines.append(f"Consulta base: {base_selected}")
-        if self.pops_entries:
-            log_lines.append("Poblaciones conjuntas: " + ", ".join(self.pops_entries))
-        # Conteo de fuentes únicas actual
-        if "__source__" in self.population_df.columns:
+
+        # Aplicar filtros si están habilitados
+        if self.filter_enable_var.get():
             try:
-                unique_sources = self.population_df["__source__"].value_counts()
-                log_lines.append("Fuentes en tabla (post-dedupe): " +
-                                 ", ".join(f"{k}:{v}" for k, v in unique_sources.items()))
-            except Exception:
-                pass
-        if cardinality_summary:
-            log_lines.append(f"Cardinalidades: {cardinality_summary}")
-        if "tag" in self.population_df.columns:
-            tag_counts = self.population_df["tag"].value_counts().head(5)
-            if not tag_counts.empty:
-                top_tags = ", ".join(f"{k}:{v}" for k, v in tag_counts.items())
-                log_lines.append(f"Top tags: {top_tags}")
-        self._append_pop_log("\n".join(log_lines) + "\n")
-        self._append_log(f"[población] Cargada en {(t1 - t0):.3f}s. {stats_text}\n")
+                custom_filters = self._collect_custom_filters()
+                if custom_filters:
+                    df = filter_dataframe(df, custom_filters.filters)
+                    self._append_pop_log(f"[población] Filtros aplicados. {len(df)} acordes restantes.\n")
+            except Exception as exc:
+                messagebox.showerror("Error al aplicar filtros", str(exc))
+                return
+
+        dedup_df, _ = dedupe_population(df)
+        self.temporal_population_df = dedup_df.reset_index(drop=True)
+        self._fill_population_tree(self.temporal_population_df)
+
+        stats_text = self._compute_population_stats(self.temporal_population_df)
+        self.pop_stats_var.set(f"Temporal: {stats_text}")
+        self._append_pop_log(f"[población] Población temporal generada en {(t1-t0):.3f}s. {stats_text}\n")
+
+    def _on_add_to_final_population(self) -> None:
+        if self.temporal_population_df is None or self.temporal_population_df.empty:
+            messagebox.showinfo("Información", "No hay población temporal para añadir.")
+            return
+
+        if self.final_population_df is None or self.final_population_df.empty:
+            self.final_population_df = self.temporal_population_df.copy()
+        else:
+            self.final_population_df = pd.concat([self.final_population_df, self.temporal_population_df], ignore_index=True)
+
+        self.final_population_df, _ = dedupe_population(self.final_population_df)
+        self.final_population_df.reset_index(drop=True, inplace=True)
+
+        # Limpiar la población temporal
+        self.temporal_population_df = None
+        for item in self.pop_tree.get_children():
+            self.pop_tree.delete(item)
+
+        final_stats = self._compute_population_stats(self.final_population_df)
+        self.pop_stats_var.set(f"Final: {final_stats}")
+        self._append_pop_log(f"[población] Añadido a población final. {final_stats}\n")
+
 
     def _load_population(self) -> pd.DataFrame:
         executor = data_access.get_executor()
@@ -1385,15 +1435,15 @@ class ExperimentLauncher(tk.Tk):
             expand_scale=bool(expand_scale and scale_pitch_classes),
         )
 
-    def _fill_population_tree(self) -> None:
+    def _fill_population_tree(self, df: pd.DataFrame | None) -> None:
         # Clear
         for item in self.pop_tree.get_children():
             self.pop_tree.delete(item)
         self.population_selected_rows.clear()
         self.population_row_ids.clear()
-        if self.population_df is None:
+        if df is None:
             return
-        for idx, row in self.population_df.iterrows():
+        for idx, row in df.iterrows():
             rowd = row.to_dict()
             raw_id = rowd.get("id")
             chord_id: int | None
@@ -1414,6 +1464,8 @@ class ExperimentLauncher(tk.Tk):
             self.population_row_ids[int(idx)] = chord_id
 
     def _compute_population_stats(self, df: pd.DataFrame) -> str:
+        if df is None or df.empty:
+            return "Total: 0"
         total = len(df)
         by_n = df["n"].value_counts().sort_index() if "n" in df.columns else {}
         triad_set = set()
@@ -1486,14 +1538,14 @@ class ExperimentLauncher(tk.Tk):
                 self.population_selected_rows.add(row_idx)
 
     def _selected_population_rows(self) -> list[int]:
-        if self.population_df is None or self.population_df.empty:
+        if self.final_population_df is None or self.final_population_df.empty:
             return []
         if not self.population_selected_rows:
             return []
         return sorted(self.population_selected_rows)
 
     def _selected_population_ids(self, rows: list[int] | None = None) -> list[int]:
-        if self.population_df is None or self.population_df.empty:
+        if self.final_population_df is None or self.final_population_df.empty:
             return []
         if rows is None:
             rows = self._selected_population_rows()
@@ -1570,27 +1622,23 @@ class ExperimentLauncher(tk.Tk):
         if self.running_thread and self.running_thread.is_alive():
             return
 
-        if (self.population_df is None or self.population_df.empty) and (
-            self.pops_entries or (self.base_query_var.get().strip() and self.base_query_var.get().strip() != "<Ninguna>")
-        ):
-            self._on_population_preview_clicked()
-            if self.population_df is None or self.population_df.empty:
-                messagebox.showwarning(
-                    "Sin población",
-                    "Carga una población en la pestaña anterior antes de ejecutar el experimento.",
-                )
-                return
+        if self.final_population_df is None or self.final_population_df.empty:
+            messagebox.showwarning(
+                "Sin población",
+                "La población final está vacía. Genere y/o añada poblaciones antes de ejecutar el experimento.",
+            )
+            return
 
         df_override: pd.DataFrame | None = None
         descriptor: str | None = None
         selected_rows: list[int] = []
         selected_ids: list[int] = []
-        if self.population_df is not None and not self.population_df.empty:
-            selected_rows = self._selected_population_rows()
-            if not selected_rows:
-                selected_rows = list(range(len(self.population_df)))
-            df_override = self.population_df.iloc[selected_rows].copy()
-            selected_ids = self._selected_population_ids(selected_rows)
+        if self.final_population_df is not None and not self.final_population_df.empty:
+            # Para el experimento, usamos la población final completa, no la selección de la tabla temporal
+            selected_rows = list(range(len(self.final_population_df)))
+            df_override = self.final_population_df.copy()
+            # selected_ids ya no se usa directamente aquí, el df_override lo reemplaza
+            descriptor = f"Población final ({len(df_override)} acordes)"
             if selected_ids:
                 preview_count = 10
                 sql_preview = data_access.build_sql_for_ids(
@@ -1710,16 +1758,18 @@ class ExperimentLauncher(tk.Tk):
     def _on_compare_run_clicked(self) -> None:
         if self.running_thread and self.running_thread.is_alive():
             return
-        if self.population_df is None or self.population_df.empty:
-            self._on_population_preview_clicked()
-            if self.population_df is None or self.population_df.empty:
-                messagebox.showwarning("Sin población", "Carga una población en la pestaña anterior antes de ejecutar la comparación.")
-                return
+        if self.final_population_df is None or self.final_population_df.empty:
+            messagebox.showwarning("Sin población", "La población final está vacía. Genere y/o añada poblaciones antes de ejecutar la comparación.")
+            return
+
+        # Para la comparación, tiene sentido usar la selección actual de la tabla, que ahora es la población final
+        self._fill_population_tree(self.final_population_df)
         row_indices = self._selected_population_rows()
         if not row_indices:
-            messagebox.showwarning("Sin selección", "Selecciona al menos un acorde en la lista.")
-            return
-        df_selected = self.population_df.iloc[row_indices].reset_index(drop=True)
+             # Si no hay selección, usar todo
+            row_indices = list(range(len(self.final_population_df)))
+
+        df_selected = self.final_population_df.iloc[row_indices].reset_index(drop=True)
         population_json = None
         needs_payload, payload_reason = self._needs_population_payload(df_selected)
         if needs_payload:
@@ -1862,16 +1912,16 @@ class ExperimentLauncher(tk.Tk):
     def _on_reduction_run_clicked(self) -> None:
         if self.running_thread and self.running_thread.is_alive():
             return
-        if self.population_df is None or self.population_df.empty:
-            self._on_population_preview_clicked()
-            if self.population_df is None or self.population_df.empty:
-                messagebox.showwarning("Sin población", "Carga una población en la pestaña anterior antes de ejecutar la comparación.")
-                return
+        if self.final_population_df is None or self.final_population_df.empty:
+            messagebox.showwarning("Sin población", "La población final está vacía. Genere y/o añada poblaciones antes de ejecutar la comparación.")
+            return
+
+        self._fill_population_tree(self.final_population_df)
         row_indices = self._selected_population_rows()
         if not row_indices:
-            messagebox.showwarning("Sin selección", "Selecciona al menos un acorde en la lista.")
-            return
-        df_selected = self.population_df.iloc[row_indices].reset_index(drop=True)
+            row_indices = list(range(len(self.final_population_df)))
+
+        df_selected = self.final_population_df.iloc[row_indices].reset_index(drop=True)
         population_json = None
         needs_payload, payload_reason = self._needs_population_payload(df_selected)
         if needs_payload:
@@ -2075,7 +2125,8 @@ class ExperimentLauncher(tk.Tk):
     def _mark_population_dirty(self) -> None:
         """Invalida la previsualizacin para reconstruirla con la configuracin actual."""
 
-        self.population_df = None
+        self.temporal_population_df = None
+        self.final_population_df = None
         self.population_selected_rows.clear()
         self.population_row_ids.clear()
 
@@ -2204,6 +2255,35 @@ class ExperimentLauncher(tk.Tk):
                         pass
                 self._schedule_progress_reset()
         self.after(120, self._process_log_queue)
+
+    def _build_combinatorial_frame(self, parent: ttk.Frame) -> None:
+        frame = ttk.LabelFrame(parent, text="Parámetros de Generación Combinatoria")
+        frame.grid(row=0, column=0, sticky="nwe", pady=(0, 8))
+
+        frame.columnconfigure(1, weight=1)
+
+        ttk.Label(frame, text="Alfabeto (PCs, 0-11):").grid(row=0, column=0, sticky="w", padx=5, pady=5)
+        ttk.Entry(frame, textvariable=self.combinatorial_alphabet_var).grid(row=0, column=1, sticky="we", padx=5, pady=5)
+
+        ttk.Label(frame, text="Rango de Octavas (min-max):").grid(row=1, column=0, sticky="w", padx=5, pady=5)
+        octave_frame = ttk.Frame(frame)
+        octave_frame.grid(row=1, column=1, sticky="w", padx=5, pady=5)
+        ttk.Entry(octave_frame, textvariable=self.combinatorial_octave_min_var, width=5).pack(side=tk.LEFT)
+        ttk.Label(octave_frame, text="-").pack(side=tk.LEFT, padx=5)
+        ttk.Entry(octave_frame, textvariable=self.combinatorial_octave_max_var, width=5).pack(side=tk.LEFT)
+
+        ttk.Label(frame, text="Cardinalidades (e.g., 3,4):").grid(row=2, column=0, sticky="w", padx=5, pady=5)
+        ttk.Entry(frame, textvariable=self.combinatorial_cardinalities_var).grid(row=2, column=1, sticky="we", padx=5, pady=5)
+
+    def _on_generation_mode_change(self) -> None:
+        mode = self.generation_mode_var.get()
+        if mode == 'db':
+            self.db_controls_frame.grid()
+            self.combinatorial_controls_frame.grid_remove()
+        else:
+            self.db_controls_frame.grid_remove()
+            self.combinatorial_controls_frame.grid()
+        self._mark_population_dirty()
 
 
 def main() -> None:
