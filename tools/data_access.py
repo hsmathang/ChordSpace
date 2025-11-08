@@ -1,4 +1,4 @@
-"""
+﻿"""
 Centralized data-access helpers for building and executing chord population queries.
 
 This module abstracts the SQL generation that was previously spread across the GUI
@@ -120,8 +120,14 @@ class PopulationPreset:
 # --------------------------------------------------------------------------- #
 
 
+_EXECUTOR_SINGLETON = None
+
+
 def get_executor() -> QueryExecutor:
-    return QueryExecutor(**cfg.config_db)
+    global _EXECUTOR_SINGLETON
+    if _EXECUTOR_SINGLETON is None:
+        _EXECUTOR_SINGLETON = QueryExecutor(**cfg.config_db)
+    return _EXECUTOR_SINGLETON
 
 
 def _normalize_columns(profile: ColumnProfile, df: pd.DataFrame) -> pd.DataFrame:
@@ -555,3 +561,4 @@ def apply_population_mode(df: pd.DataFrame, mode: str) -> pd.DataFrame:
         except Exception:
             return df
     return df
+
