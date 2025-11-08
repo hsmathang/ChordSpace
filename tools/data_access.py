@@ -462,13 +462,24 @@ def _resolve_raw_sql(identifier: str) -> str:
     return identifier
 
 
+def _apply_limit_clause(sql: str, preview_limit: Optional[int]) -> str:
+    if not preview_limit:
+        return sql
+    stripped = sql.rstrip()
+    if stripped.endswith(";"):
+        stripped = stripped[:-1].rstrip()
+    return f"{stripped} LIMIT {int(preview_limit)}"
+
+
 def fetch_population(
     filters: ChordFilters,
     profile: ColumnProfile = ColumnProfile.VISUAL,
     *,
     executor: Optional[QueryExecutor] = None,
+    preview_limit: Optional[int] = None,
 ) -> pd.DataFrame:
     sql = build_sql(filters, profile)
+    sql = _apply_limit_clause(sql, preview_limit)
     exec_obj = executor or get_executor()
     df = exec_obj.as_pandas(sql)
     df = _normalize_columns(profile, df)
@@ -480,16 +491,23 @@ def fetch_population_by_name(
     profile: ColumnProfile = ColumnProfile.VISUAL,
     *,
     executor: Optional[QueryExecutor] = None,
+    preview_limit: Optional[int] = None,
 ) -> pd.DataFrame:
     preset = PRESETS.get(name)
     if preset and preset.filters:
-        return fetch_population(preset.filters, profile=profile, executor=executor)
+        return fetch_population(
+            preset.filters,
+            profile=profile,
+            executor=executor,
+            preview_limit=preview_limit,
+        )
 
     # Fallback to raw SQL (preset raw or registry)
     if preset and preset.raw_sql:
         sql = _resolve_raw_sql(preset.raw_sql)
     else:
         sql = resolve_query_sql(name)
+    sql = _apply_limit_clause(sql, preview_limit)
     exec_obj = executor or get_executor()
     df = exec_obj.as_pandas(sql)
     df = _normalize_columns(profile, df)
@@ -501,14 +519,23 @@ def fetch_population_spec(
     profile: ColumnProfile = ColumnProfile.VISUAL,
     *,
     executor: Optional[QueryExecutor] = None,
+    preview_limit: Optional[int] = None,
 ) -> pd.DataFrame:
     if ":" in spec:
         ptype, qname = _parse_pop_spec(spec)
         df = _build_population(ptype, qname)
         df = _normalize_columns(profile, df)
         exec_obj = executor or get_executor()
-        return _rehydrate_profile_columns(df, profile, exec_obj)
-    return fetch_population_by_name(spec, profile=profile, executor=executor)
+        df = _rehydrate_profile_columns(df, profile, exec_obj)
+        if preview_limit:
+            return df.head(preview_limit)
+        return df
+    return fetch_population_by_name(
+        spec,
+        profile=profile,
+        executor=executor,
+        preview_limit=preview_limit,
+    )
 
 
 def fetch_population_with_source(
@@ -517,8 +544,14 @@ def fetch_population_with_source(
     source_label: str,
     *,
     executor: Optional[QueryExecutor] = None,
+    preview_limit: Optional[int] = None,
 ) -> pd.DataFrame:
-    df = fetch_population_spec(spec, profile=profile, executor=executor).copy()
+    df = fetch_population_spec(
+        spec,
+        profile=profile,
+        executor=executor,
+        preview_limit=preview_limit,
+    ).copy()
     df["__source__"] = source_label
     return df
 

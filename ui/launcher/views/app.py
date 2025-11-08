@@ -1,4 +1,4 @@
-﻿"""
+"""
 GUI launcher for ChordSpace experiments.
 
 Provides a simple Tk interface to configure populations, manage query definitions
@@ -49,6 +49,7 @@ from tools.population_builders import ScaleConstraint, generate_scale_population
 # (32 767 caracteres es el máximo; dejamos holgura por el resto de argumentos.)
 MAX_SQL_IDS_CHARS = 20000
 CHECK_MARK = "\u2713"
+PREVIEW_ROW_LIMIT = 5000
 
 
 @dataclass
@@ -73,6 +74,7 @@ class PopulationJobRequest:
     octave_max: int = 0
     cardinalities: Tuple[int, ...] = ()
     apply_post_filters: bool = False
+    preview_limit: int | None = None
 
 
 _MISSING = object()
@@ -393,6 +395,8 @@ class ExperimentLauncher(tk.Tk):
     def _init_filter_vars(self) -> None:
         self.filter_enable_var = tk.BooleanVar(value=False)
         self._bind_state_var(self.filter_enable_var, lambda value: self.state.toggle_filter(bool(value)))
+        self.preview_limit_var = tk.BooleanVar(value=True)
+        self.preview_limit_rows = PREVIEW_ROW_LIMIT
         self.filter_cardinality_vars: Dict[int, tk.BooleanVar] = {
             n: tk.BooleanVar(value=False) for n in range(2, 7)
         }
@@ -511,6 +515,11 @@ class ExperimentLauncher(tk.Tk):
 
         preview_row = ttk.Frame(controls)
         preview_row.grid(row=3, column=0, sticky="w", pady=(10, 6))
+        ttk.Checkbutton(
+            preview_row,
+            text=f"Vista rápida (máx. {self.preview_limit_rows} filas)",
+            variable=self.preview_limit_var,
+        ).pack(side=tk.LEFT, padx=(0, 12))
         self.generate_population_button = ttk.Button(
             preview_row,
             text="Generar Población Temporal",
@@ -1202,6 +1211,7 @@ class ExperimentLauncher(tk.Tk):
         if mode == "db":
             base_query = self.base_query_var.get().strip()
             pops_entries = tuple(self.pops_entries)
+            preview_limit = self.preview_limit_rows if self.preview_limit_var.get() else None
             return PopulationJobRequest(
                 mode="db",
                 base_query=base_query,
@@ -1211,6 +1221,7 @@ class ExperimentLauncher(tk.Tk):
                 transpose_enabled=transpose_enabled,
                 transpose_steps_text=transpose_steps_text,
                 apply_post_filters=bool(custom_filters),
+                preview_limit=preview_limit,
             )
 
         alphabet_str = self.combinatorial_alphabet_var.get()
@@ -1243,6 +1254,7 @@ class ExperimentLauncher(tk.Tk):
             cardinalities=cardinalities,
             custom_filters=custom_filters,
             apply_post_filters=bool(custom_filters),
+            preview_limit=None,
         )
 
     def _set_generation_button_state(self, state: str) -> None:
@@ -1297,6 +1309,7 @@ class ExperimentLauncher(tk.Tk):
                     filter_mode=request.filter_mode,
                     transpose_enabled=request.transpose_enabled,
                     transpose_steps_text=request.transpose_steps_text,
+                    preview_limit=request.preview_limit,
                     log_callback=log_cb,
                 )
             else:
@@ -1432,25 +1445,52 @@ class ExperimentLauncher(tk.Tk):
         filter_mode: str | None = None,
         transpose_enabled: bool | None = None,
         transpose_steps_text: str | None = None,
+        preview_limit: int | None = None,
         log_callback=None,
     ) -> pd.DataFrame:
         executor = data_access.get_executor()
         frames: list[pd.DataFrame] = []
-        profile = data_access.ColumnProfile.VISUAL\n        t_total0 = time.perf_counter()
+        profile = data_access.ColumnProfile.VISUAL
+        log = log_callback or self._append_pop_log
+        if preview_limit:
+            log(f"[db] vista rápida activa (máx {preview_limit} filas por fuente)\n")
+
+        def _log_frame(label: str, frame: pd.DataFrame) -> None:
+            try:
+                memory_mb = frame.memory_usage(deep=True).sum() / (1024 * 1024)
+            except Exception:
+                memory_mb = float("nan")
+            log(f"[db] {label}: filas={len(frame)}, mem={memory_mb:.3f} MB\n")
+        t_total0 = time.perf_counter()
+
         base = base_query if base_query is not None else self.base_query_var.get().strip()
         if base and base != "<Ninguna>":
-            t_b0 = time.perf_counter(); df_base = data_access.fetch_population_by_name(base, profile=profile, executor=executor).copy(); t_b1 = time.perf_counter();\n            (log_callback or self._append_pop_log)(f'[db] base {base} en {(t_b1 - t_b0):.3f}s\n')
+            t_b0 = time.perf_counter()
+            df_base = data_access.fetch_population_by_name(
+                base,
+                profile=profile,
+                executor=executor,
+                preview_limit=preview_limit,
+            ).copy()
+            t_b1 = time.perf_counter()
+            log(f"[db] base {base} en {(t_b1 - t_b0):.3f}s\n")
+            _log_frame(f"base {base}", df_base)
             df_base["__source__"] = f"BASE:{base}"
             frames.append(df_base)
 
         sources = pops_entries if pops_entries is not None else list(self.pops_entries)
         for spec in sources:
+            t_p0 = time.perf_counter()
             df_p = data_access.fetch_population_with_source(
                 spec,
                 profile=profile,
                 source_label=spec,
                 executor=executor,
+                preview_limit=preview_limit,
             )
+            t_p1 = time.perf_counter()
+            log(f"[db] pop {spec} en {(t_p1 - t_p0):.3f}s\n")
+            _log_frame(f"pop {spec}", df_p)
             frames.append(df_p)
 
         filters_spec: CustomFilterSpec | None
@@ -1459,11 +1499,16 @@ class ExperimentLauncher(tk.Tk):
         else:
             filters_spec = custom_filters
         if filters_spec is not None:
+            t_f0 = time.perf_counter()
             df_filters = data_access.fetch_population(
                 filters_spec.filters,
                 profile=profile,
                 executor=executor,
+                preview_limit=preview_limit,
             ).copy()
+            t_f1 = time.perf_counter()
+            log(f"[db] filtros en {(t_f1 - t_f0):.3f}s\n")
+            _log_frame("filtros", df_filters)
             label = filters_spec.label
             if filters_spec.expand_scale and filters_spec.scale_pitch_classes:
                 constraint = ScaleConstraint(tuple(filters_spec.scale_pitch_classes))
@@ -1487,16 +1532,27 @@ class ExperimentLauncher(tk.Tk):
                 "No hay fuentes configuradas. Agrega al menos una población conjunta o selecciona una consulta base."
             )
 
-        t_c0 = time.perf_counter(); combined = pd.concat(frames, ignore_index=True); t_c1 = time.perf_counter(); (log_callback or self._append_pop_log)(f'[db] concat {(t_c1 - t_c0):.3f}s, filas={len(combined)}\n')
+        t_c0 = time.perf_counter()
+        combined = pd.concat(frames, ignore_index=True)
+        t_c1 = time.perf_counter()
+        log(f"[db] concat {(t_c1 - t_c0):.3f}s, filas={len(combined)}\n")
+        _log_frame("concat", combined)
+
         transpose_flag = transpose_enabled if transpose_enabled is not None else bool(self.transpose_enable_var.get())
         if transpose_flag:
+            t_t0 = time.perf_counter()
             combined = self._apply_population_transpositions(
                 combined,
                 log_callback=log_callback,
                 steps_text=transpose_steps_text,
             )
-        t_total1 = time.perf_counter(); (log_callback or self._append_pop_log)(f'[db] total {(t_total1 - t_total0):.3f}s\n'); return combined
+            t_t1 = time.perf_counter()
+            log(f"[db] transposiciones {(t_t1 - t_t0):.3f}s, filas={len(combined)}\n")
+            _log_frame("transposiciones", combined)
 
+        t_total1 = time.perf_counter()
+        log(f"[db] total {(t_total1 - t_total0):.3f}s\n")
+        return combined
     def _append_tab_log(self, widget: ScrolledText, text: str) -> None:
         if widget is None:
             return
@@ -2572,4 +2628,5 @@ def main() -> None:
 
 if __name__ == "__main__":
     main()
+
 
