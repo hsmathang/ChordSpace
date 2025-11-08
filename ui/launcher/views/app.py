@@ -1327,14 +1327,7 @@ class ExperimentLauncher(tk.Tk):
                     request.octave_max,
                     list(request.cardinalities),
                 )
-                # Filtro opcional: voicings cerrados (máx intervalo interno ≤ 7)
-                try:
-                    if bool(getattr(self, 'combinatorial_closed_var', tk.BooleanVar(value=False)).get()):
-                        from tools.data_access import ChordFilters
-                        df = filter_dataframe(df, ChordFilters(max_internal_interval=7))
-                        log_cb(f"[población] Solo cerrados: {len(df)} acordes.\n")
-                except Exception:
-                    pass
+                # Nota: filtros de voicing cerrado se gestionan en Filtros dinámicos
 
             if request.apply_post_filters and request.custom_filters:
                 df = filter_dataframe(df, request.custom_filters.filters)
@@ -2628,9 +2621,7 @@ class ExperimentLauncher(tk.Tk):
         ttk.Label(frame, text="Cardinalidades (e.g., 3,4):").grid(row=2, column=0, sticky="w", padx=5, pady=5)
         ttk.Entry(frame, textvariable=self.combinatorial_cardinalities_var).grid(row=2, column=1, sticky="we", padx=5, pady=5)
 
-        # Opción rápida: solo voicings cerrados (máx intervalo interno ≤ 7)
-        self.combinatorial_closed_var = tk.BooleanVar(value=False)
-        ttk.Checkbutton(frame, text="Solo voicings cerrados (≤7)", variable=self.combinatorial_closed_var).grid(row=3, column=0, columnspan=2, sticky="w", padx=5, pady=(0,5))
+        # Nota: voicings cerrados se controlan desde Filtros dinámicos (max. intervalo interno)
 
     def _on_generation_mode_change(self) -> None:
         mode = self.generation_mode_var.get()
