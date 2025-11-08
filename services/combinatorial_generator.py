@@ -41,7 +41,8 @@ def _actual_mask(notes_abs: List[int]) -> str:
 
 # Columnas esperadas por el pipeline principal
 EXPECTED_COLUMNS = [
-    'id', 'n', 'interval', 'notes', 'code', 'bass', 'octave', 'tag',
+    'id', 'n', 'interval', 'notes', 'code', 'bass', 'octave',
+    'frequencies', 'chroma', 'tag',
     'span_semitones', 'abs_mask_int', 'abs_mask_hex', 'notes_abs_json',
     'source_id', 'rotation', 'family_id', 'family_size',
     '__source__', '__transposition__', '__root_midi', 'abs_mask_midi'
