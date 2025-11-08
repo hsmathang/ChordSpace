@@ -1,4 +1,4 @@
-"""
+﻿"""
 GUI launcher for ChordSpace experiments.
 
 Provides a simple Tk interface to configure populations, manage query definitions
@@ -1436,10 +1436,10 @@ class ExperimentLauncher(tk.Tk):
     ) -> pd.DataFrame:
         executor = data_access.get_executor()
         frames: list[pd.DataFrame] = []
-        profile = data_access.ColumnProfile.VISUAL
+        profile = data_access.ColumnProfile.VISUAL\n        t_total0 = time.perf_counter()
         base = base_query if base_query is not None else self.base_query_var.get().strip()
         if base and base != "<Ninguna>":
-            df_base = data_access.fetch_population_by_name(base, profile=profile, executor=executor).copy()
+            t_b0 = time.perf_counter(); df_base = data_access.fetch_population_by_name(base, profile=profile, executor=executor).copy(); t_b1 = time.perf_counter();\n            (log_callback or self._append_pop_log)(f'[db] base {base} en {(t_b1 - t_b0):.3f}s\n')
             df_base["__source__"] = f"BASE:{base}"
             frames.append(df_base)
 
@@ -1487,7 +1487,7 @@ class ExperimentLauncher(tk.Tk):
                 "No hay fuentes configuradas. Agrega al menos una población conjunta o selecciona una consulta base."
             )
 
-        combined = pd.concat(frames, ignore_index=True)
+        t_c0 = time.perf_counter(); combined = pd.concat(frames, ignore_index=True); t_c1 = time.perf_counter(); (log_callback or self._append_pop_log)(f'[db] concat {(t_c1 - t_c0):.3f}s, filas={len(combined)}\n')
         transpose_flag = transpose_enabled if transpose_enabled is not None else bool(self.transpose_enable_var.get())
         if transpose_flag:
             combined = self._apply_population_transpositions(
@@ -1495,7 +1495,7 @@ class ExperimentLauncher(tk.Tk):
                 log_callback=log_callback,
                 steps_text=transpose_steps_text,
             )
-        return combined
+        t_total1 = time.perf_counter(); (log_callback or self._append_pop_log)(f'[db] total {(t_total1 - t_total0):.3f}s\n'); return combined
 
     def _append_tab_log(self, widget: ScrolledText, text: str) -> None:
         if widget is None:
@@ -2572,3 +2572,4 @@ def main() -> None:
 
 if __name__ == "__main__":
     main()
+
