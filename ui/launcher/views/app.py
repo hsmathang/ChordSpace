@@ -397,6 +397,8 @@ class ExperimentLauncher(tk.Tk):
         self._bind_state_var(self.filter_enable_var, lambda value: self.state.toggle_filter(bool(value)))
         self.preview_limit_var = tk.BooleanVar(value=True)
         self.preview_limit_rows = PREVIEW_ROW_LIMIT
+        # Vista: anclar a 0 (normalizada) o mostrar PCs reales
+        self.view_anchor_var = tk.BooleanVar(value=False)
         self.filter_cardinality_vars: Dict[int, tk.BooleanVar] = {
             n: tk.BooleanVar(value=False) for n in range(2, 7)
         }
@@ -519,6 +521,12 @@ class ExperimentLauncher(tk.Tk):
             preview_row,
             text=f"Vista rápida (máx. {self.preview_limit_rows} filas)",
             variable=self.preview_limit_var,
+        ).pack(side=tk.LEFT, padx=(0, 12))
+        ttk.Checkbutton(
+            preview_row,
+            text="Anclar vista a 0 (normalizada)",
+            variable=self.view_anchor_var,
+            command=lambda: self._fill_population_tree(getattr(self, 'temporal_population_df', None) if self.temporal_population_df is not None else self.final_population_df),
         ).pack(side=tk.LEFT, padx=(0, 12))
         self.generate_population_button = ttk.Button(
             preview_row,
@@ -1319,6 +1327,14 @@ class ExperimentLauncher(tk.Tk):
                     request.octave_max,
                     list(request.cardinalities),
                 )
+                # Filtro opcional: voicings cerrados (máx intervalo interno ≤ 7)
+                try:
+                    if bool(getattr(self, 'combinatorial_closed_var', tk.BooleanVar(value=False)).get()):
+                        from tools.data_access import ChordFilters
+                        df = filter_dataframe(df, ChordFilters(max_internal_interval=7))
+                        log_cb(f"[población] Solo cerrados: {len(df)} acordes.\n")
+                except Exception:
+                    pass
 
             if request.apply_post_filters and request.custom_filters:
                 df = filter_dataframe(df, request.custom_filters.filters)
@@ -1774,7 +1790,18 @@ class ExperimentLauncher(tk.Tk):
             else:
                 chord_id = None
             display_id = chord_id if chord_id is not None else ""
-            values = [CHECK_MARK, display_id, rowd.get("n"), rowd.get("interval"), rowd.get("notes"), rowd.get("code"), rowd.get("bass"), rowd.get("octave"), rowd.get("tag"), rowd.get("span_semitones"), rowd.get("abs_mask_int"), rowd.get("abs_mask_hex")]
+            # Elegir vista: normalizada (si existen columnas __norm_*) o real por defecto
+            if bool(self.view_anchor_var.get()):
+                interval_v = rowd.get("__norm_interval", rowd.get("interval"))
+                notes_v = rowd.get("__norm_notes", rowd.get("notes"))
+                code_v = rowd.get("__norm_code", rowd.get("code"))
+                bass_v = rowd.get("__norm_bass", rowd.get("bass"))
+            else:
+                interval_v = rowd.get("interval")
+                notes_v = rowd.get("notes")
+                code_v = rowd.get("code")
+                bass_v = rowd.get("bass")
+            values = [CHECK_MARK, display_id, rowd.get("n"), interval_v, notes_v, code_v, bass_v, rowd.get("octave"), rowd.get("tag"), rowd.get("span_semitones"), rowd.get("abs_mask_int"), rowd.get("abs_mask_hex")]
             self.pop_tree.insert("", tk.END, iid=str(idx), values=values)
             self.population_selected_rows.add(int(idx))
             self.population_row_ids[int(idx)] = chord_id
@@ -2600,6 +2627,10 @@ class ExperimentLauncher(tk.Tk):
 
         ttk.Label(frame, text="Cardinalidades (e.g., 3,4):").grid(row=2, column=0, sticky="w", padx=5, pady=5)
         ttk.Entry(frame, textvariable=self.combinatorial_cardinalities_var).grid(row=2, column=1, sticky="we", padx=5, pady=5)
+
+        # Opción rápida: solo voicings cerrados (máx intervalo interno ≤ 7)
+        self.combinatorial_closed_var = tk.BooleanVar(value=False)
+        ttk.Checkbutton(frame, text="Solo voicings cerrados (≤7)", variable=self.combinatorial_closed_var).grid(row=3, column=0, columnspan=2, sticky="w", padx=5, pady=(0,5))
 
     def _on_generation_mode_change(self) -> None:
         mode = self.generation_mode_var.get()

@@ -45,7 +45,8 @@ EXPECTED_COLUMNS = [
     'frequencies', 'chroma', 'tag',
     'span_semitones', 'abs_mask_int', 'abs_mask_hex', 'notes_abs_json',
     'source_id', 'rotation', 'family_id', 'family_size',
-    '__source__', '__transposition__', '__root_midi', 'abs_mask_midi'
+    '__source__', '__transposition__', '__root_midi', 'abs_mask_midi',
+    '__norm_interval', '__norm_notes', '__norm_code', '__norm_bass'
 ]
 
 
@@ -90,10 +91,26 @@ def generate_combinatorial_chords(
             normalized = [note - root_midi for note in notes_abs]
 
             record = _build_record_from_notes(normalized, tag="combinatorial")
+            # Guardar la vista normalizada (anclada) para la UI opcional
+            record['__norm_interval'] = record.get('interval')
+            record['__norm_notes'] = record.get('notes')
+            record['__norm_code'] = record.get('code')
+            record['__norm_bass'] = record.get('bass')
+
+            # Reemplazar por vista REAL (no anclada): PCs y diferencias en MIDI
             record['notes_abs_json'] = json.dumps(notes_abs)
             record['octave'] = (root_midi // 12) - 1
             record['frequencies'] = [_midi_to_freq(note) for note in notes_abs]
             record['span_semitones'] = notes_abs[-1] - notes_abs[0]
+            # PCs reales y bajo real
+            pcs_real = [str(n % 12) for n in notes_abs]
+            intervals_real = [int(notes_abs[i+1] - notes_abs[i]) for i in range(len(notes_abs)-1)]
+            record['notes'] = pcs_real
+            record['bass'] = str(root_midi % 12)
+            # code real (0123456789AB)
+            HEX12 = "0123456789AB"
+            record['code'] = ''.join(HEX12[int(n) % 12] for n in notes_abs)
+            record['interval'] = intervals_real
             record['__source__'] = "GENERATED:COMBINATORIAL"
             record['__transposition__'] = 0
             record['__root_midi'] = root_midi
