@@ -181,6 +181,7 @@ class Acorde:
     frequencies: Optional[List[float]] = None
     notes: Optional[List[str]] = None
     total_roughness: Optional[float] = None
+    notes_abs: Optional[List[int]] = None
 
     def __post_init__(self):
         if self.chroma is None:

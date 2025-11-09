@@ -445,6 +445,8 @@ def build_scatter_payload(
             family_counts.get(family_tags[i], 1),
             summary_texts[i],
             detail_texts[i],
+                entries[i].musical_inversion_ids,
+                entries[i].structural_inversion_ids,
         ]
         for i in range(total_points)
     ]

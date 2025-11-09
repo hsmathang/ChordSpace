@@ -42,6 +42,8 @@ class DummyEntry:
         self.family_id = family_id
         self.is_inversion = is_inversion
         self.inversion_rotation = inversion_rotation
+        self.musical_inversion_ids = []
+        self.structural_inversion_ids = []
 
 
 def build_sample_entries() -> List[DummyEntry]:
