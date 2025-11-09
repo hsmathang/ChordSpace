@@ -6,6 +6,7 @@ import json
 from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, Any, Dict, Iterable, List, Optional, Sequence, Tuple
 
+import math
 import numpy as np
 import plotly.graph_objects as go
 from plotly.utils import PlotlyJSONEncoder
@@ -196,6 +197,9 @@ def build_hover_summary(
         f"{name}{interval_label} · {color_title}: {float(color_value):.2f} · "
         f"Familia: {fam_label}"
     )
+
+
+EPS = 1e-12
 
 
 DEFAULT_HIGHLIGHT: HighlightConfig = {
@@ -458,6 +462,102 @@ def build_scatter_payload(
         for i in range(total_points)
     ]
 
+    # --- Sustituciones: métricas básicas (JSD + Jaccard) ---
+    substitution_neighbors: Dict[str, List[Dict[str, object]]] = {}
+    if total_points > 1:
+        hist_probs: List[np.ndarray] = []
+        pc_vectors: List[np.ndarray] = []
+        cardinalities: List[int] = []
+
+        for entry in entries:
+            hist = np.asarray(getattr(entry, "hist", np.zeros(12, dtype=float)), dtype=float)
+            total_hist = float(np.sum(hist))
+            if total_hist <= EPS:
+                norm = np.full_like(hist, 1.0 / max(len(hist), 1))
+            else:
+                norm = hist / total_hist
+            hist_probs.append(norm)
+
+            notes_abs = getattr(getattr(entry, "acorde", None), "notes_abs", None) or []
+            vec = np.zeros(12, dtype=float)
+            if notes_abs:
+                for note in notes_abs:
+                    try:
+                        vec[int(note) % 12] = 1.0
+                    except Exception:
+                        continue
+            else:
+                intervals = getattr(getattr(entry, "acorde", None), "intervals", []) or []
+                current = 0
+                vec[int(current) % 12] = 1.0
+                for step in intervals:
+                    current += int(step)
+                    vec[int(current) % 12] = 1.0
+            pc_vectors.append(vec)
+            cardinalities.append(int(getattr(entry, "n_notes", 0) or 0))
+
+        hist_probs = np.asarray(hist_probs)
+        pc_vectors = np.asarray(pc_vectors)
+        cardinalities = np.asarray(cardinalities, dtype=int)
+
+        p_safe = np.clip(hist_probs, EPS, None)
+        log_p = np.log(p_safe)
+        p_expanded = p_safe[:, None, :]
+        q_expanded = p_safe[None, :, :]
+        log_p_expanded = log_p[:, None, :]
+        log_q_expanded = log_p[None, :, :]
+        m = 0.5 * (p_expanded + q_expanded)
+        log_m = np.log(np.clip(m, EPS, None))
+        kl_pm = np.sum(p_expanded * (log_p_expanded - log_m), axis=2)
+        kl_qm = np.sum(q_expanded * (log_q_expanded - log_m), axis=2)
+        jsd_matrix = np.sqrt(np.maximum(0.0, 0.5 * (kl_pm + kl_qm)))
+        np.fill_diagonal(jsd_matrix, 0.0)
+
+        intersection = np.minimum(pc_vectors[:, None, :], pc_vectors[None, :, :]).sum(axis=2)
+        union = np.maximum(pc_vectors[:, None, :], pc_vectors[None, :, :]).sum(axis=2)
+        with np.errstate(divide="ignore", invalid="ignore"):
+            ratio = np.divide(intersection, union, out=np.zeros_like(intersection), where=union > EPS)
+        jaccard_matrix = 1.0 - ratio
+        np.fill_diagonal(jaccard_matrix, 0.0)
+
+        weights = {"jsd": 0.6, "jaccard": 0.4}
+        dist_matrix = weights["jsd"] * jsd_matrix + weights["jaccard"] * jaccard_matrix
+
+        card_groups: Dict[int, np.ndarray] = {}
+        for idx, card in enumerate(cardinalities):
+            card_groups.setdefault(card, []).append(idx)  # type: ignore[arg-type]
+        card_groups = {card: np.asarray(indices, dtype=int) for card, indices in card_groups.items()}
+
+        for idx in range(total_points):
+            card = cardinalities[idx]
+            group = card_groups.get(card)
+            if group is None or len(group) <= 1:
+                continue
+            candidates = group[group != idx]
+            if candidates.size == 0:
+                continue
+            candidate_dists = dist_matrix[idx, candidates]
+            if candidate_dists.size > 8:
+                order = np.argpartition(candidate_dists, 8)[:8]
+                sorted_idx = order[np.argsort(candidate_dists[order])]
+            else:
+                sorted_idx = np.argsort(candidate_dists)
+            top_entries: List[Dict[str, object]] = []
+            for pos in sorted_idx:
+                neighbor_idx = int(candidates[pos])
+                dist_val = float(candidate_dists[pos])
+                top_entries.append(
+                    {
+                        "neighbor": int(customdata_all[neighbor_idx][7]),
+                        "distance": dist_val,
+                        "components": {
+                            "jsd": float(jsd_matrix[idx, neighbor_idx]),
+                            "jaccard": float(jaccard_matrix[idx, neighbor_idx]),
+                        },
+                    }
+                )
+            substitution_neighbors[str(customdata_all[idx][7])] = top_entries
+
     filter_definitions, filter_fields = _build_filter_metadata(entries, family_tags)
     trace_sources: List[Dict[str, Any]] = []
 
@@ -633,6 +733,8 @@ def build_scatter_payload(
         "fields": filter_definitions,
     }
     meta_payload["filterDataset"] = filter_dataset
+    if substitution_neighbors:
+        meta_payload["substitutionNeighbors"] = substitution_neighbors
 
     layout = {
         "title": title,

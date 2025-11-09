@@ -1587,6 +1587,7 @@ def build_report_html_v2(
         <div class='inversion-controls'>
             <label><input type='checkbox' class='inversion-toggle' data-inversion-type='musical'> Resaltar inversiones musicales</label>
             <label><input type='checkbox' class='inversion-toggle' data-inversion-type='structural'> Resaltar inversiones estructurales</label>
+            <label><input type='checkbox' class='substitution-toggle'> Resaltar sustituciones</label>
         </div>
         """
         card_attrs = [f"data-sid='{sid}'", f"data-family-highlight='{'1' if highlight_enabled_flag else '0'}'"]
@@ -1782,6 +1783,65 @@ def build_report_html_v2(
         }
         showPanel();
       });
+
+      function getBaseMarkerOpacities(gd, traceIndex, trace) {
+        if (!gd.__baseMarkerOpacities) gd.__baseMarkerOpacities = {};
+        const cache = gd.__baseMarkerOpacities;
+        const length = Array.isArray(trace.customdata) ? trace.customdata.length : (Array.isArray(trace.x) ? trace.x.length : 0);
+        if (!length) return null;
+        if (cache[traceIndex] && cache[traceIndex].length === length) {
+          return cache[traceIndex];
+        }
+        let baseArray;
+        const marker = trace.marker || {};
+        if (Array.isArray(marker.opacity) && marker.opacity.length === length) {
+          baseArray = marker.opacity.slice();
+        } else {
+          const base = typeof marker.opacity === 'number' ? marker.opacity : 0.6;
+          baseArray = new Array(length).fill(base);
+        }
+        cache[traceIndex] = baseArray;
+        return baseArray;
+      }
+
+      function applyGlobalIdHighlight(gd, activeIds, fadeFactor = 0.1) {
+        const ids = activeIds && activeIds.size ? activeIds : null;
+        const indices = [];
+        const payload = [];
+        gd.data.forEach((trace, idx) => {
+          if (!Array.isArray(trace.customdata) || !trace.customdata.length) return;
+          const baseOpacities = getBaseMarkerOpacities(gd, idx, trace);
+          if (!baseOpacities) return;
+          indices.push(idx);
+          payload.push(trace.customdata.map((row, pointIdx) => {
+            const gid = row && row.length >= 8 ? Number(row[7]) : NaN;
+            if (ids && (!Number.isFinite(gid) || !ids.has(gid))) {
+              return baseOpacities[pointIdx] * fadeFactor;
+            }
+            return baseOpacities[pointIdx];
+          }));
+        });
+        if (indices.length) {
+          Plotly.restyle(gd, {'marker.opacity': payload}, indices);
+        }
+      }
+
+      function findPointCoordinates(gd, targetId) {
+        if (!Number.isFinite(targetId)) return null;
+        for (let i = 0; i < gd.data.length; i++) {
+          const trace = gd.data[i];
+          const cd = trace.customdata || [];
+          const xs = trace.x || [];
+          const ys = trace.y || [];
+          for (let j = 0; j < cd.length; j++) {
+            const row = cd[j];
+            if (row && row.length >= 8 && Number(row[7]) === Number(targetId)) {
+              return { x: xs[j], y: ys[j] };
+            }
+          }
+        }
+        return null;
+      }
 
       function setupFamilyHighlight(gd) {
         if (!gd || gd.__familyHighlightBound) return;
@@ -2461,37 +2521,7 @@ def build_report_html_v2(
         }
 
         function idToXY(targetId) {
-            for (let i = 0; i < gd.data.length; i++) {
-                const trace = gd.data[i];
-                const cd = trace.customdata || [];
-                const xs = trace.x || [];
-                const ys = trace.y || [];
-                for (let j = 0; j < cd.length; j++) {
-                    const row = cd[j];
-                    if (row && row.length >= 8 && row[7] === targetId) {
-                        return { x: xs[j], y: ys[j] };
-                    }
-                }
-            }
-            return null;
-        }
-
-        function getBaseOpacities(index, trace) {
-            gd.__originalOpacities = gd.__originalOpacities || {};
-            const length = Array.isArray(trace.customdata) ? trace.customdata.length : Array.isArray(trace.x) ? trace.x.length : 0;
-            if (gd.__originalOpacities[index] && gd.__originalOpacities[index].length === length && length) {
-                return gd.__originalOpacities[index];
-            }
-            if (!length) return null;
-            let baseArray;
-            if (Array.isArray(trace.marker && trace.marker.opacity) && trace.marker.opacity.length === length) {
-                baseArray = trace.marker.opacity.slice();
-            } else {
-                const baseVal = typeof trace.marker?.opacity === 'number' ? trace.marker.opacity : 0.6;
-                baseArray = new Array(length).fill(baseVal);
-            }
-            gd.__originalOpacities[index] = baseArray;
-            return baseArray;
+            return findPointCoordinates(gd, targetId);
         }
 
         function updateOverlay(musicalSet, structuralSet) {
@@ -2536,27 +2566,8 @@ def build_report_html_v2(
         }
 
         function applyInversionHighlight(useMusicalSet, useStructuralSet) {
-            const indices = [];
-            const payload = [];
-            gd.data.forEach((trace, idx) => {
-                if (!Array.isArray(trace.customdata) || !trace.customdata.length) {
-                    return;
-                }
-                const baseOpacities = getBaseOpacities(idx, trace);
-                if (!baseOpacities) return;
-                indices.push(idx);
-                payload.push(trace.customdata.map((cd, pointIdx) => {
-                    const globalId = Array.isArray(cd) ? cd[7] : undefined;
-                    const base = baseOpacities[pointIdx] ?? 0.6;
-                    if (activeInversions.size > 0 && (!Number.isFinite(globalId) || !activeInversions.has(globalId))) {
-                        return base * 0.1;
-                    }
-                    return base;
-                }));
-            });
-            if (indices.length) {
-                Plotly.restyle(gd, { 'marker.opacity': payload }, indices);
-            }
+            const ids = activeInversions.size ? new Set(Array.from(activeInversions).map(Number)) : null;
+            applyGlobalIdHighlight(gd, ids, 0.1);
             updateOverlay(useMusicalSet || new Set(), useStructuralSet || new Set());
         }
 
@@ -2609,6 +2620,145 @@ def build_report_html_v2(
         if (musicalToggle) musicalToggle.addEventListener('change', () => recomputeActive());
         if (structuralToggle) structuralToggle.addEventListener('change', () => recomputeActive());
       }
+
+      function setupSubstitutionHighlight(gd) {
+        if (!gd || gd.__substitutionHighlightBound) return;
+        const card = gd.closest('.plot-card');
+        const toggle = card.querySelector('.substitution-toggle');
+        const neighborsMap = gd.layout && gd.layout.meta && gd.layout.meta.substitutionNeighbors;
+        if (!toggle || !neighborsMap) return;
+        gd.__substitutionHighlightBound = true;
+
+        let lastHoverId = null;
+
+        function ensureSubOverlay() {
+          if (gd.__subOverlay && gd.__subOverlay.ready) {
+            return Promise.resolve(gd.__subOverlay);
+          }
+          if (gd.__subOverlayPending) {
+            return gd.__subOverlayPending;
+          }
+          const overlayTrace = {
+            type: 'scatter',
+            mode: 'lines',
+            name: '',
+            showlegend: false,
+            hoverinfo: 'skip',
+            x: [],
+            y: [],
+            line: { color: '#007BFF', width: 2, dash: 'dot' },
+            visible: false,
+          };
+          gd.__subOverlayPending = Plotly.addTraces(gd, [overlayTrace]).then(() => {
+            gd.__subOverlay = {
+              lineIdx: gd.data.length - 1,
+              ready: true,
+            };
+            gd.__subOverlayPending = null;
+            return gd.__subOverlay;
+          }).catch(() => {
+            gd.__subOverlayPending = null;
+            gd.__subOverlay = null;
+            return null;
+          });
+          return gd.__subOverlayPending;
+        }
+
+        function hideOverlay() {
+          const overlay = gd.__subOverlay;
+          if (!overlay || typeof overlay.lineIdx !== 'number') return;
+          Plotly.restyle(gd, { x: [[]], y: [[]], visible: [false] }, [overlay.lineIdx]);
+        }
+
+        function drawLines(sourceId, neighborIds) {
+          ensureSubOverlay().then(overlay => {
+            if (!overlay || typeof overlay.lineIdx !== 'number') return;
+            const origin = findPointCoordinates(gd, sourceId);
+            if (!origin) {
+              hideOverlay();
+              return;
+            }
+            const xs = [];
+            const ys = [];
+            neighborIds.forEach(id => {
+              const dest = findPointCoordinates(gd, id);
+              if (!dest) return;
+              xs.push(origin.x, dest.x, null);
+              ys.push(origin.y, dest.y, null);
+            });
+            const visible = xs.length > 0;
+            Plotly.restyle(gd, { x: [xs], y: [ys], visible: [visible] }, [overlay.lineIdx]);
+          });
+        }
+
+        function applyForId(globalId) {
+          if (!toggle.checked) {
+            applyGlobalIdHighlight(gd, null);
+            hideOverlay();
+            return;
+          }
+          if (!Number.isFinite(globalId)) {
+            applyGlobalIdHighlight(gd, null);
+            hideOverlay();
+            return;
+          }
+          const key = String(globalId);
+          const entries = neighborsMap[key] || [];
+          if (!entries.length) {
+            const ownSet = new Set([Number(globalId)]);
+            applyGlobalIdHighlight(gd, ownSet, 0.1);
+            hideOverlay();
+            return;
+          }
+          const active = new Set([Number(globalId)]);
+           const neighborIds = [];
+          entries.forEach(item => {
+            if (item && Object.prototype.hasOwnProperty.call(item, 'neighbor')) {
+              const neigh = Number(item.neighbor);
+              active.add(neigh);
+              neighborIds.push(neigh);
+            }
+          });
+          applyGlobalIdHighlight(gd, active, 0.1);
+          drawLines(globalId, neighborIds);
+        }
+
+        gd.on('plotly_hover', ev => {
+          const pt = ev.points && ev.points[0];
+          if (!pt || !pt.customdata || pt.customdata.length < 8) {
+            lastHoverId = null;
+            if (toggle.checked) {
+              applyGlobalIdHighlight(gd, null);
+              hideOverlay();
+            }
+            return;
+          }
+          const gid = Number(pt.customdata[7]);
+          lastHoverId = gid;
+          if (toggle.checked) {
+            applyForId(gid);
+          }
+        });
+
+        gd.on('plotly_unhover', () => {
+          lastHoverId = null;
+          if (toggle.checked) {
+            applyGlobalIdHighlight(gd, null);
+            hideOverlay();
+          }
+        });
+
+        toggle.addEventListener('change', () => {
+          if (!toggle.checked) {
+            applyGlobalIdHighlight(gd, null);
+            hideOverlay();
+            return;
+          }
+          if (Number.isFinite(lastHoverId)) {
+            applyForId(lastHoverId);
+          }
+        });
+      }
       function registerCardHighlight(card) {
         const figures = card.querySelectorAll('.js-plotly-plot');
         figures.forEach(gd => {
@@ -2620,6 +2770,7 @@ def build_report_html_v2(
                     }
                 }
                 setupInversionHighlight(gd);
+                setupSubstitutionHighlight(gd);
             };
             if (gd.layout && gd.layout.meta) {
                 attach();
@@ -2640,6 +2791,7 @@ def build_report_html_v2(
         detailPanel.innerHTML = defaultMsg;
         const figures = card.querySelectorAll('.js-plotly-plot');
         figures.forEach(gd => {
+          const substitutionMap = (gd.layout && gd.layout.meta && gd.layout.meta.substitutionNeighbors) || {};
           function lookupLabelById(id) {
             // Busca en las trazas visibles un punto con ese global_id y devuelve su 'text'
             for (let i = 0; i < gd.data.length; i++) {
@@ -2656,7 +2808,7 @@ def build_report_html_v2(
             return `Acorde ID: ${id}`;
           }
 
-          const updatePanel = (content, musicalInversions, structuralInversions) => {
+          const updatePanel = (content, musicalInversions, structuralInversions, currentGlobalId) => {
             let html = content || defaultMsg;
             if (musicalInversions && musicalInversions.length > 0) {
                 html += "<h5>Inversiones Musicales</h5><ul>";
@@ -2668,19 +2820,32 @@ def build_report_html_v2(
                 structuralInversions.forEach(id => { html += `<li>${lookupLabelById(id)}</li>`; });
                 html += "</ul>";
             }
+            if (Number.isFinite(currentGlobalId)) {
+                const subList = substitutionMap[String(currentGlobalId)] || [];
+                if (subList.length > 0) {
+                    html += "<h5>Sustitutos sugeridos</h5><ol>";
+                    subList.forEach(item => {
+                        const label = lookupLabelById(Number(item.neighbor));
+                        const dist = typeof item.distance === 'number' ? item.distance.toFixed(3) : '—';
+                        html += `<li>${label} (dist: ${dist})</li>`;
+                    });
+                    html += "</ol>";
+                }
+            }
             detailPanel.innerHTML = html;
           };
           gd.on('plotly_click', ev => {
             const pt = ev.points && ev.points[0];
             if (!pt || !pt.customdata || pt.customdata.length < 7) {
-              updatePanel(defaultMsg, null, null);
+              updatePanel(defaultMsg, null, null, null);
               return;
             }
             const musicalInversions = pt.customdata[5];
             const structuralInversions = pt.customdata[6];
-            updatePanel(pt.customdata[4], musicalInversions, structuralInversions);
+            const currentId = pt.customdata[7];
+            updatePanel(pt.customdata[4], musicalInversions, structuralInversions, currentId);
           });
-          gd.on('plotly_doubleclick', () => updatePanel(defaultMsg, null, null));
+          gd.on('plotly_doubleclick', () => updatePanel(defaultMsg, null, null, null));
         });
       }
 
