@@ -12,7 +12,7 @@ import argparse
 import json
 import time
 from concurrent.futures import ProcessPoolExecutor, ThreadPoolExecutor, as_completed
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from datetime import datetime
 from pathlib import Path
 from typing import Any, Callable, Dict, Iterable, List, Optional, Sequence, Tuple
@@ -188,6 +188,8 @@ class ChordEntry:
     is_inversion: bool = False
     family_id: Optional[object] = None
     inversion_rotation: Optional[int] = None
+    musical_inversion_ids: List[Any] = field(default_factory=list)
+    structural_inversion_ids: List[Any] = field(default_factory=list)
 
 
 
@@ -427,6 +429,17 @@ def load_chords(
 
     for _, row in df_all.iterrows():
         acorde = ChordAdapter.from_csv_row(row)
+        if 'notes_abs_json' in row and pd.notna(row['notes_abs_json']):
+            acorde.notes_abs = json.loads(row['notes_abs_json'])
+        else:
+            # Fallback a calcularlo desde los intervalos si no está
+            base_freq = 440.0 # O obtener de config
+            semitonos_rel = np.cumsum([0] + acorde.intervals)
+            # Esto es solo una aproximación si no tenemos la nota raíz
+            # Se asume C4=60 como nota más grave si no hay más info
+            root_midi = row.get('__root_midi', 60)
+            acorde.notes_abs = [int(root_midi + s) for s in semitonos_rel]
+
         identity_obj = get_chord_type_from_intervals(acorde.intervals, with_alias=True)
         identity_name = getattr(identity_obj, "name", str(identity_obj))
         identity_aliases = tuple(getattr(identity_obj, "aliases", ()))
@@ -494,6 +507,46 @@ def load_chords(
                 inversion_rotation=inv_rotation,
             )
         )
+
+    # Build inversion maps for efficient lookup
+    musical_inversion_map = {}
+    structural_inversion_map = {}
+    for i, entry in enumerate(entries):
+        notes_abs = entry.acorde.notes_abs
+        # Musical inversions
+        musical_key = tuple(notes_abs)
+        if musical_key not in musical_inversion_map:
+            musical_inversion_map[musical_key] = []
+        musical_inversion_map[musical_key].append(i)
+        # Structural inversions
+        pcs = [note % 12 for note in notes_abs]
+        structural_key = tuple(norm_0(pcs))
+        if structural_key not in structural_inversion_map:
+            structural_inversion_map[structural_key] = []
+        structural_inversion_map[structural_key].append(i)
+
+    # Populate inversion lists
+    for i, entry in enumerate(entries):
+        notes_abs = entry.acorde.notes_abs
+
+        # Find musical inversions
+        musical_inversions = get_musical_inversions(notes_abs)
+        for inv in musical_inversions:
+            key = tuple(inv)
+            if key in musical_inversion_map:
+                entry.musical_inversion_ids.extend(musical_inversion_map[key])
+
+        # Find structural inversions
+        structural_inversions = get_structural_inversions(notes_abs)
+        for inv in structural_inversions:
+            key = tuple(inv)
+            if key in structural_inversion_map:
+                entry.structural_inversion_ids.extend(structural_inversion_map[key])
+
+        # Remove duplicates
+        entry.musical_inversion_ids = sorted(list(set(entry.musical_inversion_ids)))
+        entry.structural_inversion_ids = sorted(list(set(entry.structural_inversion_ids)))
+
     return entries
 
 
@@ -516,6 +569,35 @@ def determine_dyad_bin(intervals: Sequence[int]) -> Optional[int]:
         return None
     intervalo = int(intervals[0]) % 12
     return (intervalo - 1) % 12
+
+
+def norm_0(pcs: List[int]) -> List[int]:
+    """Normaliza un conjunto de pitch classes anclándolo en 0."""
+    if not pcs:
+        return []
+    base = pcs[0]
+    return sorted([(pc - base) % 12 for pc in pcs])
+
+
+def get_musical_inversions(notes_abs: List[int]) -> List[List[int]]:
+    """Calcula las inversiones musicales de un acorde."""
+    inversions = [notes_abs]
+    current_notes = list(notes_abs)
+    for _ in range(len(notes_abs) - 1):
+        new_notes = sorted(current_notes[1:] + [current_notes[0] + 12])
+        inversions.append(new_notes)
+        current_notes = new_notes
+    return inversions
+
+
+def get_structural_inversions(notes_abs: List[int]) -> List[List[int]]:
+    """Calcula las inversiones estructurales de un acorde."""
+    musical_inversions = get_musical_inversions(notes_abs)
+    structural_inversions = []
+    for inv in musical_inversions:
+        pcs = [note % 12 for note in inv]
+        structural_inversions.append(norm_0(pcs))
+    return structural_inversions
 
 
 def stack_hist(entries: List[ChordEntry]) -> Tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
@@ -1496,6 +1578,12 @@ def build_report_html_v2(
         )
         highlight_note_html = ""
         highlight_enabled_flag = bool(card_highlight_info and card_highlight_info.get("enabled"))
+        inversion_controls_html = """
+        <div class='inversion-controls'>
+            <label><input type='checkbox' class='inversion-toggle' data-inversion-type='musical'> Resaltar inversiones musicales</label>
+            <label><input type='checkbox' class='inversion-toggle' data-inversion-type='structural'> Resaltar inversiones estructurales</label>
+        </div>
+        """
         card_attrs = [f"data-sid='{sid}'", f"data-family-highlight='{'1' if highlight_enabled_flag else '0'}'"]
         if card_highlight_info:
             families_detected = int(card_highlight_info.get("families", 0) or 0)
@@ -1527,7 +1615,7 @@ def build_report_html_v2(
         card_attrs_str = " ".join(card_attrs)
         return (
             f"<div class='plot-card' {card_attrs_str}>{header}{metrics_line}{controls}"
-            f"{highlight_note_html}{panels}{detail_panel}</div>"
+            f"{highlight_note_html}{inversion_controls_html}{panels}{detail_panel}</div>"
         )
 
     # Build nested tabs: first by reduction, then by metric
@@ -2294,24 +2382,85 @@ def build_report_html_v2(
         });
       }
 
+      function setupInversionHighlight(gd) {
+        if (!gd || gd.__inversionHighlightBound) return;
+        gd.__inversionHighlightBound = true;
+
+        const card = gd.closest('.plot-card');
+        const musicalToggle = card.querySelector('.inversion-toggle[data-inversion-type="musical"]');
+        const structuralToggle = card.querySelector('.inversion-toggle[data-inversion-type="structural"]');
+
+        let activeInversions = new Set();
+
+        function applyInversionHighlight() {
+            Plotly.restyle(gd, {
+                'marker.opacity': gd.data.map((trace, i) => {
+                    const originalOpacities = gd.__originalOpacities = gd.__originalOpacities || gd.data.map(t => t.marker.opacity);
+                    const baseOpacity = originalOpacities[i];
+                    return trace.customdata.map((cd, j) => {
+                        const pointIndex = i + '_' + j; // unique point id
+                        if (activeInversions.size > 0 && !activeInversions.has(pointIndex)) {
+                            return baseOpacity * 0.2;
+                        }
+                        return baseOpacity;
+                    });
+                })
+            });
+        }
+
+        gd.on('plotly_hover', ev => {
+            const pt = ev.points && ev.points[0];
+            if (!pt || !pt.customdata) {
+                activeInversions.clear();
+                applyInversionHighlight();
+                return;
+            }
+
+            const musicalInversions = new Set(pt.customdata[5] || []);
+            const structuralInversions = new Set(pt.customdata[6] || []);
+
+            activeInversions.clear();
+
+            if (musicalToggle && musicalToggle.checked) {
+                musicalInversions.forEach(id => activeInversions.add(id));
+            }
+            if (structuralToggle && structuralToggle.checked) {
+                structuralInversions.forEach(id => activeInversions.add(id));
+            }
+
+            applyInversionHighlight();
+        });
+
+        gd.on('plotly_unhover', () => {
+            activeInversions.clear();
+            applyInversionHighlight();
+        });
+
+        if(musicalToggle) musicalToggle.addEventListener('change', () => applyInversionHighlight());
+        if(structuralToggle) structuralToggle.addEventListener('change', () => applyInversionHighlight());
+      }
+
       function registerCardHighlight(card) {
-        if (!card || card.dataset.familyHighlight !== '1') return;
         const figures = card.querySelectorAll('.js-plotly-plot');
         figures.forEach(gd => {
-          const attach = () => {
-            const info = gd.layout && gd.layout.meta && gd.layout.meta.familyHighlight;
-            if (!info || !info.enabled) return;
-            setupFamilyHighlight(gd);
-          };
-          if (gd.layout && gd.layout.meta) {
-            attach();
-          } else {
-            const handler = () => {
-              gd.removeListener('plotly_afterplot', handler);
-              attach();
+            const attach = () => {
+                if (card.dataset.familyHighlight === '1') {
+                    const info = gd.layout && gd.layout.meta && gd.layout.meta.familyHighlight;
+                    if (info && info.enabled) {
+                        setupFamilyHighlight(gd);
+                    }
+                }
+                setupInversionHighlight(gd);
             };
-            gd.on('plotly_afterplot', handler);
-          }
+            if (gd.layout && gd.layout.meta) {
+                attach();
+            } else {
+                const handler = () => {
+                    gd.removeListener('plotly_afterplot', handler);
+                    attach();
+                };
+                gd.on('plotly_afterplot', handler);
+            }
         });
       }
 
@@ -2322,18 +2471,35 @@ def build_report_html_v2(
         detailPanel.innerHTML = defaultMsg;
         const figures = card.querySelectorAll('.js-plotly-plot');
         figures.forEach(gd => {
-          const updatePanel = content => {
-            detailPanel.innerHTML = content || defaultMsg;
+          const updatePanel = (content, musicalInversions, structuralInversions) => {
+            let html = content || defaultMsg;
+            if (musicalInversions && musicalInversions.length > 0) {
+                html += "<h5>Inversiones Musicales</h5><ul>";
+                musicalInversions.forEach(id => {
+                    html += `<li>Acorde ID: ${id}</li>`;
+                });
+                html += "</ul>";
+            }
+            if (structuralInversions && structuralInversions.length > 0) {
+                html += "<h5>Inversiones Estructurales</h5><ul>";
+                structuralInversions.forEach(id => {
+                    html += `<li>Acorde ID: ${id}</li>`;
+                });
+                html += "</ul>";
+            }
+            detailPanel.innerHTML = html;
           };
           gd.on('plotly_click', ev => {
             const pt = ev.points && ev.points[0];
-            if (!pt || !pt.customdata || pt.customdata.length < 5) {
-              updatePanel(defaultMsg);
+            if (!pt || !pt.customdata || pt.customdata.length < 7) {
+              updatePanel(defaultMsg, null, null);
               return;
             }
-            updatePanel(pt.customdata[4]);
+            const musicalInversions = pt.customdata[5];
+            const structuralInversions = pt.customdata[6];
+            updatePanel(pt.customdata[4], musicalInversions, structuralInversions);
           });
-          gd.on('plotly_doubleclick', () => updatePanel(defaultMsg));
+          gd.on('plotly_doubleclick', () => updatePanel(defaultMsg, null, null));
         });
       }
 
@@ -2406,6 +2572,7 @@ def build_report_html_v2(
     .highlight-note {{ font-size: 0.82rem; color: #1f4c5c; margin: 6px 0 10px 0; }}
     .highlight-note.muted {{ color: #6a6f7a; font-style: italic; }}
     .detail-panel {{ margin: 8px 0 10px 0; padding: 10px 12px; background: #fffbe6; border: 1px solid #f0d98c; border-radius: 8px; font-size: 0.88rem; min-height: 56px; line-height: 1.35; }}
+    .inversion-controls {{ margin: 8px 0; display: flex; gap: 16px; font-size: 0.9rem; }}
   </style>
 </head>
 <body>

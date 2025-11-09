@@ -39,6 +39,40 @@ def _actual_mask(notes_abs: List[int]) -> str:
     return format(mask, "x")
 
 
+def _process_chord_record(notes_abs: List[int], tag: str) -> Dict[str, Any]:
+    """Procesa una lista de notas MIDI y devuelve un diccionario con los datos del acorde."""
+    root_midi = notes_abs[0]
+    normalized = [note - root_midi for note in notes_abs]
+
+    record = _build_record_from_notes(normalized, tag=tag)
+    # Guardar la vista normalizada (anclada) para la UI opcional
+    record['__norm_interval'] = record.get('interval')
+    record['__norm_notes'] = record.get('notes')
+    record['__norm_code'] = record.get('code')
+    record['__norm_bass'] = record.get('bass')
+
+    # Reemplazar por vista REAL (no anclada): PCs y diferencias en MIDI
+    record['notes_abs_json'] = json.dumps(notes_abs)
+    record['octave'] = (root_midi // 12) - 1
+    record['frequencies'] = [_midi_to_freq(note) for note in notes_abs]
+    record['span_semitones'] = notes_abs[-1] - notes_abs[0]
+    # PCs reales y bajo real
+    pcs_real = [str(n % 12) for n in notes_abs]
+    intervals_real = [int(notes_abs[i+1] - notes_abs[i]) for i in range(len(notes_abs)-1)]
+    record['notes'] = pcs_real
+    record['bass'] = str(root_midi % 12)
+    # code real (0123456789AB)
+    HEX12 = "0123456789AB"
+    record['code'] = ''.join(HEX12[int(n) % 12] for n in notes_abs)
+    record['interval'] = intervals_real
+    record['__source__'] = "GENERATED:COMBINATORIAL"
+    record['__transposition__'] = 0
+    record['__root_midi'] = root_midi
+    record['abs_mask_midi'] = _actual_mask(notes_abs)
+    record['id'] = _stable_id(notes_abs)
+    return record
+
+
 # Columnas esperadas por el pipeline principal
 EXPECTED_COLUMNS = [
     'id', 'n', 'interval', 'notes', 'code', 'bass', 'octave',
@@ -55,6 +89,7 @@ def generate_combinatorial_chords(
     octave_min: int,
     octave_max: int,
     cardinalities: List[int],
+    structural_mode: bool = False,
 ) -> pd.DataFrame:
     """
     Genera un DataFrame de acordes usando un enfoque combinatorio.
@@ -64,6 +99,7 @@ def generate_combinatorial_chords(
         octave_min: Octava MIDI inicial (e.g., 3 para C3).
         octave_max: Octava MIDI final.
         cardinalities: Lista de tamaños de acorde a generar (e.g., [3, 4]).
+        structural_mode: Si es True, la primera nota de cada acorde será DO.
 
     Returns:
         Un DataFrame de pandas con los acordes generados.
@@ -85,39 +121,24 @@ def generate_combinatorial_chords(
         if k <= 0 or k > len(midi_universe):
             continue
 
-        for chord_midi_tuple in itertools.combinations(midi_universe, k):
-            notes_abs = list(chord_midi_tuple)
-            root_midi = notes_abs[0]
-            normalized = [note - root_midi for note in notes_abs]
+        if structural_mode:
+            c_zero = 12 * (octave_min + 1)
+            if c_zero not in midi_universe:
+                continue
 
-            record = _build_record_from_notes(normalized, tag="combinatorial")
-            # Guardar la vista normalizada (anclada) para la UI opcional
-            record['__norm_interval'] = record.get('interval')
-            record['__norm_notes'] = record.get('notes')
-            record['__norm_code'] = record.get('code')
-            record['__norm_bass'] = record.get('bass')
+            other_notes = [note for note in midi_universe if note != c_zero]
+            if k - 1 > len(other_notes):
+                continue
 
-            # Reemplazar por vista REAL (no anclada): PCs y diferencias en MIDI
-            record['notes_abs_json'] = json.dumps(notes_abs)
-            record['octave'] = (root_midi // 12) - 1
-            record['frequencies'] = [_midi_to_freq(note) for note in notes_abs]
-            record['span_semitones'] = notes_abs[-1] - notes_abs[0]
-            # PCs reales y bajo real
-            pcs_real = [str(n % 12) for n in notes_abs]
-            intervals_real = [int(notes_abs[i+1] - notes_abs[i]) for i in range(len(notes_abs)-1)]
-            record['notes'] = pcs_real
-            record['bass'] = str(root_midi % 12)
-            # code real (0123456789AB)
-            HEX12 = "0123456789AB"
-            record['code'] = ''.join(HEX12[int(n) % 12] for n in notes_abs)
-            record['interval'] = intervals_real
-            record['__source__'] = "GENERATED:COMBINATORIAL"
-            record['__transposition__'] = 0
-            record['__root_midi'] = root_midi
-            record['abs_mask_midi'] = _actual_mask(notes_abs)
-            record['id'] = _stable_id(notes_abs)
-
-            all_chords_records.append(record)
+            for chord_midi_tuple in itertools.combinations(other_notes, k - 1):
+                notes_abs = sorted([c_zero] + list(chord_midi_tuple))
+                record = _process_chord_record(notes_abs, "combinatorial_structural")
+                all_chords_records.append(record)
+        else:
+            for chord_midi_tuple in itertools.combinations(midi_universe, k):
+                notes_abs = list(chord_midi_tuple)
+                record = _process_chord_record(notes_abs, "combinatorial")
+                all_chords_records.append(record)
 
     if not all_chords_records:
         return pd.DataFrame(columns=EXPECTED_COLUMNS)

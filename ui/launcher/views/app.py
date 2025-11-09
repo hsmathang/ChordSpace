@@ -75,6 +75,7 @@ class PopulationJobRequest:
     cardinalities: Tuple[int, ...] = ()
     apply_post_filters: bool = False
     preview_limit: int | None = None
+    structural_mode: bool = False
 
 
 _MISSING = object()
@@ -452,6 +453,11 @@ class ExperimentLauncher(tk.Tk):
         self.combinatorial_octave_min_var = tk.StringVar(value="3")
         self.combinatorial_octave_max_var = tk.StringVar(value="4")
         self.combinatorial_cardinalities_var = tk.StringVar(value="3,4")
+        self.structural_mode_var = tk.BooleanVar(value=False)
+        self._bind_state_var(
+            self.structural_mode_var,
+            lambda value: self.state.update(structural_mode_enabled=value),
+        )
 
     def _create_layout(self) -> None:
         main = ttk.Frame(self, padding=14)
@@ -1263,6 +1269,7 @@ class ExperimentLauncher(tk.Tk):
             custom_filters=custom_filters,
             apply_post_filters=bool(custom_filters),
             preview_limit=None,
+            structural_mode=self.state.structural_mode_enabled,
         )
 
     def _set_generation_button_state(self, state: str) -> None:
@@ -1326,6 +1333,7 @@ class ExperimentLauncher(tk.Tk):
                     request.octave_min,
                     request.octave_max,
                     list(request.cardinalities),
+                    structural_mode=request.structural_mode,
                 )
                 # Nota: filtros de voicing cerrado se gestionan en Filtros dinámicos
 
@@ -2620,6 +2628,12 @@ class ExperimentLauncher(tk.Tk):
 
         ttk.Label(frame, text="Cardinalidades (e.g., 3,4):").grid(row=2, column=0, sticky="w", padx=5, pady=5)
         ttk.Entry(frame, textvariable=self.combinatorial_cardinalities_var).grid(row=2, column=1, sticky="we", padx=5, pady=5)
+
+        ttk.Checkbutton(
+            frame,
+            text="Modo Estructural (primera nota es DO)",
+            variable=self.structural_mode_var,
+        ).grid(row=3, column=0, columnspan=2, sticky="w", padx=5, pady=5)
 
         # Nota: voicings cerrados se controlan desde Filtros dinámicos (max. intervalo interno)
 
