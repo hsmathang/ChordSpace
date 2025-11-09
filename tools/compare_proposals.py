@@ -429,8 +429,13 @@ def load_chords(
 
     for _, row in df_all.iterrows():
         acorde = ChordAdapter.from_csv_row(row)
-        if 'notes_abs_json' in row and pd.notna(row['notes_abs_json']):
+        if 'notes_abs_json' in row and isinstance(row['notes_abs_json'], str) and row['notes_abs_json']:
             acorde.notes_abs = json.loads(row['notes_abs_json'])
+        elif 'notes_abs_json' in row and isinstance(row['notes_abs_json'], (list, tuple, np.ndarray)):
+            try:
+                acorde.notes_abs = [int(n) for n in list(row['notes_abs_json'])]
+            except Exception:
+                acorde.notes_abs = None
         else:
             # Fallback a calcularlo desde los intervalos si no está
             base_freq = 440.0 # O obtener de config
@@ -2391,55 +2396,219 @@ def build_report_html_v2(
         const structuralToggle = card.querySelector('.inversion-toggle[data-inversion-type="structural"]');
 
         let activeInversions = new Set();
+        let lastMusical = new Set();
+        let lastStructural = new Set();
+        let hasHover = false;
+        let currentHover = { id: null, x: null, y: null };
 
-        function applyInversionHighlight() {
-            Plotly.restyle(gd, {
-                'marker.opacity': gd.data.map((trace, i) => {
-                    const originalOpacities = gd.__originalOpacities = gd.__originalOpacities || gd.data.map(t => t.marker.opacity);
-                    const baseOpacity = originalOpacities[i];
-                    return trace.customdata.map((cd, j) => {
-                        const pointIndex = i + '_' + j; // unique point id
-                        if (activeInversions.size > 0 && !activeInversions.has(pointIndex)) {
-                            return baseOpacity * 0.2;
-                        }
-                        return baseOpacity;
-                    });
-                })
+        function togglesEnabled() {
+            return (musicalToggle && musicalToggle.checked) || (structuralToggle && structuralToggle.checked);
+        }
+
+        function ensureOverlay() {
+            if (gd.__invOverlay && gd.__invOverlay.ready) {
+                return Promise.resolve(gd.__invOverlay);
+            }
+            if (gd.__invOverlayPending) {
+                return gd.__invOverlayPending;
+            }
+            const baseIndex = gd.data.length;
+            const overlayTraces = [
+                {
+                    type: 'scatter', mode: 'markers', name: '', showlegend: false, hoverinfo: 'skip',
+                    x: [], y: [],
+                    marker: {
+                        size: 18,
+                        color: 'rgba(0, 184, 217, 0.28)',
+                        line: { color: '#002C3A', width: 2.5 },
+                        symbol: 'circle'
+                    }
+                },
+                {
+                    type: 'scatter', mode: 'lines', name: '', showlegend: false, hoverinfo: 'skip',
+                    x: [], y: [],
+                    line: { color: '#00B8D9', width: 2.4, dash: 'solid' }
+                },
+                {
+                    type: 'scatter', mode: 'lines', name: '', showlegend: false, hoverinfo: 'skip',
+                    x: [], y: [],
+                    line: { color: '#FF2D6D', width: 2.4, dash: 'dash' }
+                }
+            ];
+            gd.__invOverlayPending = Plotly.addTraces(gd, overlayTraces).then(() => {
+                gd.__invOverlay = {
+                    markersIdx: baseIndex,
+                    linksMusIdx: baseIndex + 1,
+                    linksStrIdx: baseIndex + 2,
+                    ready: true,
+                };
+                gd.__invOverlayPending = null;
+                return gd.__invOverlay;
+            }).catch(() => {
+                gd.__invOverlayPending = null;
+                gd.__invOverlay = null;
+                return null;
             });
+            return gd.__invOverlayPending;
+        }
+
+        function hideOverlay() {
+            const overlays = gd.__invOverlay;
+            if (!overlays || typeof overlays.markersIdx !== 'number') return;
+            Plotly.restyle(gd, { x: [[]], y: [[]], visible: [false] }, [overlays.markersIdx]);
+            Plotly.restyle(gd, { x: [[]], y: [[]], visible: [false] }, [overlays.linksMusIdx]);
+            Plotly.restyle(gd, { x: [[]], y: [[]], visible: [false] }, [overlays.linksStrIdx]);
+        }
+
+        function idToXY(targetId) {
+            for (let i = 0; i < gd.data.length; i++) {
+                const trace = gd.data[i];
+                const cd = trace.customdata || [];
+                const xs = trace.x || [];
+                const ys = trace.y || [];
+                for (let j = 0; j < cd.length; j++) {
+                    const row = cd[j];
+                    if (row && row.length >= 8 && row[7] === targetId) {
+                        return { x: xs[j], y: ys[j] };
+                    }
+                }
+            }
+            return null;
+        }
+
+        function getBaseOpacities(index, trace) {
+            gd.__originalOpacities = gd.__originalOpacities || {};
+            const length = Array.isArray(trace.customdata) ? trace.customdata.length : Array.isArray(trace.x) ? trace.x.length : 0;
+            if (gd.__originalOpacities[index] && gd.__originalOpacities[index].length === length && length) {
+                return gd.__originalOpacities[index];
+            }
+            if (!length) return null;
+            let baseArray;
+            if (Array.isArray(trace.marker && trace.marker.opacity) && trace.marker.opacity.length === length) {
+                baseArray = trace.marker.opacity.slice();
+            } else {
+                const baseVal = typeof trace.marker?.opacity === 'number' ? trace.marker.opacity : 0.6;
+                baseArray = new Array(length).fill(baseVal);
+            }
+            gd.__originalOpacities[index] = baseArray;
+            return baseArray;
+        }
+
+        function updateOverlay(musicalSet, structuralSet) {
+            if (!togglesEnabled() || (!musicalSet.size && !structuralSet.size) || !Number.isFinite(currentHover.id)) {
+                hideOverlay();
+                return;
+            }
+            ensureOverlay().then(overlays => {
+                if (!overlays) return;
+                const union = new Set();
+                musicalSet.forEach(id => union.add(id));
+                structuralSet.forEach(id => union.add(id));
+                union.add(currentHover.id);
+
+                const mx = [], my = [];
+                union.forEach(id => {
+                    const pos = idToXY(id);
+                    if (pos) { mx.push(pos.x); my.push(pos.y); }
+                });
+
+                const hx = currentHover.x;
+                const hy = currentHover.y;
+                const linksSolidX = [];
+                const linksSolidY = [];
+                const linksDashX = [];
+                const linksDashY = [];
+                if (hx !== null && hy !== null) {
+                    musicalSet.forEach(id => {
+                        const pos = idToXY(id);
+                        if (pos) { linksSolidX.push(hx, pos.x, null); linksSolidY.push(hy, pos.y, null); }
+                    });
+                    structuralSet.forEach(id => {
+                        const pos = idToXY(id);
+                        if (pos) { linksDashX.push(hx, pos.x, null); linksDashY.push(hy, pos.y, null); }
+                    });
+                }
+
+                Plotly.restyle(gd, { x: [mx], y: [my], visible: [mx.length ? true : false] }, [overlays.markersIdx]);
+                Plotly.restyle(gd, { x: [linksSolidX], y: [linksSolidY], visible: [linksSolidX.length ? true : false] }, [overlays.linksMusIdx]);
+                Plotly.restyle(gd, { x: [linksDashX], y: [linksDashY], visible: [linksDashX.length ? true : false] }, [overlays.linksStrIdx]);
+            });
+        }
+
+        function applyInversionHighlight(useMusicalSet, useStructuralSet) {
+            const indices = [];
+            const payload = [];
+            gd.data.forEach((trace, idx) => {
+                if (!Array.isArray(trace.customdata) || !trace.customdata.length) {
+                    return;
+                }
+                const baseOpacities = getBaseOpacities(idx, trace);
+                if (!baseOpacities) return;
+                indices.push(idx);
+                payload.push(trace.customdata.map((cd, pointIdx) => {
+                    const globalId = Array.isArray(cd) ? cd[7] : undefined;
+                    const base = baseOpacities[pointIdx] ?? 0.6;
+                    if (activeInversions.size > 0 && (!Number.isFinite(globalId) || !activeInversions.has(globalId))) {
+                        return base * 0.1;
+                    }
+                    return base;
+                }));
+            });
+            if (indices.length) {
+                Plotly.restyle(gd, { 'marker.opacity': payload }, indices);
+            }
+            updateOverlay(useMusicalSet || new Set(), useStructuralSet || new Set());
+        }
+
+        function recomputeActive() {
+            activeInversions.clear();
+            if (!hasHover || !togglesEnabled()) {
+                applyInversionHighlight(new Set(), new Set());
+                hideOverlay();
+                return;
+            }
+            const useMusical = (musicalToggle && musicalToggle.checked) ? new Set(lastMusical) : new Set();
+            const useStructural = (structuralToggle && structuralToggle.checked) ? new Set(lastStructural) : new Set();
+            useMusical.forEach(id => activeInversions.add(id));
+            useStructural.forEach(id => activeInversions.add(id));
+            if (Number.isFinite(currentHover.id)) {
+                activeInversions.add(currentHover.id);
+            }
+            applyInversionHighlight(useMusical, useStructural);
         }
 
         gd.on('plotly_hover', ev => {
             const pt = ev.points && ev.points[0];
             if (!pt || !pt.customdata) {
-                activeInversions.clear();
-                applyInversionHighlight();
+                hasHover = false;
+                lastMusical = new Set();
+                lastStructural = new Set();
+                currentHover = { id: null, x: null, y: null };
+                recomputeActive();
                 return;
             }
-
-            const musicalInversions = new Set(pt.customdata[5] || []);
-            const structuralInversions = new Set(pt.customdata[6] || []);
-
-            activeInversions.clear();
-
-            if (musicalToggle && musicalToggle.checked) {
-                musicalInversions.forEach(id => activeInversions.add(id));
-            }
-            if (structuralToggle && structuralToggle.checked) {
-                structuralInversions.forEach(id => activeInversions.add(id));
-            }
-
-            applyInversionHighlight();
+            lastMusical = new Set(pt.customdata[5] || []);
+            lastStructural = new Set(pt.customdata[6] || []);
+            currentHover = {
+                id: typeof pt.customdata[7] === 'number' ? pt.customdata[7] : parseInt(pt.customdata[7], 10),
+                x: pt.x,
+                y: pt.y,
+            };
+            hasHover = true;
+            recomputeActive();
         });
 
         gd.on('plotly_unhover', () => {
-            activeInversions.clear();
-            applyInversionHighlight();
+            hasHover = false;
+            lastMusical = new Set();
+            lastStructural = new Set();
+            currentHover = { id: null, x: null, y: null };
+            recomputeActive();
         });
 
-        if(musicalToggle) musicalToggle.addEventListener('change', () => applyInversionHighlight());
-        if(structuralToggle) structuralToggle.addEventListener('change', () => applyInversionHighlight());
+        if (musicalToggle) musicalToggle.addEventListener('change', () => recomputeActive());
+        if (structuralToggle) structuralToggle.addEventListener('change', () => recomputeActive());
       }
-
       function registerCardHighlight(card) {
         const figures = card.querySelectorAll('.js-plotly-plot');
         figures.forEach(gd => {
@@ -2471,20 +2640,32 @@ def build_report_html_v2(
         detailPanel.innerHTML = defaultMsg;
         const figures = card.querySelectorAll('.js-plotly-plot');
         figures.forEach(gd => {
+          function lookupLabelById(id) {
+            // Busca en las trazas visibles un punto con ese global_id y devuelve su 'text'
+            for (let i = 0; i < gd.data.length; i++) {
+              const trace = gd.data[i];
+              const cd = trace.customdata || [];
+              const tx = trace.text || [];
+              for (let j = 0; j < cd.length; j++) {
+                const row = cd[j];
+                if (row && row.length >= 8 && row[7] === id) {
+                  return typeof tx[j] === 'string' ? tx[j] : `Acorde ID: ${id}`;
+                }
+              }
+            }
+            return `Acorde ID: ${id}`;
+          }
+
           const updatePanel = (content, musicalInversions, structuralInversions) => {
             let html = content || defaultMsg;
             if (musicalInversions && musicalInversions.length > 0) {
                 html += "<h5>Inversiones Musicales</h5><ul>";
-                musicalInversions.forEach(id => {
-                    html += `<li>Acorde ID: ${id}</li>`;
-                });
+                musicalInversions.forEach(id => { html += `<li>${lookupLabelById(id)}</li>`; });
                 html += "</ul>";
             }
             if (structuralInversions && structuralInversions.length > 0) {
                 html += "<h5>Inversiones Estructurales</h5><ul>";
-                structuralInversions.forEach(id => {
-                    html += `<li>Acorde ID: ${id}</li>`;
-                });
+                structuralInversions.forEach(id => { html += `<li>${lookupLabelById(id)}</li>`; });
                 html += "</ul>";
             }
             detailPanel.innerHTML = html;

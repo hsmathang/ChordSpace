@@ -438,6 +438,12 @@ def build_scatter_payload(
             )
         )
 
+    # customdata layout per point:
+    # [0] family_tag, [1] is_inversion(0/1), [2] family_size,
+    # [3] summary_html, [4] detail_html,
+    # [5] musical_inversion_ids (global indices),
+    # [6] structural_inversion_ids (global indices),
+    # [7] global_id (index in entries)
     customdata_all = [
         [
             family_tags[i],
@@ -445,8 +451,9 @@ def build_scatter_payload(
             family_counts.get(family_tags[i], 1),
             summary_texts[i],
             detail_texts[i],
-                entries[i].musical_inversion_ids,
-                entries[i].structural_inversion_ids,
+            entries[i].musical_inversion_ids,
+            entries[i].structural_inversion_ids,
+            i,
         ]
         for i in range(total_points)
     ]

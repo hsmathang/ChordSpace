@@ -115,6 +115,13 @@ def generate_combinatorial_chords(
                 midi_universe.append(midi_note)
 
     midi_universe = sorted(set(midi_universe))
+    if alphabet:
+        boundary_pc = min(int(pc) for pc in alphabet)
+        boundary_octave = octave_max + 1
+        boundary_note = 12 * (boundary_octave + 1) + boundary_pc
+        if 0 <= boundary_note <= 127 and boundary_note not in midi_universe:
+            midi_universe.append(boundary_note)
+            midi_universe.sort()
     all_chords_records: List[Dict[str, Any]] = []
 
     for k in cardinalities:
