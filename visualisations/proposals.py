@@ -4,7 +4,7 @@ from __future__ import annotations
 import copy
 import json
 from dataclasses import dataclass, field
-from typing import TYPE_CHECKING, Any, Dict, Iterable, List, Optional, Sequence, Tuple
+from typing import TYPE_CHECKING, Any, Callable, Dict, Iterable, List, Optional, Sequence, Tuple
 
 import math
 import numpy as np
@@ -210,6 +210,8 @@ DEFAULT_HIGHLIGHT: HighlightConfig = {
     "fade_factor": 0.25,
 }
 
+SUBSTITUTION_TOP_K = 8
+
 
 def _build_filter_metadata(
     entries: Sequence["ChordEntry"],
@@ -350,6 +352,65 @@ def _build_filter_metadata(
     return filter_definitions, field_values
 
 
+def _compute_neighbors_from_matrix(
+    dist_matrix: np.ndarray,
+    customdata_all: Sequence[Sequence[Any]],
+    cardinalities: Sequence[int],
+    *,
+    top_k: int = SUBSTITUTION_TOP_K,
+    same_cardinality: bool = True,
+    components_factory: Optional[Callable[[int, int], Dict[str, Any]]] = None,
+) -> Dict[str, List[Dict[str, object]]]:
+    dist_matrix = np.asarray(dist_matrix, dtype=float)
+    total_points = dist_matrix.shape[0]
+    if total_points == 0 or dist_matrix.shape[0] != dist_matrix.shape[1]:
+        return {}
+    card_array = np.asarray(cardinalities, dtype=int)
+    neighbor_map: Dict[str, List[Dict[str, object]]] = {}
+    if same_cardinality:
+        card_groups: Dict[int, np.ndarray] = {}
+        for idx, card in enumerate(card_array):
+            card_groups.setdefault(int(card), []).append(idx)
+        card_groups = {card: np.asarray(indices, dtype=int) for card, indices in card_groups.items()}
+    for idx in range(total_points):
+        if same_cardinality:
+            group = card_groups.get(int(card_array[idx]))
+            if group is None or group.size <= 1:
+                continue
+            candidates = group[group != idx]
+        else:
+            if total_points <= 1:
+                continue
+            candidates = np.delete(np.arange(total_points, dtype=int), idx)
+        if candidates.size == 0:
+            continue
+        candidate_dists = dist_matrix[idx, candidates]
+        if candidate_dists.size == 0:
+            continue
+        if candidate_dists.size > top_k:
+            order = np.argpartition(candidate_dists, top_k)[:top_k]
+            selected = order[np.argsort(candidate_dists[order])]
+        else:
+            selected = np.argsort(candidate_dists)
+        neighbor_entries: List[Dict[str, object]] = []
+        for pos in selected:
+            neighbor_idx = int(candidates[pos])
+            dist_val = float(candidate_dists[pos])
+            components = (
+                components_factory(idx, neighbor_idx) if components_factory is not None else {}
+            )
+            neighbor_entries.append(
+                {
+                    "neighbor": int(customdata_all[neighbor_idx][7]),
+                    "distance": dist_val,
+                    "components": components,
+                }
+            )
+        if neighbor_entries:
+            neighbor_map[str(customdata_all[idx][7])] = neighbor_entries
+    return neighbor_map
+
+
 def build_scatter_payload(
     embedding: np.ndarray,
     entries: Sequence["ChordEntry"],
@@ -364,6 +425,7 @@ def build_scatter_payload(
     is_proposal: bool,
     highlight: Optional[HighlightConfig] = None,
     meta: Optional[Dict[str, Any]] = None,
+    substitution_options: Optional[Dict[str, Any]] = None,
 ) -> Dict[str, Any]:
     highlight_cfg = dict(DEFAULT_HIGHLIGHT)
     if highlight:
@@ -462,12 +524,17 @@ def build_scatter_payload(
         for i in range(total_points)
     ]
 
+    cardinality_list = [int(getattr(entry, "n_notes", 0) or 0) for entry in entries]
+    cardinality_array = np.asarray(cardinality_list, dtype=int) if cardinality_list else np.zeros(0, dtype=int)
+
+    substitution_profiles: Dict[str, Dict[str, List[Dict[str, object]]]] = {}
+    substitution_profile_meta: Dict[str, Dict[str, str]] = {}
+    default_profile_key: Optional[str] = None
+
     # --- Sustituciones: métricas básicas (JSD + Jaccard) ---
-    substitution_neighbors: Dict[str, List[Dict[str, object]]] = {}
     if total_points > 1:
         hist_probs: List[np.ndarray] = []
         pc_vectors: List[np.ndarray] = []
-        cardinalities: List[int] = []
 
         for entry in entries:
             hist = np.asarray(getattr(entry, "hist", np.zeros(12, dtype=float)), dtype=float)
@@ -494,11 +561,9 @@ def build_scatter_payload(
                     current += int(step)
                     vec[int(current) % 12] = 1.0
             pc_vectors.append(vec)
-            cardinalities.append(int(getattr(entry, "n_notes", 0) or 0))
 
         hist_probs = np.asarray(hist_probs)
         pc_vectors = np.asarray(pc_vectors)
-        cardinalities = np.asarray(cardinalities, dtype=int)
 
         p_safe = np.clip(hist_probs, EPS, None)
         log_p = np.log(p_safe)
@@ -523,40 +588,63 @@ def build_scatter_payload(
         weights = {"jsd": 0.6, "jaccard": 0.4}
         dist_matrix = weights["jsd"] * jsd_matrix + weights["jaccard"] * jaccard_matrix
 
-        card_groups: Dict[int, np.ndarray] = {}
-        for idx, card in enumerate(cardinalities):
-            card_groups.setdefault(card, []).append(idx)  # type: ignore[arg-type]
-        card_groups = {card: np.asarray(indices, dtype=int) for card, indices in card_groups.items()}
+        def _prob_components(src_idx: int, neighbor_idx: int) -> Dict[str, Any]:
+            return {
+                "jsd": float(jsd_matrix[src_idx, neighbor_idx]),
+                "jaccard": float(jaccard_matrix[src_idx, neighbor_idx]),
+            }
 
-        for idx in range(total_points):
-            card = cardinalities[idx]
-            group = card_groups.get(card)
-            if group is None or len(group) <= 1:
+        prob_neighbors = _compute_neighbors_from_matrix(
+            dist_matrix,
+            customdata_all,
+            cardinality_array,
+            top_k=SUBSTITUTION_TOP_K,
+            components_factory=_prob_components,
+        )
+        if prob_neighbors:
+            substitution_profiles["susti_probab"] = prob_neighbors
+            substitution_profile_meta["susti_probab"] = {
+                "label": "susti_probab(JSD_Jaccard)",
+                "description": "Top vecinos según 0.6·JSD + 0.4·Jaccard sobre el histograma probabilístico.",
+            }
+            default_profile_key = default_profile_key or "susti_probab"
+
+    if substitution_options:
+        for profile_key, option in substitution_options.items():
+            if not option:
                 continue
-            candidates = group[group != idx]
-            if candidates.size == 0:
+            dist_mat = option.get("distance_matrix")
+            if dist_mat is None:
                 continue
-            candidate_dists = dist_matrix[idx, candidates]
-            if candidate_dists.size > 8:
-                order = np.argpartition(candidate_dists, 8)[:8]
-                sorted_idx = order[np.argsort(candidate_dists[order])]
-            else:
-                sorted_idx = np.argsort(candidate_dists)
-            top_entries: List[Dict[str, object]] = []
-            for pos in sorted_idx:
-                neighbor_idx = int(candidates[pos])
-                dist_val = float(candidate_dists[pos])
-                top_entries.append(
-                    {
-                        "neighbor": int(customdata_all[neighbor_idx][7]),
-                        "distance": dist_val,
-                        "components": {
-                            "jsd": float(jsd_matrix[idx, neighbor_idx]),
-                            "jaccard": float(jaccard_matrix[idx, neighbor_idx]),
-                        },
-                    }
-                )
-            substitution_neighbors[str(customdata_all[idx][7])] = top_entries
+            dist_mat = np.asarray(dist_mat, dtype=float)
+            if dist_mat.shape[0] != total_points or dist_mat.shape[0] != dist_mat.shape[1]:
+                continue
+
+            metric_label = option.get("metric")
+
+            def _scenario_components(_: int, __: int) -> Dict[str, Any]:
+                if metric_label:
+                    return {"metric": str(metric_label)}
+                return {}
+
+            neighbors = _compute_neighbors_from_matrix(
+                dist_mat,
+                customdata_all,
+                cardinality_array,
+                top_k=SUBSTITUTION_TOP_K,
+                components_factory=_scenario_components,
+            )
+            if not neighbors:
+                continue
+            profile_key = str(profile_key)
+            substitution_profiles[profile_key] = neighbors
+            substitution_profile_meta[profile_key] = {
+                "label": option.get("label") or "susti_basic(vecino del espacio original)",
+                "description": option.get("description")
+                or "Vecinos calculados según la métrica del escenario activo.",
+            }
+            if default_profile_key is None:
+                default_profile_key = profile_key
 
     filter_definitions, filter_fields = _build_filter_metadata(entries, family_tags)
     trace_sources: List[Dict[str, Any]] = []
@@ -733,8 +821,14 @@ def build_scatter_payload(
         "fields": filter_definitions,
     }
     meta_payload["filterDataset"] = filter_dataset
-    if substitution_neighbors:
-        meta_payload["substitutionNeighbors"] = substitution_neighbors
+    if substitution_profiles:
+        if not default_profile_key or default_profile_key not in substitution_profiles:
+            default_profile_key = next(iter(substitution_profiles.keys()))
+        meta_payload["substitutionNeighbors"] = substitution_profiles
+        meta_payload["substitutionProfiles"] = {
+            "default": default_profile_key,
+            "profiles": substitution_profile_meta,
+        }
 
     layout = {
         "title": title,

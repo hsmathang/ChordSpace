@@ -831,6 +831,15 @@ def _run_scenario_task(task: Dict[str, Any]) -> Dict[str, Any]:
     X = np.asarray(preproc_cache[preproc_id], dtype=float)
     simplex = np.asarray(dist_simplex_cache[preproc_id], dtype=float)
     dist_condensed_base = distance_cache[(preproc_id, metric)]
+    dist_matrix_base = squareform(dist_condensed_base)
+    substitution_options = {
+        "susti_basic": {
+            "label": "susti_basic(vecino del espacio original)",
+            "description": f"Vecinos según la métrica '{metric}' del escenario.",
+            "distance_matrix": dist_matrix_base,
+            "metric": metric,
+        }
+    }
 
     warnings: List[str] = []
     results: List[Dict[str, Any]] = []
@@ -843,7 +852,7 @@ def _run_scenario_task(task: Dict[str, Any]) -> Dict[str, Any]:
         t_red_start = time.perf_counter()
         dist_condensed = dist_condensed_base
 
-        dist_matrix = squareform(dist_condensed)
+        dist_matrix = dist_matrix_base
         base_matrix = X if metric in BASE_VECTOR_METRICS else simplex
 
         nn_top1, nn_top2 = evaluate_nn_hits(dist_matrix, entries, simplex)
@@ -908,6 +917,7 @@ def _run_scenario_task(task: Dict[str, Any]) -> Dict[str, Any]:
                     "reduction": reduction,
                     "figure_seed": figure_seed,
                     "embedding": figure_embedding,
+                    "substitution_options": substitution_options,
                 }
             )
         t_red_end = time.perf_counter()
@@ -930,6 +940,7 @@ def _generate_figures(
     pairs: np.ndarray,
     preproc_cache: Dict[str, np.ndarray],
     dist_simplex_cache: Dict[str, np.ndarray],
+    distance_cache: Dict[Tuple[str, str], np.ndarray],
 ) -> List[Tuple[str, go.Figure]]:
     """Construye las figuras a partir de los payloads aprovechando múltiples hilos."""
 
@@ -948,6 +959,7 @@ def _generate_figures(
         vectors_adjusted = np.asarray(preproc_cache[preproc_id], dtype=float)
         totals_adj = np.sum(vectors_adjusted, axis=1)
         existing_counts = np.sum(vectors_adjusted > COLOR_EXISTING_THRESHOLD, axis=1).astype(float)
+        substitution_options = payload.get("substitution_options")
 
         color_modes: List[Tuple[str, Optional[float]]] = []
         if preproc_id == "identity":
@@ -984,6 +996,7 @@ def _generate_figures(
                     "mode": mode,
                     "exponent": exponent,
                 },
+                substitution_options=substitution_options,
             )
             figs.append((f"{scenario_name}||{key}", fig))
         return figs
@@ -1209,6 +1222,7 @@ def build_scatter_figure(
     is_proposal: bool = False,
     color_title: str = "Color",
     meta: Optional[Dict[str, Any]] = None,
+    substitution_options: Optional[Dict[str, Any]] = None,
 ) -> go.Figure:
     highlight_cfg = {
         "threshold": FAMILY_HIGHLIGHT_THRESHOLD,
@@ -1230,6 +1244,7 @@ def build_scatter_figure(
         is_proposal=is_proposal,
         highlight=highlight_cfg,
         meta=meta,
+        substitution_options=substitution_options,
     )
     return go.Figure(data=payload["data"], layout=payload["layout"])
 
@@ -1588,6 +1603,12 @@ def build_report_html_v2(
             <label><input type='checkbox' class='inversion-toggle' data-inversion-type='musical'> Resaltar inversiones musicales</label>
             <label><input type='checkbox' class='inversion-toggle' data-inversion-type='structural'> Resaltar inversiones estructurales</label>
             <label><input type='checkbox' class='substitution-toggle'> Resaltar sustituciones</label>
+            <label class='substitution-profile-label'>
+                Perfil de sustitución:
+                <select class='substitution-profile' disabled>
+                    <option value=''>Cargando…</option>
+                </select>
+            </label>
         </div>
         """
         card_attrs = [f"data-sid='{sid}'", f"data-family-highlight='{'1' if highlight_enabled_flag else '0'}'"]
@@ -2621,13 +2642,90 @@ def build_report_html_v2(
         if (structuralToggle) structuralToggle.addEventListener('change', () => recomputeActive());
       }
 
+      function resolveDefaultSubstitutionProfile(neighborsByProfile, profileConfig) {
+        if (!neighborsByProfile) return null;
+        const keys = Object.keys(neighborsByProfile);
+        if (!keys.length) return null;
+        if (profileConfig && profileConfig.default && neighborsByProfile[profileConfig.default]) {
+          return profileConfig.default;
+        }
+        return keys[0];
+      }
+
+      function populateSubstitutionProfileSelect(select, neighborsByProfile, profileConfig, activeKey) {
+        if (!select) return;
+        select.innerHTML = '';
+        if (!neighborsByProfile) {
+          const opt = document.createElement('option');
+          opt.value = '';
+          opt.textContent = 'No disponible';
+          select.appendChild(opt);
+          select.disabled = true;
+          return;
+        }
+        const keys = Object.keys(neighborsByProfile);
+        if (!keys.length) {
+          const opt = document.createElement('option');
+          opt.value = '';
+          opt.textContent = 'No disponible';
+          select.appendChild(opt);
+          select.disabled = true;
+          return;
+        }
+        const metaProfiles = (profileConfig && profileConfig.profiles) || {};
+        keys.forEach(key => {
+          const opt = document.createElement('option');
+          opt.value = key;
+          const info = metaProfiles[key];
+          opt.textContent = (info && info.label) ? info.label : key;
+          select.appendChild(opt);
+        });
+        if (activeKey && neighborsByProfile[activeKey]) {
+          select.value = activeKey;
+        } else {
+          select.selectedIndex = 0;
+        }
+        select.disabled = select.options.length <= 1;
+      }
+
       function setupSubstitutionHighlight(gd) {
         if (!gd || gd.__substitutionHighlightBound) return;
         const card = gd.closest('.plot-card');
         const toggle = card.querySelector('.substitution-toggle');
-        const neighborsMap = gd.layout && gd.layout.meta && gd.layout.meta.substitutionNeighbors;
-        if (!toggle || !neighborsMap) return;
+        const profileSelect = card.querySelector('.substitution-profile');
+        const neighborsByProfile = gd.layout && gd.layout.meta && gd.layout.meta.substitutionNeighbors;
+        const profileConfig = gd.layout && gd.layout.meta && gd.layout.meta.substitutionProfiles;
+        if (!toggle || !neighborsByProfile) return;
+        const availableProfiles = Object.keys(neighborsByProfile);
+        if (!availableProfiles.length) return;
         gd.__substitutionHighlightBound = true;
+
+        const defaultProfile = resolveDefaultSubstitutionProfile(neighborsByProfile, profileConfig);
+        if (!gd.__substitutionProfile || !neighborsByProfile[gd.__substitutionProfile]) {
+          gd.__substitutionProfile = defaultProfile;
+        }
+
+        if (profileSelect) {
+          populateSubstitutionProfileSelect(profileSelect, neighborsByProfile, profileConfig, gd.__substitutionProfile);
+          profileSelect.addEventListener('change', () => {
+            const selected = profileSelect.value;
+            if (selected && neighborsByProfile[selected]) {
+              gd.__substitutionProfile = selected;
+            } else {
+              gd.__substitutionProfile = resolveDefaultSubstitutionProfile(neighborsByProfile, profileConfig);
+              if (gd.__substitutionProfile && neighborsByProfile[gd.__substitutionProfile]) {
+                profileSelect.value = gd.__substitutionProfile;
+              }
+            }
+            card.dispatchEvent(new CustomEvent('substitutionProfileChanged', { detail: { profile: gd.__substitutionProfile } }));
+            if (toggle.checked && Number.isFinite(lastHoverId)) {
+              applyForId(lastHoverId);
+            } else if (!toggle.checked) {
+              hideOverlay();
+              applyGlobalIdHighlight(gd, null);
+            }
+          });
+        }
 
         let lastHoverId = null;
 
@@ -2703,7 +2801,11 @@ def build_report_html_v2(
             return;
           }
           const key = String(globalId);
-          const entries = neighborsMap[key] || [];
+          const activeProfile = gd.__substitutionProfile && neighborsByProfile[gd.__substitutionProfile]
+            ? gd.__substitutionProfile
+            : resolveDefaultSubstitutionProfile(neighborsByProfile, profileConfig);
+          const activeMap = activeProfile ? neighborsByProfile[activeProfile] : null;
+          const entries = activeMap ? (activeMap[key] || []) : [];
           if (!entries.length) {
             const ownSet = new Set([Number(globalId)]);
             applyGlobalIdHighlight(gd, ownSet, 0.1);
@@ -2791,7 +2893,10 @@ def build_report_html_v2(
         detailPanel.innerHTML = defaultMsg;
         const figures = card.querySelectorAll('.js-plotly-plot');
         figures.forEach(gd => {
-          const substitutionMap = (gd.layout && gd.layout.meta && gd.layout.meta.substitutionNeighbors) || {};
+          const neighborsByProfile = (gd.layout && gd.layout.meta && gd.layout.meta.substitutionNeighbors) || null;
+          const profileConfig = (gd.layout && gd.layout.meta && gd.layout.meta.substitutionProfiles) || {};
+          let lastDetailState = null;
+
           function lookupLabelById(id) {
             // Busca en las trazas visibles un punto con ese global_id y devuelve su 'text'
             for (let i = 0; i < gd.data.length; i++) {
@@ -2808,6 +2913,34 @@ def build_report_html_v2(
             return `Acorde ID: ${id}`;
           }
 
+          function getActiveProfileKey() {
+            if (neighborsByProfile) {
+              if (gd.__substitutionProfile && neighborsByProfile[gd.__substitutionProfile]) {
+                return gd.__substitutionProfile;
+              }
+              if (profileConfig && profileConfig.default && neighborsByProfile[profileConfig.default]) {
+                return profileConfig.default;
+              }
+              const keys = Object.keys(neighborsByProfile);
+              if (keys.length) return keys[0];
+            }
+            return null;
+          }
+
+          function getProfileLabel(profileKey) {
+            if (!profileKey || !profileConfig || !profileConfig.profiles) return profileKey;
+            const info = profileConfig.profiles[profileKey];
+            return info && info.label ? info.label : profileKey;
+          }
+
+          function getSubstitutionList(globalId) {
+            if (!Number.isFinite(globalId) || !neighborsByProfile) return [];
+            const profileKey = getActiveProfileKey();
+            if (!profileKey) return [];
+            const profileMap = neighborsByProfile[profileKey] || {};
+            return profileMap[String(globalId)] || [];
+          }
+
           const updatePanel = (content, musicalInversions, structuralInversions, currentGlobalId) => {
             let html = content || defaultMsg;
             if (musicalInversions && musicalInversions.length > 0) {
@@ -2821,9 +2954,12 @@ def build_report_html_v2(
                 html += "</ul>";
             }
             if (Number.isFinite(currentGlobalId)) {
-                const subList = substitutionMap[String(currentGlobalId)] || [];
+                const subList = getSubstitutionList(currentGlobalId);
                 if (subList.length > 0) {
-                    html += "<h5>Sustitutos sugeridos</h5><ol>";
+                    const activeKey = getActiveProfileKey();
+                    const profileLabel = activeKey ? getProfileLabel(activeKey) : null;
+                    const titleSuffix = profileLabel ? ` (${profileLabel})` : "";
+                    html += `<h5>Sustitutos sugeridos${titleSuffix}</h5><ol>`;
                     subList.forEach(item => {
                         const label = lookupLabelById(Number(item.neighbor));
                         const dist = typeof item.distance === 'number' ? item.distance.toFixed(3) : '—';
@@ -2833,6 +2969,12 @@ def build_report_html_v2(
                 }
             }
             detailPanel.innerHTML = html;
+            lastDetailState = {
+              content: content || defaultMsg,
+              musicalInversions: musicalInversions || [],
+              structuralInversions: structuralInversions || [],
+              currentGlobalId,
+            };
           };
           gd.on('plotly_click', ev => {
             const pt = ev.points && ev.points[0];
@@ -2846,6 +2988,16 @@ def build_report_html_v2(
             updatePanel(pt.customdata[4], musicalInversions, structuralInversions, currentId);
           });
           gd.on('plotly_doubleclick', () => updatePanel(defaultMsg, null, null, null));
+          card.addEventListener('substitutionProfileChanged', () => {
+            if (lastDetailState && Number.isFinite(lastDetailState.currentGlobalId)) {
+              updatePanel(
+                lastDetailState.content,
+                lastDetailState.musicalInversions,
+                lastDetailState.structuralInversions,
+                lastDetailState.currentGlobalId,
+              );
+            }
+          });
         });
       }
 
@@ -3330,6 +3482,7 @@ def main() -> None:
         pairs,
         preproc_cache,
         dist_simplex_cache,
+        distance_cache,
     )
     timer.mark("figures")
 

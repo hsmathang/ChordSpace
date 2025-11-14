@@ -298,4 +298,121 @@ Futuro (largo plazo):
 ---
 
 Autor: Equipo ChordSpace — Propuesta técnica inicial para sustitución armónica basada en métricas.
+## 14. Usando lo que tenemos a mano para sustituciA3n
 
+Esta secciA3n aterriza el diseA�o anterior en el contexto del cA3digo actual del repositorio, con el objetivo explA-cito de **aprovechar las estructuras ya disponibles** (histogramas Sethares, `ChordEntry`, `compare_proposals`, `visualisations/proposals`, `report.html`) para ofrecer variantes de sustituciA3n sin necesidad de construir toda la carpeta `substitution/` de golpe.
+
+La idea central es que, sin tocar aA-n el cA3digo, definamos claramente:
+
+- quA(c) perfiles de sustituciA3n queremos (nombrados y con semA!ntica), y
+- cA3mo se mapearA-an esos perfiles a los vectores y mAActricas que YA existen en el pipeline.
+
+### 14.1. Perfil actual `susti_probab(JSD_Jaccard)`
+
+Este es el perfil que ya estA! en producciA3n (descrito tambiAcn en `docs/primer_intento_de_algoritmo_de_sustitucion.md`):
+
+- **Vector sensorial**: histograma de rugosidad Sethares `h_C = ChordEntry.hist` (12�?`D).
+- **NormalizaciA3n**: se construye \(p_C = h_C / \sum_k h_C[k]\) (con fallback uniforme) en `visualisations/proposals.py` al entrar en la secciA3n de sustituciones.
+- **MActtrica sensorial**: \(D_{\mathrm{JSD}}(C,D) = \sqrt{\mathrm{JSD}(p_C,p_D)}\), donde JSD se calcula por broadcasting sobre la matriz de `p_C` (ver secciA3n 3.1).
+- **Vector estructural**: vector binario de PCs `b_C` derivado de `notes_abs` (mod 12) en `visualisations/proposals.py`.
+- **MActtrica estructural**: \(D_{\mathrm{Jac}}(C,D)\) sobre PC�?`set a partir de `b_C` (secciA3n 3.2).
+- **CombinaciA3n actual**:
+  \[
+  D(C,D)\;=\;0{,}6\,D_{\mathrm{JSD}}(C,D)\;+\;0{,}4\,D_{\mathrm{Jac}}(C,D),
+  \]
+  sA3lo entre acordes de **misma cardinalidad** (filtro implA-cito en la implementaciA3n actual).
+- **Salida**:
+  - Para cada acorde se seleccionan los `K` vecinos mA!s cercanos (Top�?`K`, hoy \(K=8\)) usando `np.argpartition` para eficiencia.
+  - El resultado se guarda en `meta["substitutionNeighbors"]` como un mapa `{id_global: [ {neighbor, distance, components}, ... ] }` y se consume desde el JavaScript del reporte para:
+    - resaltar sustituciones en el scatter (overlay de lA-neas), y
+    - listar “Sustitutos sugeridos” en el panel derecho.
+
+Este perfil es el que llamaremos **`susti_probab(JSD_Jaccard)`**. Sirve como baseline y punto de referencia cuando introduzcamos nuevos perfiles.
+
+### 14.2. Nuevo perfil `susti_basic(vecino del espacio original)`
+
+AdemA!s del espacio probabilA-stico de rugosidad, el pipeline ya dispone de otra familia de distancias muy rica: **las distancias de cada escenario** calculadas en `tools/compare_proposals.py` para construir embeddings y evaluar calidad:
+
+- Para cada escenario `S = (preproc_id, metric)`:
+  - Se construye un vector ajustado `X_C` y, cuando procede, un `dist_simplex_C`.
+  - Se llama a `metric_distance(metric, X, dist_simplex)` para obtener una matriz de distancias \(D_S(C,D)\) (condensada).
+- Esa misma matriz \(D_S\) es la que MDS/UMAP tratan de preservar.
+
+La propuesta de perfil **`susti_basic(vecino del espacio original)`** es:
+
+- **Vector de base**: el vector que ya se usa en el escenario activo (`X_C` o `dist_simplex_C`, segA-on `preproc_id` y el diseA�o de `metric_distance`).
+- **MActtrica**: la misma `metric` del escenario (`cosine`, `js`, `hellinger`, `euclidean`, etc.), es decir, usar directamente \(D_S(C,D)\) en lugar de recalcular otra distancia independiente.
+- **SelecciA3n de vecinos**:
+  - Para cada acorde, tomar sus `K` vecinos mA!s cercanos segA-on \(D_S\), con la misma tA(c)cnica que hoy (cardinalidad opcional, `argpartition` + `argsort`).
+- **Opciones adicionales**:
+  - Se puede conservar la combinaciA3n con Jaccard PC (añadiendo un peso \(w_{\mathrm{Jac}}\)) si se desea mantener un control explA-cito del material comA-on de PCs.
+  - Se puede mantener inicialmente el filtro de “misma cardinalidad” para evitar cambios bruscos y explorar mA!s adelante cA3mo introducir sustituciones entre cardinalidades distintas.
+
+En este perfil, la intuiciA3n es: *“si ya hemos decidido que la mActtrica del escenario \(S\) es una buena descripciA3n geomA(c)trica del espacio de acordes, usemos esa misma mActtrica para definir quA(c) acordes son sustitutos cercanos.”*
+
+### 14.3. Extender el reporte para soportar varios perfiles
+
+El `report.html` actual sA3lo conoce una lista de vecinos (la de `susti_probab(JSD_Jaccard)`), y el JavaScript:
+
+- lee `gd.layout.meta.substitutionNeighbors` en `setupSubstitutionHighlight`, y
+- usa ese mismo mapa tanto para:
+  - resaltar sustituciones en el scatter (overlay de lA-neas y cambios de opacidad), como para
+  - listar “Sustitutos sugeridos” en el panel derecho (`registerCardDetail`).
+
+Para permitir alternar entre `susti_probab(JSD_Jaccard)` y `susti_basic(vecino del espacio original)` **sin regenerar el reporte**, la idea es:
+
+1. **Preparar ambas listas en `meta`**  
+   - En lugar de un solo `substitutionNeighbors`, serializar una estructura con perfiles, por ejemplo:
+     ```json
+     "substitutionNeighbors": {
+       "susti_probab": { "42": [ ... ], ... },
+       "susti_basic":  { "42": [ ... ], ... }
+     }
+     ```
+     o bien campos separados (`substitutionNeighborsProb`, `substitutionNeighborsBasic`) siempre que el JS sepa distinguirlos.
+
+2. **Añadir un selector de perfil en la interfaz del reporte**  
+   - Un control (radio buttons o dropdown) en el panel de controles que permita elegir:
+     - `susti_probab(JSD_Jaccard)`, o
+     - `susti_basic(vecino del espacio original)`.
+   - Este selector no recalcula nada: solo cambia una variable de estado en JS, por ejemplo `gd.__substitutionProfile = 'susti_probab' | 'susti_basic'`.
+
+3. **Adaptar `setupSubstitutionHighlight`**  
+   - Hoy `setupSubstitutionHighlight(gd)` lee un solo mapa `neighborsMap = gd.layout.meta.substitutionNeighbors;`.
+   - En la variante multi‑perfil:
+     - LeerA(a) la estructura completa de perfiles.
+     - En `applyForId(globalId)`, segA-on el perfil activo (`gd.__substitutionProfile`), elegirA(a) la lista de vecinos:
+       ```js
+       const profile = gd.__substitutionProfile || 'susti_probab';
+       const profileMap = neighborsMap[profile] || {};
+       const entries = profileMap[String(globalId)] || [];
+       ```
+   - El resto de la lA3gica de resaltado (llamada a `applyGlobalIdHighlight`, dibujo de lA-neas con `drawLines`, etc.) seguirA(a) siendo el mismo; solo cambia la fuente de vecinos que se consideran.
+
+4. **Adaptar `registerCardDetail`**  
+   - De forma anA!loga, `registerCardDetail` hoy construye la lista “Sustitutos sugeridos” leyendo `substitutionMap[String(currentGlobalId)]`.
+   - Con perfiles:
+     - VolverA-a a leer la estructura por perfil y usarA(a) el mismo perfil activo (`gd.__substitutionProfile`) para decidir quA(c) vecinos mostrar en la lista.
+
+5. **IntegraciA3n con el checkbox de “Resaltar sustituciones”**  
+   - El checkbox existente (`.substitution-toggle`) seguirA(a) controlando si se aplica o no el resaltado:
+     - Cuando estA! activado, `setupSubstitutionHighlight` usarA(a) el mapa de vecinos del **perfil activo**.
+     - Cuando estA! desactivado, no se dibujarA!n lA-neas ni se cambiarA!n opacidades, independientemente del perfil seleccionado.
+   - Es importante que:
+     - Cambiar el perfil (por ejemplo de `susti_probab` a `susti_basic`) **actualice inmediatamente** los vecinos resaltados y la lista del panel, si el checkbox estA! activo.
+     - El comportamiento de “sustituciones” siga siendo coherente: siempre se refiera al mismo perfil en el scatter y en la lista de detalle.
+
+Desde el punto de vista del diseA�o, esto garantiza que:
+
+- El usuario pueda elegir *en tiempo real* si quiere interpretar “sustituto” en clave probabilA-stica (perfil actual) o en clave geomA(c)trica del escenario (perfil basic).
+- El checkbox “Resaltar sustituciones” y la lista “Sustitutos sugeridos” sigan representando **exactamente el mismo concepto** para el perfil activo, sin inconsistencias entre lo que se ve en el scatter y lo que se lee en el panel.
+
+### 14.4. Resumen de pasos (sin implementar aA-n)
+
+1. Definir claramente los dos perfiles a nivel de datos:
+   - `susti_probab(JSD_Jaccard)` = JSD + Jaccard en el espacio probabilA-stico de rugosidad (perfil actual).
+   - `susti_basic(vecino del espacio original)` = vecinos segA-on la mActtrica y el vector del escenario activo.
+2. Acordar la forma de serializar ambas listas de vecinos en `meta` (una estructura por perfiles).
+3. DiseAñar el selector de perfil en el HTML del reporte y el estado `gd.__substitutionProfile` que utilizarA(a) el JS.
+4. Ajustar `setupSubstitutionHighlight` y `registerCardDetail` para leer vecinos segA-on el perfil activo, manteniendo la integraciA3n con el checkbox de “Resaltar sustituciones”.
+5. Validar musicalmente ambos perfiles antes de introducir perfiles adicionales o mover la lA3gica a los mA3dulos `substitution/`.
