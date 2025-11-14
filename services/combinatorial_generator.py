@@ -39,6 +39,10 @@ def _actual_mask(notes_abs: List[int]) -> str:
     return format(mask, "x")
 
 
+def _format_structure_id(values: List[int]) -> str:
+    return "|".join(str(int(v)) for v in values)
+
+
 def _process_chord_record(notes_abs: List[int], tag: str) -> Dict[str, Any]:
     """Procesa una lista de notas MIDI y devuelve un diccionario con los datos del acorde."""
     root_midi = notes_abs[0]
@@ -70,6 +74,8 @@ def _process_chord_record(notes_abs: List[int], tag: str) -> Dict[str, Any]:
     record['__root_midi'] = root_midi
     record['abs_mask_midi'] = _actual_mask(notes_abs)
     record['id'] = _stable_id(notes_abs)
+    record['__struct_semitones'] = [int(v) for v in normalized]
+    record['__structure_id'] = _format_structure_id(record['__struct_semitones'])
     return record
 
 
@@ -80,8 +86,28 @@ EXPECTED_COLUMNS = [
     'span_semitones', 'abs_mask_int', 'abs_mask_hex', 'notes_abs_json',
     'source_id', 'rotation', 'family_id', 'family_size',
     '__source__', '__transposition__', '__root_midi', 'abs_mask_midi',
-    '__norm_interval', '__norm_notes', '__norm_code', '__norm_bass'
+    '__norm_interval', '__norm_notes', '__norm_code', '__norm_bass',
+    '__struct_semitones', '__structure_id'
 ]
+
+
+def _build_canonical_record(offsets: List[int], base_root_midi: int) -> Dict[str, Any]:
+    if not offsets:
+        offsets = [0]
+    offsets = [int(v) for v in offsets]
+    offsets.sort()
+    max_offset = offsets[-1]
+    root = base_root_midi
+    while root + max_offset > 127 and root >= 12:
+        root -= 12
+    if root < 0 or root + max_offset > 127:
+        root = max(0, 127 - max_offset)
+    notes_abs = [root + off for off in offsets]
+    record = _process_chord_record(notes_abs, "combinatorial_structural")
+    record['__source__'] = "GENERATED:COMBINATORIAL_STRUCTURAL"
+    record['__struct_semitones'] = offsets
+    record['__structure_id'] = _format_structure_id(offsets)
+    return record
 
 
 def generate_combinatorial_chords(
@@ -99,7 +125,8 @@ def generate_combinatorial_chords(
         octave_min: Octava MIDI inicial (e.g., 3 para C3).
         octave_max: Octava MIDI final.
         cardinalities: Lista de tamaños de acorde a generar (e.g., [3, 4]).
-        structural_mode: Si es True, la primera nota de cada acorde será DO.
+        structural_mode: Si es True, se devuelve un catálogo estructural
+            (una fila por forma normalizada) con notas canónicas ancladas en DO.
 
     Returns:
         Un DataFrame de pandas con los acordes generados.
@@ -123,34 +150,38 @@ def generate_combinatorial_chords(
             midi_universe.append(boundary_note)
             midi_universe.sort()
     all_chords_records: List[Dict[str, Any]] = []
+    structural_patterns: Dict[Tuple[int, Tuple[int, ...]], List[int]] = {}
 
     for k in cardinalities:
         if k <= 0 or k > len(midi_universe):
             continue
 
-        if structural_mode:
-            c_zero = 12 * (octave_min + 1)
-            if c_zero not in midi_universe:
-                continue
-
-            other_notes = [note for note in midi_universe if note != c_zero]
-            if k - 1 > len(other_notes):
-                continue
-
-            for chord_midi_tuple in itertools.combinations(other_notes, k - 1):
-                notes_abs = sorted([c_zero] + list(chord_midi_tuple))
-                record = _process_chord_record(notes_abs, "combinatorial_structural")
-                all_chords_records.append(record)
-        else:
-            for chord_midi_tuple in itertools.combinations(midi_universe, k):
-                notes_abs = list(chord_midi_tuple)
+        for chord_midi_tuple in itertools.combinations(midi_universe, k):
+            notes_abs = list(chord_midi_tuple)
+            offsets = [notes_abs[i] - notes_abs[0] for i in range(len(notes_abs))]
+            key = (k, tuple(offsets))
+            if structural_mode:
+                if key not in structural_patterns:
+                    structural_patterns[key] = offsets
+            else:
                 record = _process_chord_record(notes_abs, "combinatorial")
+                record['__struct_semitones'] = offsets
+                record['__structure_id'] = _format_structure_id(offsets)
                 all_chords_records.append(record)
 
-    if not all_chords_records:
-        return pd.DataFrame(columns=EXPECTED_COLUMNS)
+    if structural_mode:
+        if not structural_patterns:
+            return pd.DataFrame(columns=EXPECTED_COLUMNS)
+        base_root_midi = 12 * (octave_min + 1)
+        canonical_records = []
+        for offsets in structural_patterns.values():
+            canonical_records.append(_build_canonical_record(offsets, base_root_midi))
+        df = pd.DataFrame.from_records(canonical_records)
+    else:
+        if not all_chords_records:
+            return pd.DataFrame(columns=EXPECTED_COLUMNS)
+        df = pd.DataFrame.from_records(all_chords_records)
 
-    df = pd.DataFrame.from_records(all_chords_records)
     for col in EXPECTED_COLUMNS:
         if col not in df.columns:
             df[col] = np.nan
