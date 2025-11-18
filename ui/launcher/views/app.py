@@ -7,18 +7,20 @@ and execute the experiment runner without dealing with command line syntax.
 
 from __future__ import annotations
 
+import copy
 import datetime as dt
+import json
 import os
 import queue
 import tempfile
 import threading
 import tkinter as tk
-from dataclasses import dataclass
+from dataclasses import asdict, dataclass
 from pathlib import Path
 from tkinter import filedialog, messagebox
 from tkinter import ttk
 from tkinter.scrolledtext import ScrolledText
-from typing import Dict, List, Optional, Tuple
+from typing import Any, Dict, List, Optional, Tuple
 
 from tools import data_access
 from tools.query_registry import get_all_queries, resolve_query_sql
@@ -165,6 +167,9 @@ class ExperimentLauncher(tk.Tk):
         self._running_thread: threading.Thread | None = None
         self.population_queue: queue.Queue = queue.Queue()
         self._population_worker: threading.Thread | None = None
+        self._active_population_request: PopulationJobRequest | None = None
+        self.temporal_population_metadata: dict[str, Any] | None = None
+        self.final_population_metadata: list[dict[str, Any]] = []
         self.pops_entries: list[str] = []
         self.progress_var = tk.DoubleVar(value=0.0)
         self.progress_text_var = tk.StringVar(value="0.0%")
@@ -1105,6 +1110,13 @@ class ExperimentLauncher(tk.Tk):
         self.compare_seeds_var = tk.StringVar(value="42")
         ttk.Entry(seed_row, textvariable=self.compare_seeds_var, width=18).pack(side=tk.LEFT, padx=(6,0))
 
+        self.compare_include_identity_var = tk.BooleanVar(value=True)
+        ttk.Checkbutton(
+            params,
+            text="Incluir baseline identity (control)",
+            variable=self.compare_include_identity_var,
+        ).grid(row=3, column=0, columnspan=2, sticky="w", pady=(4, 0))
+
         params.columnconfigure(0, weight=1)
         params.columnconfigure(1, weight=1)
 
@@ -1304,6 +1316,8 @@ class ExperimentLauncher(tk.Tk):
         self._set_population_busy(True, f"Generando ({request.mode})...")
         self.pop_stats_var.set("Generando población temporal...")
         self._append_pop_log(f"[población] Iniciando generación ({request.mode}).\n")
+        self._active_population_request = request
+        self.temporal_population_metadata = None
         self._population_worker = threading.Thread(
             target=self._run_population_job,
             args=(request,),
@@ -1387,6 +1401,10 @@ class ExperimentLauncher(tk.Tk):
                 else:
                     self.temporal_population_df = df
                     self.population_dirty = False
+                    self.temporal_population_metadata = self._build_population_metadata_snapshot(
+                        self._active_population_request,
+                        row_count=len(self.temporal_population_df),
+                    )
                     self._fill_population_tree(self.temporal_population_df)
                     stats_text = self._compute_population_stats(self.temporal_population_df)
                     self.pop_stats_var.set(f"Temporal: {stats_text}")
@@ -1397,6 +1415,7 @@ class ExperimentLauncher(tk.Tk):
                 self._set_population_busy(False, "Listo.")
                 self._set_generation_button_state(tk.NORMAL)
                 self._population_worker = None
+                self._active_population_request = None
         except queue.Empty:
             pass
         finally:
@@ -1409,6 +1428,7 @@ class ExperimentLauncher(tk.Tk):
 
         if self.final_population_df is None or self.final_population_df.empty:
             self.final_population_df = self.temporal_population_df.copy()
+            self.final_population_metadata = []
         else:
             self.final_population_df = pd.concat([self.final_population_df, self.temporal_population_df], ignore_index=True)
 
@@ -1424,6 +1444,12 @@ class ExperimentLauncher(tk.Tk):
         self.final_stats_text = final_stats
         self.pop_stats_var.set(f"Final: {final_stats}")
         self._append_pop_log(f"[población] Añadido a población final. {final_stats}\n")
+
+        if self.temporal_population_metadata:
+            snapshot = copy.deepcopy(self.temporal_population_metadata)
+            snapshot["added_at"] = _dt.datetime.now().isoformat(timespec="seconds")
+            self.final_population_metadata.append(snapshot)
+        self.temporal_population_metadata = None
 
     def _clear_final_population(self) -> None:
         if self.final_population_df is None or self.final_population_df.empty:
@@ -1443,6 +1469,7 @@ class ExperimentLauncher(tk.Tk):
 
         self.final_population_df = None
         self.final_stats_text = None
+        self.final_population_metadata = []
         self.population_selected_rows.clear()
         self.population_row_ids.clear()
         tree = getattr(self, "pop_tree", None)
@@ -2147,12 +2174,35 @@ class ExperimentLauncher(tk.Tk):
                 self._append_compare_log("[info] SQL inline omitido (se usara payload JSON para los IDs seleccionados).\n")
         if ids:
             self._append_compare_log(f"[debug] IDs seleccionados: {len(ids)}\n")
+        run_metadata: dict[str, Any] | None = None
+        try:
+            run_metadata = self._build_run_metadata(
+                df_selected=df_selected,
+                ids=ids,
+                population_json=population_json,
+                payload_reason=payload_reason,
+            )
+        except Exception:
+            run_metadata = None
         out_dir = Path(self.output_var.get().strip()).resolve()
         out_dir.mkdir(parents=True, exist_ok=True)
         sub = out_dir / f"compare_{_dt.datetime.now().strftime('%Y%m%d_%H%M%S')}"
+        sub.mkdir(parents=True, exist_ok=True)
         # Ruta esperada del reporte
         self.compare_last_report = None
         self.compare_expected_report = sub / "report.html"
+        metadata_path: Path | None = None
+        if run_metadata:
+            try:
+                metadata_path = sub / "run_metadata.json"
+                metadata_path.write_text(
+                    json.dumps(run_metadata, indent=2, ensure_ascii=False),
+                    encoding="utf-8",
+                )
+                self._append_compare_log(f"[info] Metadata guardada en: {metadata_path}\n")
+            except Exception as exc:
+                metadata_path = None
+                self._append_compare_log(f"[warn] No se pudo guardar metadata: {exc}\n")
         # Build process args
         self._append_log(f"\n--- Ejecutando comparación ---\n[población] {len(df_selected)} acordes seleccionados\n")
         self._append_compare_log(
@@ -2195,9 +2245,14 @@ class ExperimentLauncher(tk.Tk):
         jobs_value = self.n_jobs_var.get().strip()
         if jobs_value:
             args.extend(["--n-jobs", jobs_value])
+        if not self.compare_include_identity_var.get():
+            args.append("--disable-baseline-identity")
+            self._append_compare_log("[info] Baseline identity desactivado.\n")
         if population_json:
             args.extend(["--population-json", population_json])
             self._append_compare_log(f"Usando población precalculada: {population_json}\n")
+        if metadata_path:
+            args.extend(["--run-metadata", str(metadata_path)])
         mode_log = self.exec_mode_var.get()
         jobs_log = jobs_value if jobs_value else ("1" if exec_value == "deterministic" else "auto")
         self._append_compare_log(f"Modo: {mode_log} \u00B7 n_jobs={jobs_log}\n")
@@ -2477,6 +2532,7 @@ class ExperimentLauncher(tk.Tk):
         """Invalida la previsualización para reconstruirla con la configuración actual."""
 
         self.temporal_population_df = None
+        self.temporal_population_metadata = None
         self.population_selected_rows.clear()
         self.population_row_ids.clear()
         self.population_dirty = True
@@ -2505,6 +2561,77 @@ class ExperimentLauncher(tk.Tk):
                 path.unlink(missing_ok=True)
             except Exception:
                 continue
+
+    def _build_population_metadata_snapshot(
+        self,
+        request: PopulationJobRequest | None,
+        *,
+        row_count: int | None = None,
+    ) -> Optional[dict[str, Any]]:
+        if request is None:
+            return None
+        meta: dict[str, Any] = {
+            "mode": request.mode,
+            "rows": row_count,
+            "generated_at": _dt.datetime.now().isoformat(timespec="seconds"),
+        }
+        if request.mode == "db":
+            meta["database"] = {
+                "base_query": request.base_query,
+                "pops_entries": list(request.pops_entries or ()),
+                "filter_mode": request.filter_mode,
+                "transpose_enabled": bool(request.transpose_enabled),
+                "transpose_steps": request.transpose_steps_text,
+                "preview_limit": request.preview_limit,
+            }
+        elif request.mode == "combinatorial":
+            meta["combinatorial"] = {
+                "alphabet": list(request.alphabet),
+                "octave_min": request.octave_min,
+                "octave_max": request.octave_max,
+                "cardinalities": list(request.cardinalities),
+                "structural_mode": bool(request.structural_mode),
+            }
+        if request.custom_filters:
+            filters_meta: dict[str, Any] = {
+                "label": request.custom_filters.label,
+                "expand_scale": bool(request.custom_filters.expand_scale),
+                "scale_pitch_classes": list(request.custom_filters.scale_pitch_classes or []),
+            }
+            try:
+                filters_meta["definition"] = asdict(request.custom_filters.filters)
+            except Exception:
+                filters_meta["definition"] = None
+            meta["filters"] = filters_meta
+        return meta
+
+    def _build_run_metadata(
+        self,
+        *,
+        df_selected: pd.DataFrame,
+        ids: list[int],
+        population_json: str | None,
+        payload_reason: str | None,
+    ) -> dict[str, Any]:
+        descriptors = copy.deepcopy(self.final_population_metadata)
+        selection_mode = "payload" if population_json else "ids"
+        selection: dict[str, Any] = {
+            "rows_selected": int(len(df_selected)) if df_selected is not None else 0,
+            "rows_available": int(len(self.final_population_df)) if self.final_population_df is not None else 0,
+            "mode": selection_mode,
+            "ids_count": len(ids),
+            "payload_path": population_json,
+            "payload_reason": payload_reason,
+        }
+        metadata: dict[str, Any] = {
+            "generated_at": _dt.datetime.now().isoformat(timespec="seconds"),
+            "selection": selection,
+            "population": {
+                "final_stats": self.final_stats_text,
+                "descriptors": descriptors,
+            },
+        }
+        return metadata
 
     def _selected_proposals(self) -> list[str]:
         return [name for name in self.proposals_order if self.proposal_vars[name].get()]

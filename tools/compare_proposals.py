@@ -9,6 +9,7 @@ reduces to 2D and generates a single HTML report with visualisations and metrics
 from __future__ import annotations
 
 import argparse
+import html
 import json
 import time
 from concurrent.futures import ProcessPoolExecutor, ThreadPoolExecutor, as_completed
@@ -379,6 +380,16 @@ def parse_args() -> argparse.Namespace:
             "Modo de color para el scatter: total bruto, por par, log(total) o log(total/par). "
             "Por defecto: log_per_pair (recomendado para poblaciones mixtas)."
         ),
+    )
+    parser.add_argument(
+        "--disable-baseline-identity",
+        action="store_true",
+        help="Omite el escenario baseline identity (control) para acelerar la corrida.",
+    )
+    parser.add_argument(
+        "--run-metadata",
+        default=None,
+        help="Ruta a un JSON con metadatos de generación de población (proporcionado por la GUI).",
     )
     return parser.parse_args()
 
@@ -1407,6 +1418,7 @@ def build_report_html_v2(
     figures: List[Tuple[str, go.Figure]],
     output_path: Path,
     seeds: Sequence[int],
+    run_metadata: Optional[Dict[str, Any]] = None,
 ) -> None:
     ranked_df = metrics_df.copy()
     ranked_df["rank"] = compute_rank(ranked_df)
@@ -3010,6 +3022,84 @@ def build_report_html_v2(
   </script>
 """
 
+    metadata_html = ""
+    if run_metadata:
+        try:
+            selection = run_metadata.get("selection", {}) if isinstance(run_metadata, dict) else {}
+            population = run_metadata.get("population", {}) if isinstance(run_metadata, dict) else {}
+            rows_selected = selection.get("rows_selected")
+            rows_available = selection.get("rows_available")
+            mode_label = selection.get("mode") or "-"
+            payload_used = bool(selection.get("payload_path"))
+            payload_reason = selection.get("payload_reason")
+
+            selection_rows: list[tuple[str, str]] = []
+            if rows_selected is not None and rows_available is not None:
+                selection_rows.append(("Selección", f"{int(rows_selected)} de {int(rows_available)} acordes"))
+            selection_rows.append(("Modo de ejecución", html.escape(str(mode_label))))
+            selection_rows.append(("Payload JSON", "sí" if payload_used else "no"))
+            if payload_reason:
+                selection_rows.append(("Motivo payload", html.escape(str(payload_reason))))
+
+            descriptors = population.get("descriptors") or []
+            source_rows: list[tuple[str, str]] = []
+            for idx, desc in enumerate(descriptors, start=1):
+                if not isinstance(desc, dict):
+                    continue
+                mode = desc.get("mode", "desconocido")
+                rows = desc.get("rows")
+                if mode == "combinatorial":
+                    combo = desc.get("combinatorial") or {}
+                    alphabet = combo.get("alphabet") or []
+                    cards = combo.get("cardinalities") or []
+                    oct_min = combo.get("octave_min")
+                    oct_max = combo.get("octave_max")
+                    structural = combo.get("structural_mode")
+                    parts = [
+                        "Combinatoria",
+                        f"{rows} acordes" if rows is not None else "",
+                        "alfabeto=" + ", ".join(str(v) for v in alphabet) if alphabet else "",
+                        f"octavas={oct_min}-{oct_max}" if oct_min is not None and oct_max is not None else "",
+                        "n=" + ", ".join(str(v) for v in cards) if cards else "",
+                        "modo estructural=Sí" if structural else "modo estructural=No",
+                    ]
+                else:
+                    db = desc.get("database") or {}
+                    base_q = db.get("base_query") or "<ninguna>"
+                    pops = db.get("pops_entries") or []
+                    filt_mode = db.get("filter_mode")
+                    parts = [
+                        "Base de datos",
+                        f"{rows} acordes" if rows is not None else "",
+                        f"base={base_q}",
+                        "poblaciones=" + ", ".join(str(v) for v in pops) if pops else "",
+                        f"modo filtros={filt_mode}" if filt_mode else "",
+                    ]
+                filt = desc.get("filters") or {}
+                label = filt.get("label")
+                if label:
+                    parts.append(f"filtros={label}")
+                clean = [html.escape(str(p)) for p in parts if p]
+                if clean:
+                    source_rows.append((f"Fuente {idx}", " · ".join(clean)))
+
+            def _render_meta_table(rows: list[tuple[str, str]]) -> str:
+                if not rows:
+                    return ""
+                body = "".join(f"<tr><th>{label}</th><td>{value}</td></tr>" for label, value in rows)
+                return "<table class='meta-table'><tbody>" + body + "</tbody></table>"
+
+            metadata_html = (
+                "<section class='meta-section'>"
+                "<h3>Configuración de la población</h3>"
+                f"{_render_meta_table(selection_rows)}"
+                f"{_render_meta_table(source_rows)}"
+                "</section>"
+            )
+        except Exception:
+            metadata_html = ""
+
+
     html_content = f"""
 <!DOCTYPE html>
 <html lang='es'>
@@ -3071,12 +3161,22 @@ def build_report_html_v2(
     .highlight-note.muted {{ color: #6a6f7a; font-style: italic; }}
     .detail-panel {{ margin: 8px 0 10px 0; padding: 10px 12px; background: #fffbe6; border: 1px solid #f0d98c; border-radius: 8px; font-size: 0.88rem; min-height: 56px; line-height: 1.35; }}
     .inversion-controls {{ margin: 8px 0; display: flex; gap: 16px; font-size: 0.9rem; }}
+    .meta-section {{ border: 1px solid #dfe4f5; border-radius: 10px; padding: 14px; background: #fafbff; margin: 12px 0 24px 0; }}
+    .meta-section h3 {{ margin-top: 0; }}
+    .meta-table {{ border-collapse: collapse; width: 100%; margin: 6px 0; }}
+    .meta-table th {{ width: 32%; text-align: left; padding: 4px 8px; background: #f4f6ff; border: 1px solid #e1e6fb; font-weight: 600; }}
+    .meta-table td {{ padding: 4px 8px; border: 1px solid #e1e6fb; background: #fff; }}
+    .meta-card {{ border: 1px solid #e4e8fb; border-radius: 8px; padding: 10px 12px; background: #fff; margin-bottom: 10px; }}
+    .meta-card h4 {{ margin: 0 0 6px 0; font-size: 1rem; }}
+    .meta-card ul {{ margin: 0; padding-left: 18px; }}
+    .meta-card pre {{ background: #161b3340; padding: 6px; border-radius: 6px; overflow: auto; white-space: pre-wrap; }}
   </style>
 </head>
 <body>
   <h1>Comparación de Propuestas de Normalización de Rugosidad</h1>
   <h3>Resumen global</h3>
   {table_html}
+  {metadata_html}
   {tabs_html}
   {script_js}
 </body>
@@ -3323,6 +3423,14 @@ def build_sections(ranked_df: pd.DataFrame) -> List[Dict[str, object]]:
 
 def main() -> None:
     args = parse_args()
+    include_identity = not getattr(args, "disable_baseline_identity", False)
+    run_metadata: Optional[Dict[str, Any]] = None
+    if getattr(args, "run_metadata", None):
+        try:
+            run_metadata = json.loads(Path(args.run_metadata).read_text(encoding="utf-8"))
+            print(f"[input] Metadata adicional: {args.run_metadata}")
+        except Exception as exc:  # pylint: disable=broad-except
+            print(f"[warn] No se pudo leer run-metadata ({args.run_metadata}): {exc}")
     df_override: Optional[pd.DataFrame] = None
     if getattr(args, "population_json", None):
         df_override = pd.read_json(args.population_json, orient="records", lines=True)
@@ -3354,7 +3462,11 @@ def main() -> None:
     proposals_requested = [p.strip().lower() for p in args.proposals.split(",") if p.strip()]
     metrics_requested = [m.strip().lower() for m in args.metrics.split(",") if m.strip()]
 
-    scenarios = build_scenarios(proposals_requested, metrics_requested)
+    scenarios = build_scenarios(
+        proposals_requested,
+        metrics_requested,
+        include_identity=include_identity,
+    )
     # Reducciones solicitadas (compatibilidad: --reduction gana si se pasa)
     if args.reduction:
         reductions = [args.reduction]
@@ -3504,7 +3616,7 @@ def main() -> None:
 
     report_path = output_dir / "report.html"
     # New report layout (tabs + centralized methods)
-    build_report_html_v2(metrics_df, figures, report_path, seed_list)
+    build_report_html_v2(metrics_df, figures, report_path, seed_list, run_metadata=run_metadata)
     timer.mark("report")
 
     if per_seed_records:
@@ -3529,7 +3641,12 @@ def main() -> None:
                 print(f"  · {friendly}: {seconds:7.2f}")
 
 
-def build_scenarios(proposals: Iterable[str], metrics: Iterable[str]) -> List[Dict[str, object]]:
+def build_scenarios(
+    proposals: Iterable[str],
+    metrics: Iterable[str],
+    *,
+    include_identity: bool = True,
+) -> List[Dict[str, object]]:
     scenarios: List[Dict[str, object]] = []
     metrics = list(metrics)
     for proposal in proposals:
@@ -3600,18 +3717,19 @@ def build_scenarios(proposals: Iterable[str], metrics: Iterable[str]) -> List[Di
                     "metric": metric,
                 }
             )
-    for metric in metrics:
-        if not any(s["preproc_id"] == "identity" and s["metric"] == metric for s in scenarios):
-            scenarios.append(
-                {
-                    "name": f"identity | {metric}",
-                    "description": "Histograma original (control)",
-                    "preproc_id": "identity",
-                    "preproc_func": PREPROCESSORS["identity"][1],
-                    "preproc_kwargs": PREPROCESSORS["identity"][2],
-                    "metric": metric,
-                }
-            )
+    if include_identity:
+        for metric in metrics:
+            if not any(s["preproc_id"] == "identity" and s["metric"] == metric for s in scenarios):
+                scenarios.append(
+                    {
+                        "name": f"identity | {metric}",
+                        "description": "Histograma original (control)",
+                        "preproc_id": "identity",
+                        "preproc_func": PREPROCESSORS["identity"][1],
+                        "preproc_kwargs": PREPROCESSORS["identity"][2],
+                        "metric": metric,
+                    }
+                )
 
     return scenarios
 
