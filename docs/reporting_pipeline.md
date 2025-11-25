@@ -101,3 +101,16 @@ Con la plantilla aislada, el siguiente objetivo es:
 
 Este documento debe mantenerse actualizado conforme avancemos en la refactorización.
 
+### 6. Contratos y pruebas de regresion (baseline)
+
+- **Pruebas automaticas**: `python -m pytest tests/test_reporting_contracts.py`.
+  - Verifica `metric_distance` (JS/Hellinger/Cosine), `_apply_color_mode`, el generador combinatorial y `render_report_html` escribiendo un HTML valido.
+  - Asegura que `build_scatter_payload` siempre incluya `filterDataset`, `substitutionNeighbors` y el perfil por defecto en `substitutionProfiles`.
+- **Contratos de nombres** que consumen `tools/report_assets/script.js`:
+  - Claves de figura: `"<escenario>||<modo>"` (ej.: `MDS:identity | cosine||raw_total`).
+  - Tabs: IDs `tab-red-<idx>` para reducciones y `tab-<rid>-<metric>` para metricas.
+  - Perfiles de sustitucion: `meta.substitutionProfiles.default` debe existir y las metricas viven en `meta.substitutionNeighbors`.
+  - Dataset de filtros: `meta.filterDataset.traceSources[*]` con `x`, `y`, `text`, `customdata`, `colors` y `filterValues`.
+- **Recomendacion**: al mover o renombrar funciones/estructuras del reporte, primero actualizar estos contratos y extender el test anterior con el nuevo comportamiento esperado.
+- **Validacion programatica**: el contrato de meta de figuras se valida con `tools.reporting.contracts.validate_scatter_payload_meta` y se ejerce en `build_scatter_payload`; cualquier cambio de claves falla en tests (`tests/test_reporting_contracts.py`). El `run_metadata` se valida con `validate_run_metadata` antes de renderizar.
+- **Chequeo de nombres indefinidos**: antes de lanzar GUI/CLI ejecutar un lint rapido (ej. `python -m ruff check tools/compare_proposals.py tools/proposals_pipeline --select F821,F401` o `pyflakes`/`pylint`) para atrapar imports faltantes como `os.cpu_count`. Integrar este comando en CI evita regresiones de NameError.

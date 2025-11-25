@@ -10,6 +10,7 @@ import pandas as pd
 import plotly.graph_objects as go
 from plotly.io import to_html
 
+from tools.reporting.contracts import validate_run_metadata
 from tools.reporting.utils import (
     compute_rank,
     format_seed_list,
@@ -376,82 +377,80 @@ def render_report_html(
 
     metadata_html = ""
     if run_metadata:
-        try:
-            selection = run_metadata.get("selection", {}) if isinstance(run_metadata, dict) else {}
-            population = run_metadata.get("population", {}) if isinstance(run_metadata, dict) else {}
-            rows_selected = selection.get("rows_selected")
-            rows_available = selection.get("rows_available")
-            mode_label = selection.get("mode") or "-"
-            payload_used = bool(selection.get("payload_path"))
-            payload_reason = selection.get("payload_reason")
+        validate_run_metadata(run_metadata)
+        selection = run_metadata.get("selection", {}) if isinstance(run_metadata, dict) else {}
+        population = run_metadata.get("population", {}) if isinstance(run_metadata, dict) else {}
+        rows_selected = selection.get("rows_selected")
+        rows_available = selection.get("rows_available")
+        mode_label = selection.get("mode") or "-"
+        payload_used = bool(selection.get("payload_path"))
+        payload_reason = selection.get("payload_reason")
 
-            selection_rows: list[tuple[str, str]] = []
-            if rows_selected is not None and rows_available is not None:
-                selection_rows.append(
-                    ("Seleccion", f"{int(rows_selected)} de {int(rows_available)} acordes")
-                )
-            selection_rows.append(("Modo de ejecucion", html.escape(str(mode_label))))
-            selection_rows.append(("Payload JSON", "si" if payload_used else "no"))
-            if payload_reason:
-                selection_rows.append(("Motivo payload", html.escape(str(payload_reason))))
-
-            descriptors = population.get("descriptors") or []
-            source_rows: list[tuple[str, str]] = []
-            for idx, desc in enumerate(descriptors, start=1):
-                if not isinstance(desc, dict):
-                    continue
-                mode = desc.get("mode", "desconocido")
-                rows = desc.get("rows")
-                if mode == "combinatorial":
-                    combo = desc.get("combinatorial") or {}
-                    alphabet = combo.get("alphabet") or []
-                    cards = combo.get("cardinalities") or []
-                    oct_min = combo.get("octave_min")
-                    oct_max = combo.get("octave_max")
-                    structural = combo.get("structural_mode")
-                    parts = [
-                        "Combinatoria",
-                        f"{rows} acordes" if rows is not None else "",
-                        "alfabeto=" + ", ".join(str(v) for v in alphabet) if alphabet else "",
-                        f"octavas={oct_min}-{oct_max}" if oct_min is not None and oct_max is not None else "",
-                        "n=" + ", ".join(str(v) for v in cards) if cards else "",
-                        "modo estructural=si" if structural else "modo estructural=no",
-                    ]
-                else:
-                    db = desc.get("database") or {}
-                    base_q = db.get("base_query") or "<ninguna>"
-                    pops = db.get("pops_entries") or []
-                    filt_mode = db.get("filter_mode")
-                    parts = [
-                        "Base de datos",
-                        f"{rows} acordes" if rows is not None else "",
-                        f"base={base_q}",
-                        "poblaciones=" + ", ".join(str(v) for v in pops) if pops else "",
-                        f"modo filtros={filt_mode}" if filt_mode else "",
-                    ]
-                filt = desc.get("filters") or {}
-                label = filt.get("label")
-                if label:
-                    parts.append(f"filtros={label}")
-                clean = [html.escape(str(p)) for p in parts if p]
-                if clean:
-                    source_rows.append((f"Fuente {idx}", " | ".join(clean)))
-
-            def _render_meta_table(rows: list[tuple[str, str]]) -> str:
-                if not rows:
-                    return ""
-                body = "".join(f"<tr><th>{label}</th><td>{value}</td></tr>" for label, value in rows)
-                return "<table class='meta-table'><tbody>" + body + "</tbody></table>"
-
-            metadata_html = (
-                "<section class='meta-section'>"
-                "<h3>Configuracion de la poblacion</h3>"
-                f"{_render_meta_table(selection_rows)}"
-                f"{_render_meta_table(source_rows)}"
-                "</section>"
+        selection_rows: list[tuple[str, str]] = []
+        if rows_selected is not None and rows_available is not None:
+            selection_rows.append(
+                ("Seleccion", f"{int(rows_selected)} de {int(rows_available)} acordes")
             )
-        except Exception:
-            metadata_html = ""
+        selection_rows.append(("Modo de ejecucion", html.escape(str(mode_label))))
+        selection_rows.append(("Payload JSON", "si" if payload_used else "no"))
+        if payload_reason:
+            selection_rows.append(("Motivo payload", html.escape(str(payload_reason))))
+
+        descriptors = population.get("descriptors") or []
+        source_rows: list[tuple[str, str]] = []
+        for idx, desc in enumerate(descriptors, start=1):
+            if not isinstance(desc, dict):
+                continue
+            mode = desc.get("mode", "desconocido")
+            rows = desc.get("rows")
+            if mode == "combinatorial":
+                combo = desc.get("combinatorial") or {}
+                alphabet = combo.get("alphabet") or []
+                cards = combo.get("cardinalities") or []
+                oct_min = combo.get("octave_min")
+                oct_max = combo.get("octave_max")
+                structural = combo.get("structural_mode")
+                parts = [
+                    "Combinatoria",
+                    f"{rows} acordes" if rows is not None else "",
+                    "alfabeto=" + ", ".join(str(v) for v in alphabet) if alphabet else "",
+                    f"octavas={oct_min}-{oct_max}" if oct_min is not None and oct_max is not None else "",
+                    "n=" + ", ".join(str(v) for v in cards) if cards else "",
+                    "modo estructural=si" if structural else "modo estructural=no",
+                ]
+            else:
+                db = desc.get("database") or {}
+                base_q = db.get("base_query") or "<ninguna>"
+                pops = db.get("pops_entries") or []
+                filt_mode = db.get("filter_mode")
+                parts = [
+                    "Base de datos",
+                    f"{rows} acordes" if rows is not None else "",
+                    f"base={base_q}",
+                    "poblaciones=" + ", ".join(str(v) for v in pops) if pops else "",
+                    f"modo filtros={filt_mode}" if filt_mode else "",
+                ]
+            filt = desc.get("filters") or {}
+            label = filt.get("label")
+            if label:
+                parts.append(f"filtros={label}")
+            clean = [html.escape(str(p)) for p in parts if p]
+            if clean:
+                source_rows.append((f"Fuente {idx}", " | ".join(clean)))
+
+        def _render_meta_table(rows: list[tuple[str, str]]) -> str:
+            if not rows:
+                return ""
+            body = "".join(f"<tr><th>{label}</th><td>{value}</td></tr>" for label, value in rows)
+            return "<table class='meta-table'><tbody>" + body + "</tbody></table>"
+
+        metadata_html = (
+            "<section class='meta-section'>"
+            "<h3>Configuracion de la poblacion</h3>"
+            f"{_render_meta_table(selection_rows)}"
+            f"{_render_meta_table(source_rows)}"
+            "</section>"
+        )
 
     if REPORT_TEMPLATE:
         html_content = (

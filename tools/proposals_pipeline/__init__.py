@@ -14,6 +14,8 @@ from .metrics import (
     mean_std,
 )
 from .figures import ColorSettings, HighlightSettings, generate_figures
+from .experiment import build_scenarios
+from .runner import run_experiment
 
 __all__ = [
     "ChordEntry",
@@ -32,4 +34,6 @@ __all__ = [
     "aggregate_seed_results",
     "mean_std",
     "BASE_VECTOR_METRICS",
+    "build_scenarios",
+    "run_experiment",
 ]

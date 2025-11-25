@@ -11,6 +11,8 @@ import numpy as np
 import plotly.graph_objects as go
 from plotly.utils import PlotlyJSONEncoder
 
+from tools.reporting.contracts import validate_scatter_payload_meta
+
 if TYPE_CHECKING:  # pragma: no cover - hints only
     from tools.compare_proposals import ChordEntry  # circular only for type checking
 
@@ -829,6 +831,8 @@ def build_scatter_payload(
             "default": default_profile_key,
             "profiles": substitution_profile_meta,
         }
+    # Validación ligera del contrato consumido por el JS del reporte.
+    validate_scatter_payload_meta(meta_payload)
 
     layout = {
         "title": title,

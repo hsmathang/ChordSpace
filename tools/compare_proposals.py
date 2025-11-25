@@ -7,30 +7,20 @@ reduces to 2D and generates a single HTML report with visualisations and metrics
 """
 
 from __future__ import annotations
-
 import argparse
 import json
 import time
-from concurrent.futures import ProcessPoolExecutor, ThreadPoolExecutor, as_completed
+import os
 from dataclasses import dataclass, field
 from datetime import datetime
 from pathlib import Path
 from typing import Any, Callable, Dict, Iterable, List, Optional, Sequence, Tuple
-
-import os
-def _format_exp(val: float) -> str:
-    return f"{val:.2f}".rstrip("0").rstrip(".")
 
 import numpy as np
 import pandas as pd
 import plotly.graph_objects as go
 from scipy.ndimage import gaussian_filter1d
 from scipy.spatial.distance import pdist, squareform, jensenshannon
-from sklearn.manifold import MDS, TSNE, Isomap
-try:
-    import umap  # type: ignore
-except Exception:  # pragma: no cover
-    umap = None  # UMAP opcional
 
 # Proveer shim para 'dotenv' si el entorno trae un paquete incompatible
 try:  # pragma: no cover
@@ -50,29 +40,16 @@ from config import (
     QUERY_TRIADS_CORE,
     config_db,
 )
-from lab import kruskal_stress_1
-from metrics import (
-    compute_continuity,
-    compute_knn_recall,
-    compute_rank_correlation,
-    compute_trustworthiness,
-)
 from pre_process import (
     ChordAdapter,
     ModeloSetharesVec,
     get_chord_type_from_intervals,
 )
 from tools.query_registry import resolve_query_sql
-from visualisations.proposals import build_scatter_payload
-
 from tools.reporting import render_report_html
 from tools.reporting.utils import (
     compute_rank,
-    format_optional,
-    format_rate,
-    format_rate_with_std,
     format_seed_list,
-    format_value_with_std,
 )
 from tools.proposals_pipeline.population import ChordEntry, load_chords, stack_hist, l1_normalize
 from tools.proposals_pipeline.metrics import (
@@ -90,21 +67,9 @@ from tools.proposals_pipeline.figures import (
     ColorSettings,
     HighlightSettings,
     generate_figures,
-    build_scatter_figure,
 )
-from tools.proposals_pipeline.population import ChordEntry, load_chords, stack_hist
-from tools.proposals_pipeline.metrics import (
-    metric_distance,
-    parallel_worker_setup,
-    run_scenario_task,
-    aggregate_seed_results,
-    mean_std,
-)
-from tools.proposals_pipeline.figures import (
-    ColorSettings,
-    HighlightSettings,
-    generate_figures,
-)
+from tools.proposals_pipeline.experiment import build_scenarios
+from tools.proposals_pipeline.runner import run_experiment
 
 try:  # Prefer packaged executor
     from chordcodex.model import QueryExecutor  # type: ignore
@@ -218,54 +183,54 @@ PROPOSAL_INFO = {
     "simplex": {
         "title": "Simplex (distribución)",
         "casual": "Reparte la rugosidad entre las 12 clases de intervalo para identificar qué mezcla de díadas caracteriza al acorde.",
-        "technical": "Normaliza el histograma \(H\) sobre el simplex: \(p_k = H_k / \sum_j H_j\). Las distancias se calculan sobre \(p\), lo que garantiza invariancia a cardinalidad.",
+        "technical": "Normaliza el histograma (H) sobre el simplex: (p_k = H_k / sum_j H_j). Las distancias se calculan sobre (p), lo que garantiza invariancia a cardinalidad.",
     },
     "simplex_sqrt": {
         "title": "Raíz + simplex",
         "casual": "Atenúa picos muy grandes antes de normalizar, dejando ver mejor las contribuciones secundarias.",
-        "technical": "Aplica \(\sqrt{H}\) previo al paso al simplex para comprimir amplitudes y estabilizar métricas angulares.",
+        "technical": "Aplica (sqrt{H}) previo al paso al simplex para comprimir amplitudes y estabilizar métricas angulares.",
     },
     "simplex_smooth": {
         "title": "Simplex suavizado",
         "casual": "Difumina ligeramente la distribución para tolerar intervalos vecinos en la rueda cromática.",
-        "technical": "Convoluciona \(p\) con un kernel Gaussiano circular (\(\sigma = 0.75\)) y renormaliza; evita discontinuidades mod 12.",
+        "technical": "Convoluciona (p) con un kernel Gaussiano circular ((sigma = 0.75)) y renormaliza; evita discontinuidades mod 12.",
     },
     "perclass_alpha1": {
         "title": "Media por clase",
         "casual": "Promedia la rugosidad de cada tipo de díada sin importar cuántas veces se repita.",
-        "technical": "Divide por la multiplicidad \(m_k\): \(H'_k = H_k / m_k\) y normaliza. Garantiza invariancia a duplicidades por clase.",
+        "technical": "Divide por la multiplicidad (m_k): (H'_k = H_k / m_k) y normaliza. Garantiza invariancia a duplicidades por clase.",
     },
     "perclass_alpha0_5": {
         "title": "Media por clase sublineal",
         "casual": "Reduce el peso de las repeticiones sin eliminarlas por completo.",
-        "technical": "Usa \(H'_k = H_k / m_k^{0.5}\) como descuento sublineal para controlar redundancias fuertes.",
+        "technical": "Usa (H'_k = H_k / m_k^{0.5}) como descuento sublineal para controlar redundancias fuertes.",
     },
 
     "perclass_alpha0_75": {
         "title": "Media por clase (α=0.75)",
         "casual": "Descuento sublineal moderado sobre repeticiones de díadas.",
-        "technical": "Usa \(H'_k = H_k / m_k^{0.75}\) para atenuar la multiplicidad sin colapsarla como α=1.",
+        "technical": "Usa (H'_k = H_k / m_k^{0.75}) para atenuar la multiplicidad sin colapsarla como α=1.",
     },
 
     "perclass_alpha0_25": {
         "title": "Media por clase (α=0.25)",
         "casual": "Descuento leve, mantiene más la contribución de repeticiones.",
-        "technical": "Usa \(H'_k = H_k / m_k^{0.25}\), apropiado cuando se desea penalización mínima por duplicidad.",
+        "technical": "Usa (H'_k = H_k / m_k^{0.25}), apropiado cuando se desea penalización mínima por duplicidad.",
     },
     "global_pairs": {
         "title": "Media global por pares",
         "casual": "Escala el vector por el número total de díadas; conserva la forma pero reduce la magnitud.",
-        "technical": "Normaliza por \(P = n(n-1)/2\): \(\bar{H} = H/P\). Sirve como baseline que preserva la distribución relativa.",
+        "technical": "Normaliza por (P = n(n-1)/2): (bar{H} = H/P). Sirve como baseline que preserva la distribución relativa.",
     },
     "divide_mminus1": {
-        "title": "División por \(m-1\)",
+        "title": "División por (m-1)",
         "casual": "Heurística que intenta penalizar la repetición de díadas restando una unidad.",
-        "technical": "Escala por \(m_k - 1\) cuando \(m_k \ge 2\); se usa como control negativo frente a alternativas más formales.",
+        "technical": "Escala por (m_k - 1) cuando (m_k ge 2); se usa como control negativo frente a alternativas más formales.",
     },
     "identity": {
         "title": "Histograma original",
         "casual": "Usa el vector tal cual lo entrega el modelo de Sethares.",
-        "technical": "Vector bruto \(H\); referencia para medir el efecto de cada normalización.",
+        "technical": "Vector bruto (H); referencia para medir el efecto de cada normalización.",
     },
 }
 
@@ -274,37 +239,37 @@ METRIC_INFO = {
     "cosine": {
         "title": "Cosine",
         "casual": "Mide el ángulo entre perfiles; importa la forma relativa más que la magnitud.",
-        "technical": "\(d(u,v) = 1 - \frac{u\cdot v}{\|u\|\,\|v\|}\). Adecuado para distribuciones en el simplex.",
+        "technical": "(d(u,v) = 1 - frac{ucdot v}{|u|,|v|}). Adecuado para distribuciones en el simplex.",
     },
     "js": {
         "title": "Jensen–Shannon",
         "casual": "Compara distribuciones como diferencias de información simétrica.",
-        "technical": "\(d_{JS}(p,q) = \sqrt{\tfrac{1}{2} D_{KL}(p\|m) + \tfrac{1}{2} D_{KL}(q\|m)}\) con \(m = (p+q)/2\); métrica suave y finita.",
+        "technical": "(d_{JS}(p,q) = sqrt{tfrac{1}{2} D_{KL}(p|m) + tfrac{1}{2} D_{KL}(q|m)}) con (m = (p+q)/2); métrica suave y finita.",
     },
     "hellinger": {
         "title": "Hellinger",
         "casual": "Distancia probabilística equilibrada, robusta a valores pequeños.",
-        "technical": "\(d_H(p,q) = \tfrac{1}{\sqrt{2}}\|\sqrt{p}-\sqrt{q}\|_2\). Equivalente a la euclidiana en raíces.",
+        "technical": "(d_H(p,q) = tfrac{1}{sqrt{2}}|sqrt{p}-sqrt{q}|_2). Equivalente a la euclidiana en raíces.",
     },
     "euclidean": {
         "title": "Euclidiana",
         "casual": "Mide separaciones directas punto a punto.",
-        "technical": "\(d(u,v) = \|u-v\|_2\). Con vectores normalizados refleja diferencias absolutas por clase.",
+        "technical": "(d(u,v) = |u-v|_2). Con vectores normalizados refleja diferencias absolutas por clase.",
     },
     "l1": {
         "title": "Manhattan",
         "casual": "Suma diferencias absolutas por componente.",
-        "technical": "\(d(u,v) = \|u-v\|_1\).",
+        "technical": "(d(u,v) = |u-v|_1).",
     },
     "cityblock": {
         "title": "Manhattan",
         "casual": "Suma diferencias absolutas por componente.",
-        "technical": "\(d(u,v) = \|u-v\|_1\).",
+        "technical": "(d(u,v) = |u-v|_1).",
     },
     "manhattan": {
         "title": "Manhattan",
         "casual": "Suma diferencias absolutas por componente.",
-        "technical": "\(d(u,v) = \|u-v\|_1\).",
+        "technical": "(d(u,v) = |u-v|_1).",
     },
 }
 
@@ -665,267 +630,6 @@ class TimingRecorder:
         return self._marks[-1][1] - self._marks[0][1]
 
 
-def top_bins(dist_vector: np.ndarray, top_k: int = 2) -> Tuple[np.ndarray, np.ndarray]:
-    if not np.any(dist_vector > 0):
-        return np.array([], dtype=int), np.array([], dtype=float)
-    idx_sorted = np.argsort(dist_vector)[::-1]
-    idx_sorted = idx_sorted[:top_k]
-    weights = dist_vector[idx_sorted]
-    positive_mask = weights > 0
-    idx_sorted = idx_sorted[positive_mask]
-    weights = weights[positive_mask]
-    return idx_sorted, weights
-
-
-def evaluate_nn_hits(
-    dist_matrix: np.ndarray,
-    entries: List[ChordEntry],
-    simplex: np.ndarray,
-) -> Tuple[Optional[float], Optional[float]]:
-    if not any(e.n_notes == 3 for e in entries):
-        return None, None
-    hits_top1: List[int] = []
-    hits_top2: List[int] = []
-    for idx, entry in enumerate(entries):
-        if entry.n_notes != 3:
-            continue
-        row = dist_matrix[idx].copy()
-        row[idx] = np.inf
-        neighbor = int(np.argmin(row))
-        if entries[neighbor].n_notes != 2:
-            hits_top1.append(0)
-            hits_top2.append(0)
-            continue
-        bins, weights = top_bins(simplex[idx], top_k=2)
-        if bins.size == 0:
-            hits_top1.append(0)
-            hits_top2.append(0)
-            continue
-        target_bins = set(int(b) for b in bins)
-        neighbor_bin = entries[neighbor].dyad_bin
-        hit1 = 1 if neighbor_bin is not None and neighbor_bin == int(bins[0]) else 0
-        hit_any = 1 if neighbor_bin is not None and neighbor_bin in target_bins else 0
-        hits_top1.append(hit1)
-        hits_top2.append(hit_any)
-    if hits_top1:
-        top1_rate = float(np.mean(hits_top1))
-        top2_rate = float(np.mean(hits_top2))
-    else:
-        top1_rate = None
-        top2_rate = None
-    return top1_rate, top2_rate
-
-
-def evaluate_mixture_error(simplex: np.ndarray, entries: List[ChordEntry]) -> Tuple[Optional[float], Optional[float]]:
-    errors: List[float] = []
-    for idx, entry in enumerate(entries):
-        if entry.n_notes != 3:
-            continue
-        bins, weights = top_bins(simplex[idx], top_k=2)
-        if bins.size == 0:
-            continue
-        weights = weights / weights.sum()
-        mixture = np.zeros(12, dtype=float)
-        for bin_idx, weight in zip(bins, weights):
-            mixture[int(bin_idx)] = weight
-        error = float(np.linalg.norm(simplex[idx] - mixture, ord=1))
-        errors.append(error)
-    if not errors:
-        return None, None
-    return float(np.mean(errors)), float(np.max(errors))
-
-
-def summarise_embedding_metrics(
-    X_original: np.ndarray,
-    embedding: np.ndarray,
-    dist_matrix: np.ndarray,
-) -> Dict[str, Optional[float]]:
-    try:
-        trust = float(compute_trustworthiness(X_original, embedding))
-    except Exception:
-        trust = None
-    try:
-        cont = float(compute_continuity(X_original, embedding))
-    except Exception:
-        cont = None
-    try:
-        knn = float(compute_knn_recall(X_original, embedding))
-    except Exception:
-        knn = None
-    try:
-        rank_corr = float(compute_rank_correlation(X_original, embedding))
-    except Exception:
-        rank_corr = None
-    try:
-        stress = float(
-            kruskal_stress_1(dist_matrix, squareform(pdist(embedding, metric="euclidean")))
-        )
-    except Exception:
-        stress = None
-    return {
-        "trustworthiness": trust,
-        "continuity": cont,
-        "knn_recall": knn,
-        "rank_corr": rank_corr,
-        "stress": stress,
-    }
-
-
-def marker_style_for_cardinality(n_notes: int) -> Tuple[str, int]:
-    return CARDINALITY_SYMBOLS.get(n_notes, DEFAULT_CARDINALITY_SYMBOL)
-
-
-def group_entries_by_cardinality(entries: List[ChordEntry]) -> List[Tuple[int, List[int]]]:
-    buckets: Dict[int, List[int]] = {}
-    for idx, entry in enumerate(entries):
-        buckets.setdefault(entry.n_notes, []).append(idx)
-    return sorted(buckets.items(), key=lambda pair: pair[0])
-
-
-def build_scatter_figure(
-    embedding: np.ndarray,
-    entries: List[ChordEntry],
-    color_values: np.ndarray,
-    pair_counts: np.ndarray,
-    type_counts: np.ndarray,
-    vectors: np.ndarray,
-    adjusted_vectors: np.ndarray,
-    title: str,
-    *,
-    is_proposal: bool = False,
-    color_title: str = "Color",
-    meta: Optional[Dict[str, Any]] = None,
-    substitution_options: Optional[Dict[str, Any]] = None,
-) -> go.Figure:
-    highlight_cfg = {
-        "threshold": FAMILY_HIGHLIGHT_THRESHOLD,
-        "size_scale": FAMILY_HIGHLIGHT_SIZE_SCALE,
-        "size_delta": FAMILY_HIGHLIGHT_SIZE_DELTA,
-        "selected_opacity": FAMILY_HIGHLIGHT_SELECTED_OPACITY,
-        "fade_factor": FAMILY_HIGHLIGHT_UNSELECTED_OPACITY_FACTOR,
-    }
-    payload = build_scatter_payload(
-        embedding=embedding,
-        entries=entries,
-        color_values=color_values,
-        pair_counts=pair_counts,
-        type_counts=type_counts,
-        vectors=vectors,
-        adjusted_vectors=adjusted_vectors,
-        title=title,
-        color_title=color_title,
-        is_proposal=is_proposal,
-        highlight=highlight_cfg,
-        meta=meta,
-        substitution_options=substitution_options,
-    )
-    return go.Figure(data=payload["data"], layout=payload["layout"])
-
-def _format_vec(vec: np.ndarray, *, precision: int = 2, max_len: int = 12) -> str:
-    slice_vec = vec[:max_len]
-    values = ", ".join(f"{float(v):.{precision}f}" for v in slice_vec)
-    if len(vec) > max_len:
-        values += ", ..."
-    return f"[{values}]"
-
-
-def build_hover(
-    entry: ChordEntry,
-    vector_used: np.ndarray,
-    vector_adjusted: np.ndarray,
-    color_value: float,
-    color_title: str,
-    pair_count: int,
-    type_count: int,
-    *,
-    is_proposal: bool,
-    family_size: Optional[int] = None,
-) -> str:
-    """Hover rich text.
-
-    Incluye la rugosidad normalizada (según la pestaña de color activa) y,
-    para propuestas, también el total ajustado.
-    """
-    acorde = entry.acorde
-    intervals = getattr(acorde, "intervals", [])
-    tipo = getattr(acorde, "name", "Unknown")
-    total = entry.total
-    n = entry.n_notes
-    identity_label = entry.identity_name if entry.is_named else "Desconocido"
-    alias_line = ""
-    if entry.identity_aliases:
-        alias_line = f"Alias: {', '.join(entry.identity_aliases)}<br>"
-    color_line = f"{color_title}: {float(color_value):.4f}<br>"
-    pair_line = f"Pares totales (P): {pair_count}<br>"
-    type_line = f"Tipos activos (PE): {type_count}<br>"
-    family_line = ""
-    has_family_id = entry.family_id is not None
-    if has_family_id or entry.is_inversion:
-        family_label = str(entry.family_id) if has_family_id else "—"
-        role = "Inversión" if entry.is_inversion else "Acorde base"
-        details: List[str] = []
-        if family_size is not None and family_size > 0:
-            details.append(f"miembros: {family_size}")
-        if entry.is_inversion and entry.inversion_rotation is not None:
-            details.append(f"rotación: {entry.inversion_rotation}")
-        details_text = f" ({role}{', ' + ', '.join(details) if details else ''})" if role or details else ""
-        family_line = f"Familia: {family_label}{details_text}<br>"
-    if is_proposal:
-        total_adj = float(np.sum(vector_adjusted))
-        return (
-            f"Acorde: {tipo}<br>"
-            f"Notas: {n}<br>"
-            f"Intervalos: {intervals}<br>"
-            f"Identidad: {identity_label}<br>"
-            f"{alias_line}"
-            f"{family_line}"
-            f"TotalRug (bruto): {total:.4f}<br>"
-            f"TotalRug (ajustado): {total_adj:.4f}<br>"
-            f"H bruto: {_format_vec(entry.hist)}<br>"
-            f"H ajustado: {_format_vec(vector_adjusted)}<br>"
-            f"{color_line}"
-            f"{pair_line}"
-            f"{type_line}"
-        )
-    else:
-        return (
-            f"Acorde: {tipo}<br>"
-            f"Notas: {n}<br>"
-            f"Intervalos: {intervals}<br>"
-            f"Identidad: {identity_label}<br>"
-            f"{alias_line}"
-            f"{family_line}"
-            f"TotalRug: {total:.4f}<br>"
-            f"{color_line}"
-            f"{pair_line}"
-            f"{type_line}"
-            f"H bruto: {_format_vec(entry.hist)}<br>"
-        )
-
-
-def build_hover_summary(
-    entry: ChordEntry,
-    family_size: Optional[int],
-    color_value: float,
-    color_title: str,
-) -> str:
-    acorde = entry.acorde
-    name = getattr(acorde, "name", None)
-    if not name or name == "Unknown":
-        name = entry.identity_name or "Acorde"
-    intervals = getattr(acorde, "intervals", [])
-    interval_label = ""
-    try:
-        if intervals:
-            interval_label = " " + "[" + ",".join(str(int(i)) for i in intervals) + "]"
-    except Exception:
-        interval_label = ""
-    fam_label = family_size if family_size and family_size > 0 else 1
-    return (
-        f"{name}{interval_label} · {color_title}: {float(color_value):.2f} · "
-        f"Familia: {fam_label}"
-    )
-
 def extract_stat(row: Dict[str, object], key: str) -> Tuple[Optional[float], Optional[float]]:
     return row.get(f"{key}_mean"), row.get(f"{key}_std")
 
@@ -1009,6 +713,7 @@ def main() -> None:
     scenarios = build_scenarios(
         proposals_requested,
         metrics_requested,
+        PREPROCESSORS,
         include_identity=include_identity,
     )
     # Reducciones solicitadas (compatibilidad: --reduction gana si se pasa)
@@ -1030,81 +735,28 @@ def main() -> None:
     if not seed_list:
         seed_list = [args.seed]
 
-    per_seed_records: List[Dict[str, object]] = []
-
-    scenario_tasks: List[Dict[str, Any]] = []
-    expected_order: List[str] = []
-    distance_cache: Dict[Tuple[str, str], np.ndarray] = {}
-
-    for scenario in scenarios:
-        preproc_id = scenario["preproc_id"]
-        if preproc_id not in dist_simplex_cache:
-            preproc_func = scenario["preproc_func"]
-            kwargs = scenario["preproc_kwargs"]
-            X, simplex = preproc_func(hist, counts=counts, pairs=pairs, **kwargs)
-            preproc_cache[preproc_id] = X
-            dist_simplex_cache[preproc_id] = simplex
-        key = (preproc_id, scenario["metric"])
-        if key not in distance_cache:
-            X = preproc_cache[preproc_id]
-            simplex = dist_simplex_cache[preproc_id]
-            try:
-                dist_condensed = metric_distance(scenario["metric"], X, simplex)
-            except ValueError as exc:
-                print(f"[skip] {scenario['name']}: {exc}")
-                continue
-            distance_cache[key] = dist_condensed
-        dist_condensed = distance_cache[key]
-
-        for reduction in reductions:
-            expected_order.append(f"{reduction}:{scenario['name']}")
-        scenario_tasks.append(
-            {
-                "scenario": scenario,
-                "reductions": list(reductions),
-                "seed_list": list(seed_list),
-                "deterministic": deterministic,
-                "jobs": jobs,
-                "mds_n_init": mds_n_init,
-            }
-        )
-
-    figure_payloads: List[Dict[str, Any]] = []
-    warnings: List[str] = []
-    scenario_time_details: List[Tuple[str, float]] = []
-
-    if scenario_tasks:
-        context = {
-            "entries": entries,
-            "preproc_cache": preproc_cache,
-            "dist_simplex_cache": dist_simplex_cache,
-            "distance_cache": distance_cache,
-        }
-        use_parallel = len(scenario_tasks) > 1 and cpu_count > 1
-        if use_parallel:
-            max_workers = min(len(scenario_tasks), cpu_count)
-            with ProcessPoolExecutor(
-                max_workers=max_workers,
-                initializer=parallel_worker_setup,
-                initargs=(context,),
-            ) as executor:
-                futures = [executor.submit(run_scenario_task, task) for task in scenario_tasks]
-                for fut in as_completed(futures):
-                    res = fut.result()
-                    warnings.extend(res["warnings"])
-                    results.extend(res["results"])
-                    per_seed_records.extend(res["per_seed_records"])
-                    figure_payloads.extend(res["figure_payloads"])
-                    scenario_time_details.extend(res.get("timings", []))
-        else:
-            parallel_worker_setup(context)
-            for task in scenario_tasks:
-                res = run_scenario_task(task)
-                warnings.extend(res["warnings"])
-                results.extend(res["results"])
-                per_seed_records.extend(res["per_seed_records"])
-                figure_payloads.extend(res["figure_payloads"])
-                scenario_time_details.extend(res.get("timings", []))
+    run_result = run_experiment(
+        entries=entries,
+        hist=hist,
+        counts=counts,
+        pairs=pairs,
+        seed_list=seed_list,
+        reductions=reductions,
+        scenarios=scenarios,
+        deterministic=deterministic,
+        jobs=jobs,
+        mds_n_init=mds_n_init,
+        cpu_count=cpu_count,
+    )
+    results = run_result["results"]
+    per_seed_records: List[Dict[str, object]] = run_result["per_seed_records"]
+    figure_payloads = run_result["figure_payloads"]
+    warnings = run_result["warnings"]
+    scenario_time_details = run_result["scenario_time_details"]
+    expected_order = run_result["expected_order"]
+    preproc_cache = run_result["preproc_cache"]
+    dist_simplex_cache = run_result["dist_simplex_cache"]
+    distance_cache = run_result["distance_cache"]
     timer.mark("scenarios")
 
     for msg in warnings:
@@ -1189,101 +841,9 @@ def main() -> None:
         if scenario_time_details:
             print("[timing] escenarios detallados (s):")
             for key, seconds in scenario_time_details:
-                friendly = key.replace(":", " ▸ ", 1)
-                print(f"  · {friendly}: {seconds:7.2f}")
-
-
-def build_scenarios(
-    proposals: Iterable[str],
-    metrics: Iterable[str],
-    *,
-    include_identity: bool = True,
-) -> List[Dict[str, object]]:
-    scenarios: List[Dict[str, object]] = []
-    metrics = list(metrics)
-    for proposal in proposals:
-        proposal = proposal.strip().lower()
-        if proposal in {"simplex", "simplex_cosine"}:
-            preproc_id = "simplex"
-            preproc_func = PREPROCESSORS["simplex"][1]
-            kwargs = PREPROCESSORS["simplex"][2]
-            description = PREPROCESSORS["simplex"][0]
-        elif proposal in {"simplexsqrt", "simplex_sqrt"}:
-            preproc_id = "simplex_sqrt"
-            preproc_func = PREPROCESSORS["simplex_sqrt"][1]
-            kwargs = PREPROCESSORS["simplex_sqrt"][2]
-            description = PREPROCESSORS["simplex_sqrt"][0]
-        elif proposal in {"simplexsmooth", "simplex_smooth"}:
-            preproc_id = "simplex_smooth"
-            preproc_func = PREPROCESSORS["simplex_smooth"][1]
-            kwargs = PREPROCESSORS["simplex_smooth"][2]
-            description = PREPROCESSORS["simplex_smooth"][0]
-        elif proposal == "perclass_alpha1":
-            preproc_id = "perclass_alpha1"
-            preproc_func = PREPROCESSORS["perclass_alpha1"][1]
-            kwargs = PREPROCESSORS["perclass_alpha1"][2]
-            description = PREPROCESSORS["perclass_alpha1"][0]
-        elif proposal in {"perclass_alpha0_5", "perclass_alpha05"}:
-            preproc_id = "perclass_alpha0_5"
-            preproc_func = PREPROCESSORS["perclass_alpha0_5"][1]
-            kwargs = PREPROCESSORS["perclass_alpha0_5"][2]
-            description = PREPROCESSORS["perclass_alpha0_5"][0]
-        elif proposal in {"perclass_alpha0_75", "perclass_alpha075", "perclass_alpha75"}:
-            preproc_id = "perclass_alpha0_75"
-            preproc_func = PREPROCESSORS["perclass_alpha0_75"][1]
-            kwargs = PREPROCESSORS["perclass_alpha0_75"][2]
-            description = PREPROCESSORS["perclass_alpha0_75"][0]
-        elif proposal in {"perclass_alpha0_25", "perclass_alpha025", "perclass_alpha25"}:
-            preproc_id = "perclass_alpha0_25"
-            preproc_func = PREPROCESSORS["perclass_alpha0_25"][1]
-            kwargs = PREPROCESSORS["perclass_alpha0_25"][2]
-            description = PREPROCESSORS["perclass_alpha0_25"][0]
-        elif proposal == "global_pairs":
-            preproc_id = "global_pairs"
-            preproc_func = PREPROCESSORS["global_pairs"][1]
-            kwargs = PREPROCESSORS["global_pairs"][2]
-            description = PREPROCESSORS["global_pairs"][0]
-        elif proposal in {"divide_mminus1", "divide_m-1"}:
-            preproc_id = "divide_mminus1"
-            preproc_func = PREPROCESSORS["divide_mminus1"][1]
-            kwargs = PREPROCESSORS["divide_mminus1"][2]
-            description = PREPROCESSORS["divide_mminus1"][0]
-        elif proposal in {"baseline_identity", "identity"}:
-            preproc_id = "identity"
-            preproc_func = PREPROCESSORS["identity"][1]
-            kwargs = PREPROCESSORS["identity"][2]
-            description = "Histograma original (control)"
-        else:
-            print(f"[warn] Propuesta desconocida: {proposal}. Se ignora.")
-            continue
-
-        for metric in metrics:
-            metric = metric.strip().lower()
-            scenarios.append(
-                {
-                    "name": f"{proposal} | {metric}",
-                    "description": description,
-                    "preproc_id": preproc_id,
-                    "preproc_func": preproc_func,
-                    "preproc_kwargs": kwargs,
-                    "metric": metric,
-                }
-            )
-    if include_identity:
-        for metric in metrics:
-            if not any(s["preproc_id"] == "identity" and s["metric"] == metric for s in scenarios):
-                scenarios.append(
-                    {
-                        "name": f"identity | {metric}",
-                        "description": "Histograma original (control)",
-                        "preproc_id": "identity",
-                        "preproc_func": PREPROCESSORS["identity"][1],
-                        "preproc_kwargs": PREPROCESSORS["identity"][2],
-                        "metric": metric,
-                    }
-                )
-
-    return scenarios
+                # Evitar caracteres no ASCII para consolas cp1252/legacy
+                friendly = key.replace(":", " -> ", 1)
+                print(f"  - {friendly}: {seconds:7.2f}")
 
 
 if __name__ == "__main__":
