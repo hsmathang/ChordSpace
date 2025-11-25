@@ -37,7 +37,7 @@ class LauncherState:
     running_thread: Any = None
     status_text: str = "Listo"
     comparison_status_text: str = "Listo"
-    structural_mode_enabled: bool = False
+    structural_mode_enabled: bool = True
 
     _listeners: list[StateListener] = field(default_factory=list, init=False, repr=False)
 

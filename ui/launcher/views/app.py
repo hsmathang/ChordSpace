@@ -451,14 +451,15 @@ class ExperimentLauncher(tk.Tk):
         )
 
     def _init_combinatorial_vars(self) -> None:
-        self.generation_mode_var = tk.StringVar(value="db") # 'db' or 'combinatorial'
+        # Default to combinatorial mode to favour offline/structured generation
+        self.generation_mode_var = tk.StringVar(value="combinatorial") # 'db' or 'combinatorial'
 
         # Vars for combinatorial generator controls
         self.combinatorial_alphabet_var = tk.StringVar(value="0,2,4,5,7,9,11") # Diatonic
         self.combinatorial_octave_min_var = tk.StringVar(value="3")
         self.combinatorial_octave_max_var = tk.StringVar(value="4")
         self.combinatorial_cardinalities_var = tk.StringVar(value="3,4")
-        self.structural_mode_var = tk.BooleanVar(value=False)
+        self.structural_mode_var = tk.BooleanVar(value=True)
         self._bind_state_var(
             self.structural_mode_var,
             lambda value: self.state.update(structural_mode_enabled=value),
@@ -1110,7 +1111,8 @@ class ExperimentLauncher(tk.Tk):
         self.compare_seeds_var = tk.StringVar(value="42")
         ttk.Entry(seed_row, textvariable=self.compare_seeds_var, width=18).pack(side=tk.LEFT, padx=(6,0))
 
-        self.compare_include_identity_var = tk.BooleanVar(value=True)
+        # Default: baseline identity desactivado para acelerar corridas
+        self.compare_include_identity_var = tk.BooleanVar(value=False)
         ttk.Checkbutton(
             params,
             text="Incluir baseline identity (control)",
