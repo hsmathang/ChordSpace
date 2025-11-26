@@ -178,10 +178,13 @@ class ExperimentLauncher(tk.Tk):
         self._transpose_entry: ttk.Entry | None = None
         self.population_dirty = False
         self.final_stats_text: str | None = None
+        self.compare_status_var = tk.StringVar(value="Listo.")
+        self._bind_state_var(self.compare_status_var, self.state.set_comparison_status)
 
         self._load_queries()
         self._init_state_vars()
         self._init_combinatorial_vars()
+        self._init_report_sections()
         # Estado para la nueva pestaña de población/preview
         self.temporal_population_df: pd.DataFrame | None = None
         self.final_population_df: pd.DataFrame | None = None
@@ -348,7 +351,7 @@ class ExperimentLauncher(tk.Tk):
     def _init_compare_vars(self) -> None:
         # Proposals: combinación de definidos en PROPOSAL_INFO y PREPROCESSORS
         all_props = sorted(set(PREPROCESSORS.keys()) | set(PROPOSAL_INFO.keys()))
-        default_props = {"perclass_alpha0_75"}
+        default_props: set[str] = {"perclass_alpha0_75"}
         self.proposals_order: list[str] = all_props
         self.proposal_vars: dict[str, tk.BooleanVar] = {
             name: tk.BooleanVar(value=(name in default_props))
@@ -399,14 +402,14 @@ class ExperimentLauncher(tk.Tk):
         )
 
     def _init_filter_vars(self) -> None:
-        self.filter_enable_var = tk.BooleanVar(value=False)
+        self.filter_enable_var = tk.BooleanVar(value=True)
         self._bind_state_var(self.filter_enable_var, lambda value: self.state.toggle_filter(bool(value)))
         self.preview_limit_var = tk.BooleanVar(value=True)
         self.preview_limit_rows = PREVIEW_ROW_LIMIT
         # Vista: anclar a 0 (normalizada) o mostrar PCs reales
         self.view_anchor_var = tk.BooleanVar(value=False)
         self.filter_cardinality_vars: Dict[int, tk.BooleanVar] = {
-            n: tk.BooleanVar(value=False) for n in range(2, 7)
+            n: tk.BooleanVar(value=(n == 2)) for n in range(2, 7)
         }
         self.filter_span_min_var = tk.StringVar(value="")
         self.filter_span_max_var = tk.StringVar(value="")
@@ -414,7 +417,7 @@ class ExperimentLauncher(tk.Tk):
         self.filter_exclude_pcs_var = tk.StringVar(value="")
         self.filter_interval_var = tk.StringVar(value="")
         self.filter_code_var = tk.StringVar(value="")
-        self.filter_max_internal_interval_var = tk.StringVar(value="")
+        self.filter_max_internal_interval_var = tk.StringVar(value="12")
         self.filter_scale_expand_var = tk.BooleanVar(value=False)
         # Nuevos modos para filtros avanzados
         self.filter_pc_mode_labels = [
@@ -453,17 +456,28 @@ class ExperimentLauncher(tk.Tk):
     def _init_combinatorial_vars(self) -> None:
         # Default to combinatorial mode to favour offline/structured generation
         self.generation_mode_var = tk.StringVar(value="combinatorial") # 'db' or 'combinatorial'
+        self.population_preset_var = tk.StringVar(value="diadas_estructurales_octava3")
 
         # Vars for combinatorial generator controls
         self.combinatorial_alphabet_var = tk.StringVar(value="0,2,4,5,7,9,11") # Diatonic
         self.combinatorial_octave_min_var = tk.StringVar(value="3")
-        self.combinatorial_octave_max_var = tk.StringVar(value="4")
-        self.combinatorial_cardinalities_var = tk.StringVar(value="3,4")
+        self.combinatorial_octave_max_var = tk.StringVar(value="3")
+        self.combinatorial_cardinalities_var = tk.StringVar(value="2")
         self.structural_mode_var = tk.BooleanVar(value=True)
         self._bind_state_var(
             self.structural_mode_var,
             lambda value: self.state.update(structural_mode_enabled=value),
         )
+
+    def _init_report_sections(self) -> None:
+        # Secciones del reporte rico (compatibles con compare_proposals)
+        self.section_vars: dict[str, tk.BooleanVar] = {
+            "scatter": tk.BooleanVar(value=True),
+            "heatmap": tk.BooleanVar(value=True),
+            "shepard": tk.BooleanVar(value=True),
+            "table": tk.BooleanVar(value=True),
+            "metadata": tk.BooleanVar(value=True),
+        }
 
     def _create_layout(self) -> None:
         main = ttk.Frame(self, padding=14)
@@ -474,12 +488,10 @@ class ExperimentLauncher(tk.Tk):
         nb.pack(fill=tk.BOTH, expand=True)
 
         tab_population = ttk.Frame(nb)
-        tab_experiment = ttk.Frame(nb)
         tab_compare = ttk.Frame(nb)
         tab_compare_reduction = ttk.Frame(nb)
         nb.add(tab_population, text="Elegir población")
-        nb.add(tab_experiment, text="Parámetros de experimento")
-        nb.add(tab_compare, text="Parámetros de comparación")
+        nb.add(tab_compare, text="Reporte / Visualización")
         nb.add(tab_compare_reduction, text="Comparar reducciones")
 
         # Tab: Población (controles + tabla en paned window)
@@ -604,46 +616,51 @@ class ExperimentLauncher(tk.Tk):
         self.pop_log = ScrolledText(pop_log_frame, height=8, state=tk.DISABLED, font=("Consolas", 10))
         self.pop_log.grid(row=0, column=0, sticky="nsew", padx=4, pady=4)
 
-        # Tab: Experimento
-        exp_scroll = ScrollableFrame(tab_experiment, padding=8)
-        exp_scroll.pack(fill=tk.BOTH, expand=True)
-        exp_container = exp_scroll.content
-        exp_container.columnconfigure(0, weight=1)
-
-        exp_frame = ttk.LabelFrame(exp_container, text="Parámetros de experimento")
-        exp_frame.grid(row=0, column=0, sticky="nwe")
-        self._build_experiment_params_frame(exp_frame)
-
-        exp_actions = ttk.Frame(exp_container)
-        exp_actions.grid(row=1, column=0, sticky="w", pady=(10, 0))
-        self.run_button = ttk.Button(exp_actions, text="Ejecutar experimento", command=self._on_run_clicked)
-        self.run_button.pack(side=tk.LEFT)
-
-        exp_log_frame = ttk.LabelFrame(exp_container, text="Registro del experimento")
-        exp_log_frame.grid(row=2, column=0, sticky="nsew", pady=(8, 0))
-        exp_log_frame.columnconfigure(0, weight=1)
-        exp_log_frame.rowconfigure(0, weight=1)
-        self.exp_log = ScrolledText(exp_log_frame, height=8, state=tk.DISABLED, font=("Consolas", 10))
-        self.exp_log.grid(row=0, column=0, sticky="nsew", padx=4, pady=4)
-        exp_container.rowconfigure(2, weight=1)
-
-        # Tab: Comparación
+        # Tab: Reporte / Visualización
         compare_scroll = ScrollableFrame(tab_compare, padding=8)
         compare_scroll.pack(fill=tk.BOTH, expand=True)
         compare_container = compare_scroll.content
         compare_container.columnconfigure(0, weight=1)
 
-        compare_frame = ttk.LabelFrame(compare_container, text="Reporte de comparación")
-        compare_frame.grid(row=0, column=0, sticky="nwe")
+        exp_frame = ttk.LabelFrame(compare_container, text="Parámetros de visualización")
+        exp_frame.grid(row=0, column=0, sticky="nwe")
+        self._build_experiment_params_frame(exp_frame)
+
+        sections_frame = ttk.LabelFrame(compare_container, text="Secciones del reporte")
+        sections_frame.grid(row=3, column=0, sticky="nwe", pady=(8, 0))
+        self._build_report_sections_frame(sections_frame)
+
+        exp_actions = ttk.Frame(compare_container)
+        exp_actions.grid(row=4, column=0, sticky="w", pady=(8, 0))
+        self.run_button = ttk.Button(exp_actions, text="Generar visualización", command=self._on_visualize_clicked)
+        self.run_button.pack(side=tk.LEFT)
+        self.compare_open_folder_button = ttk.Button(
+            exp_actions,
+            text="Abrir carpeta",
+            command=self._on_compare_open_folder_clicked,
+            state=tk.DISABLED,
+        )
+        self.compare_open_folder_button.pack(side=tk.LEFT, padx=(6, 0))
+        ttk.Label(exp_actions, textvariable=self.compare_status_var, foreground="#555").pack(side=tk.LEFT, padx=(10,0))
+
+        exp_log_frame = ttk.LabelFrame(compare_container, text="Registro de la visualización")
+        exp_log_frame.grid(row=5, column=0, sticky="nsew", pady=(8, 0))
+        exp_log_frame.columnconfigure(0, weight=1)
+        exp_log_frame.rowconfigure(0, weight=1)
+        self.exp_log = ScrolledText(exp_log_frame, height=8, state=tk.DISABLED, font=("Consolas", 10))
+        self.exp_log.grid(row=0, column=0, sticky="nsew", padx=4, pady=4)
+
+        compare_frame = ttk.LabelFrame(compare_container, text="Opciones avanzadas (proposals)")
+        compare_frame.grid(row=1, column=0, sticky="nwe", pady=(8, 0))
         self._build_compare_frame(compare_frame)
 
         compare_log_frame = ttk.LabelFrame(compare_container, text="Registro de comparación")
-        compare_log_frame.grid(row=1, column=0, sticky="nsew", pady=(8, 0))
+        compare_log_frame.grid(row=2, column=0, sticky="nsew", pady=(8, 0))
         compare_log_frame.columnconfigure(0, weight=1)
         compare_log_frame.rowconfigure(0, weight=1)
         self.compare_log = ScrolledText(compare_log_frame, height=8, state=tk.DISABLED, font=("Consolas", 10))
         self.compare_log.grid(row=0, column=0, sticky="nsew", padx=4, pady=4)
-        compare_container.rowconfigure(1, weight=1)
+        compare_container.rowconfigure(5, weight=1)
 
         # Tab: Comparación de reducciones
         red_scroll = ScrollableFrame(tab_compare_reduction, padding=8)
@@ -885,32 +902,34 @@ class ExperimentLauncher(tk.Tk):
         red_combo = ttk.Combobox(frame, textvariable=self.reduction_var, values=["MDS", "UMAP"], width=8, state="readonly")
         red_combo.grid(row=0, column=1, padx=(4, 16), sticky="w")
 
-        ttk.Label(frame, text="Modelo:").grid(row=0, column=2, sticky="w")
-        model_labels = list(self.model_label_to_value.keys())
-        self.model_combo = ttk.Combobox(frame, textvariable=self.model_var, values=model_labels, width=20, state="readonly")
-        self.model_combo.grid(row=0, column=3, sticky="w", padx=(4, 16))
-
-        ttk.Label(frame, text="Métrica:").grid(row=1, column=0, sticky="w", pady=(6, 0))
-        metric_labels = list(self.metric_label_to_value.keys())
-        self.metric_combo = ttk.Combobox(frame, textvariable=self.metric_var, values=metric_labels, width=18, state="readonly")
-        self.metric_combo.grid(row=1, column=1, sticky="w", padx=(4, 16), pady=(6, 0))
-
-        ttk.Label(frame, text="Ponderación:").grid(row=1, column=2, sticky="w", pady=(6, 0))
-        ponder_labels = list(self.ponder_label_to_value.keys())
-        self.ponder_combo = ttk.Combobox(frame, textvariable=self.ponder_var, values=ponder_labels, width=22, state="readonly")
-        self.ponder_combo.grid(row=1, column=3, sticky="w", padx=(4, 16), pady=(6, 0))
-
-        ttk.Label(frame, text="Ejecución:").grid(row=2, column=0, sticky="w", pady=(6, 0))
+        ttk.Label(frame, text="Ejecución:").grid(row=0, column=2, sticky="w")
         exec_labels = list(self.exec_mode_label_to_value.keys())
         self.exec_mode_combo = ttk.Combobox(frame, textvariable=self.exec_mode_var, values=exec_labels, width=26, state="readonly")
-        self.exec_mode_combo.grid(row=2, column=1, sticky="w", padx=(4, 16), pady=(6, 0))
+        self.exec_mode_combo.grid(row=0, column=3, sticky="w", padx=(4, 16))
 
-        ttk.Label(frame, text="n_jobs:").grid(row=2, column=2, sticky="w", pady=(6, 0))
+        ttk.Label(frame, text="n_jobs:").grid(row=1, column=0, sticky="w", pady=(6, 0))
         self.n_jobs_entry = ttk.Entry(frame, textvariable=self.n_jobs_var, width=12)
-        self.n_jobs_entry.grid(row=2, column=3, sticky="w", padx=(4, 16), pady=(6, 0))
+        self.n_jobs_entry.grid(row=1, column=1, sticky="w", padx=(4, 16), pady=(6, 0))
 
         frame.columnconfigure(1, weight=1)
         frame.columnconfigure(3, weight=1)
+
+    def _build_report_sections_frame(self, frame: ttk.Frame) -> None:
+        ttk.Label(frame, text="Selecciona qué secciones incluir en el reporte HTML:").grid(
+            row=0, column=0, sticky="w", pady=(0, 6)
+        )
+        row = 1
+        for key, label in (
+            ("scatter", "Scatter"),
+            ("heatmap", "Heatmap"),
+            ("shepard", "Shepard"),
+            ("table", "Tabla de métricas"),
+            ("metadata", "Metadatos de población/escenarios"),
+        ):
+            var = self.section_vars[key]
+            ttk.Checkbutton(frame, text=label, variable=var).grid(row=row, column=0, sticky="w", pady=2)
+            row += 1
+
 
     def _build_pops_frame(self, frame: ttk.Frame) -> None:
         selector = ttk.Frame(frame)
@@ -980,9 +999,8 @@ class ExperimentLauncher(tk.Tk):
         ttk.Label(frame, text="Máx. intervalo interno (≤ semitonos):").grid(
             row=4, column=0, sticky="w", pady=(6, 0)
         )
-        ttk.Entry(frame, textvariable=self.filter_max_internal_interval_var, width=8).grid(
-            row=4, column=1, sticky="w", pady=(6, 0)
-        )
+        self.filter_max_internal_entry = ttk.Entry(frame, textvariable=self.filter_max_internal_interval_var, width=8)
+        self.filter_max_internal_entry.grid(row=4, column=1, sticky="w", pady=(6, 0))
 
         row_offset = 1
 
@@ -1121,22 +1139,6 @@ class ExperimentLauncher(tk.Tk):
 
         params.columnconfigure(0, weight=1)
         params.columnconfigure(1, weight=1)
-
-        # Row: run/open
-        actions = ttk.Frame(frame)
-        actions.pack(fill=tk.X, padx=6, pady=(4,6))
-        self.compare_run_button = ttk.Button(actions, text="Ejecutar comparación", command=self._on_compare_run_clicked)
-        self.compare_run_button.pack(side=tk.LEFT)
-        self.compare_open_folder_button = ttk.Button(
-            actions,
-            text="Abrir carpeta",
-            command=self._on_compare_open_folder_clicked,
-            state=tk.DISABLED,
-        )
-        self.compare_open_folder_button.pack(side=tk.LEFT, padx=(6,0))
-        self.compare_status_var = tk.StringVar(value="—")
-        self._bind_state_var(self.compare_status_var, self.state.set_comparison_status)
-        ttk.Label(actions, textvariable=self.compare_status_var, foreground="#555").pack(side=tk.RIGHT)
 
         # State holders (población se gestiona en la primera pestaña)
         self.compare_last_report: Path | None = None
@@ -2045,6 +2047,7 @@ class ExperimentLauncher(tk.Tk):
                 selected_ids=selected_ids,
                 df_override=df_override,
                 descriptor=descriptor,
+                report_profile=self._collect_report_profile(),
             )
         except MissingParametersError as exc:
             messagebox.showwarning("Parámetros insuficientes", str(exc))
@@ -2188,8 +2191,7 @@ class ExperimentLauncher(tk.Tk):
             run_metadata = None
         out_dir = Path(self.output_var.get().strip()).resolve()
         out_dir.mkdir(parents=True, exist_ok=True)
-        sub = out_dir / f"compare_{_dt.datetime.now().strftime('%Y%m%d_%H%M%S')}"
-        sub.mkdir(parents=True, exist_ok=True)
+        sub = out_dir  # Unificar: usar la carpeta raíz de salida
         # Ruta esperada del reporte
         self.compare_last_report = None
         self.compare_expected_report = sub / "report.html"
@@ -2241,6 +2243,7 @@ class ExperimentLauncher(tk.Tk):
             "--reductions", reductions_arg,
             "--seeds", self.compare_seeds_var.get().strip(),
             "--output", str(sub),
+            "--sections", self._sections_arg(),
         ]
         exec_value = self.exec_mode_label_to_value.get(self.exec_mode_var.get(), "deterministic")
         args.extend(["--execution-mode", exec_value])
@@ -2358,7 +2361,7 @@ class ExperimentLauncher(tk.Tk):
             self._append_tab_log(self.reduction_log, f"[debug] IDs seleccionados: {len(ids)}\n")
         out_dir = Path(self.output_var.get().strip()).resolve()
         out_dir.mkdir(parents=True, exist_ok=True)
-        sub = out_dir / f"compare_reductions_{_dt.datetime.now().strftime('%Y%m%d_%H%M%S')}"
+        sub = out_dir  # Unificar destino
         self.reduction_last_report = None
         self.reduction_expected_report = sub / "report.html"
         try:
@@ -2635,6 +2638,20 @@ class ExperimentLauncher(tk.Tk):
         }
         return metadata
 
+    def _has_selected_proposals(self) -> bool:
+        return any(bool(var.get()) for var in self.proposal_vars.values())
+
+    def _on_visualize_clicked(self) -> None:
+        # Ejecuta siempre el flujo unificado (comparación) para generar un único reporte rico.
+        self._on_compare_run_clicked()
+
+    def _sections_arg(self) -> str:
+        # Construir lista de secciones activas para compare_proposals (--sections)
+        active = [key for key, var in self.section_vars.items() if var.get()]
+        if len(active) == len(self.section_vars):
+            return "all"
+        return ",".join(active)
+
     def _selected_proposals(self) -> list[str]:
         return [name for name in self.proposals_order if self.proposal_vars[name].get()]
 
@@ -2745,26 +2762,84 @@ class ExperimentLauncher(tk.Tk):
 
         frame.columnconfigure(1, weight=1)
 
-        ttk.Label(frame, text="Alfabeto (PCs, 0-11):").grid(row=0, column=0, sticky="w", padx=5, pady=5)
-        ttk.Entry(frame, textvariable=self.combinatorial_alphabet_var).grid(row=0, column=1, sticky="we", padx=5, pady=5)
+        ttk.Label(frame, text="Modo:").grid(row=0, column=0, sticky="w", padx=5, pady=5)
+        preset_values = ["manual", "diadas_estructurales_octava3"]
+        self.population_preset_combo = ttk.Combobox(
+            frame,
+            textvariable=self.population_preset_var,
+            values=preset_values,
+            state="readonly",
+        )
+        self.population_preset_combo.grid(row=0, column=1, sticky="w", padx=5, pady=5)
+        self.population_preset_combo.bind(
+            "<<ComboboxSelected>>", lambda *_: self._apply_population_preset(self.population_preset_var.get())
+        )
 
-        ttk.Label(frame, text="Rango de Octavas (min-max):").grid(row=1, column=0, sticky="w", padx=5, pady=5)
+        ttk.Label(frame, text="Alfabeto (PCs, 0-11):").grid(row=1, column=0, sticky="w", padx=5, pady=5)
+        self.comb_alpha_entry = ttk.Entry(frame, textvariable=self.combinatorial_alphabet_var)
+        self.comb_alpha_entry.grid(row=1, column=1, sticky="we", padx=5, pady=5)
+
+        ttk.Label(frame, text="Rango de Octavas (min-max):").grid(row=2, column=0, sticky="w", padx=5, pady=5)
         octave_frame = ttk.Frame(frame)
-        octave_frame.grid(row=1, column=1, sticky="w", padx=5, pady=5)
-        ttk.Entry(octave_frame, textvariable=self.combinatorial_octave_min_var, width=5).pack(side=tk.LEFT)
+        octave_frame.grid(row=2, column=1, sticky="w", padx=5, pady=5)
+        self.comb_oct_min_entry = ttk.Entry(octave_frame, textvariable=self.combinatorial_octave_min_var, width=5)
+        self.comb_oct_min_entry.pack(side=tk.LEFT)
         ttk.Label(octave_frame, text="-").pack(side=tk.LEFT, padx=5)
-        ttk.Entry(octave_frame, textvariable=self.combinatorial_octave_max_var, width=5).pack(side=tk.LEFT)
+        self.comb_oct_max_entry = ttk.Entry(octave_frame, textvariable=self.combinatorial_octave_max_var, width=5)
+        self.comb_oct_max_entry.pack(side=tk.LEFT)
 
-        ttk.Label(frame, text="Cardinalidades (e.g., 3,4):").grid(row=2, column=0, sticky="w", padx=5, pady=5)
-        ttk.Entry(frame, textvariable=self.combinatorial_cardinalities_var).grid(row=2, column=1, sticky="we", padx=5, pady=5)
+        ttk.Label(frame, text="Cardinalidades (e.g., 3,4):").grid(row=3, column=0, sticky="w", padx=5, pady=5)
+        self.comb_card_entry = ttk.Entry(frame, textvariable=self.combinatorial_cardinalities_var)
+        self.comb_card_entry.grid(row=3, column=1, sticky="we", padx=5, pady=5)
 
-        ttk.Checkbutton(
+        self.structural_check = ttk.Checkbutton(
             frame,
             text="Modo Estructural (primera nota es DO)",
             variable=self.structural_mode_var,
-        ).grid(row=3, column=0, columnspan=2, sticky="w", padx=5, pady=5)
+        )
+        self.structural_check.grid(row=4, column=0, columnspan=2, sticky="w", padx=5, pady=5)
 
-        # Nota: voicings cerrados se controlan desde Filtros dinámicos (max. intervalo interno)
+        # Nota: voicings cerrados se controlan desde Filtros din?micos (max. intervalo interno)
+
+        # Aplicar preset inicial
+        self._apply_population_preset(self.population_preset_var.get())
+
+    def _preset_lock_widgets(self) -> list[tk.Widget]:
+        return [
+            getattr(self, "comb_alpha_entry", None),
+            getattr(self, "comb_oct_min_entry", None),
+            getattr(self, "comb_oct_max_entry", None),
+            getattr(self, "comb_card_entry", None),
+            getattr(self, "structural_check", None),
+            getattr(self, "filter_max_internal_entry", None),
+        ]
+
+    def _set_preset_locked(self, locked: bool) -> None:
+        state = tk.DISABLED if locked else tk.NORMAL
+        for widget in self._preset_lock_widgets():
+            if widget is None:
+                continue
+            try:
+                widget.configure(state=state)
+            except Exception:
+                continue
+
+    def _apply_population_preset(self, name: str) -> None:
+        preset = (name or "").strip().lower()
+        if preset == "diadas_estructurales_octava3":
+            self.combinatorial_alphabet_var.set("0,2,4,5,7,9,11")
+            self.combinatorial_octave_min_var.set("3")
+            self.combinatorial_octave_max_var.set("3")
+            self.combinatorial_cardinalities_var.set("2")
+            self.structural_mode_var.set(True)
+            self.filter_enable_var.set(True)
+            for n, var in self.filter_cardinality_vars.items():
+                var.set(n == 2)
+            self.filter_max_internal_interval_var.set("12")
+            self._set_preset_locked(True)
+            self._mark_population_dirty()
+        else:
+            self._set_preset_locked(False)
 
     def _on_generation_mode_change(self) -> None:
         mode = self.generation_mode_var.get()

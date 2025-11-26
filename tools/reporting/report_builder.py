@@ -82,46 +82,64 @@ def render_report_html(
     run_metadata: Optional[Dict[str, Any]] = None,
     metric_info: Optional[Dict[str, Dict[str, str]]] = None,
     highlight_threshold: int = 2000,
+    sections_enabled: Optional[Dict[str, bool]] = None,
 ) -> None:
     metric_catalog = metric_info or METRIC_INFO_FALLBACK
 
     ranked_df = metrics_df.copy()
+    include_section = lambda key, default=True: bool(sections_enabled.get(key, default)) if sections_enabled else default
     ranked_df["rank"] = compute_rank(ranked_df)
     ranked_df.sort_values(by="rank", inplace=True)
 
-    display_df = ranked_df[
-        [
-            "rank",
-            "scenario",
-            "metric",
-            "stress_mean",
-            "stress_std",
-            "trustworthiness_mean",
-            "trustworthiness_std",
-            "mixture_l1_mean_mean",
-            "mixture_l1_mean_std",
-            "seeds",
+    if include_section("table", True):
+        display_df = ranked_df[
+            [
+                "rank",
+                "scenario",
+                "metric",
+                "stress_mean",
+                "stress_std",
+                "trustworthiness_mean",
+                "trustworthiness_std",
+                "mixture_l1_mean_mean",
+                "mixture_l1_mean_std",
+                "seeds",
+            ]
+        ].copy()
+    else:
+        display_df = pd.DataFrame()
+    table_html = ""
+    if not display_df.empty:
+        display_df["Stress"] = display_df.apply(
+            lambda row: format_value_with_std(row["stress_mean"], row["stress_std"]), axis=1
+        )
+        display_df["Trustworthiness"] = display_df.apply(
+            lambda row: format_value_with_std(row["trustworthiness_mean"], row["trustworthiness_std"]), axis=1
+        )
+        display_df["Mixture L1"] = display_df.apply(
+            lambda row: format_value_with_std(row["mixture_l1_mean_mean"], row["mixture_l1_mean_std"]), axis=1
+        )
+        display_df["Semillas"] = display_df["seeds"].apply(format_seed_list)
+        display_df = display_df.rename(
+            columns={"rank": "Ranking", "scenario": "Escenario", "metric": "Metrica"}
+        )
+        display_df = display_df[
+            ["Ranking", "Escenario", "Metrica", "Stress", "Trustworthiness", "Mixture L1", "Semillas"]
         ]
-    ].copy()
-    display_df["Stress"] = display_df.apply(
-        lambda row: format_value_with_std(row["stress_mean"], row["stress_std"]), axis=1
-    )
-    display_df["Trustworthiness"] = display_df.apply(
-        lambda row: format_value_with_std(row["trustworthiness_mean"], row["trustworthiness_std"]), axis=1
-    )
-    display_df["Mixture L1"] = display_df.apply(
-        lambda row: format_value_with_std(row["mixture_l1_mean_mean"], row["mixture_l1_mean_std"]), axis=1
-    )
-    display_df["Semillas"] = display_df["seeds"].apply(format_seed_list)
-    display_df = display_df.rename(
-        columns={"rank": "Ranking", "scenario": "Escenario", "metric": "Metrica"}
-    )
-    display_df = display_df[
-        ["Ranking", "Escenario", "Metrica", "Stress", "Trustworthiness", "Mixture L1", "Semillas"]
-    ]
-    table_html = display_df.to_html(index=False, float_format=lambda x: f"{x:.4f}")
+        table_html = display_df.to_html(index=False, float_format=lambda x: f"{x:.4f}")
 
-    figure_map = {title: fig for title, fig in figures}
+    # Opcionalmente filtrar figuras por secciones_enabled
+    filtered_figs: List[Tuple[str, go.Figure]] = []
+    for title, fig in figures:
+        key = title.lower()
+        if key.startswith("scatter") and not include_section("scatter", True):
+            continue
+        if key.startswith("heatmap") and not include_section("heatmap", True):
+            continue
+        if key.startswith("shepard") and not include_section("shepard", True):
+            continue
+        filtered_figs.append((title, fig))
+    figure_map = {title: fig for title, fig in filtered_figs}
 
     preferred_order = ["euclidean", "cosine", "js", "hellinger", "l1", "cityblock", "manhattan"]
 
@@ -376,7 +394,7 @@ def render_report_html(
     )
 
     metadata_html = ""
-    if run_metadata:
+    if run_metadata and include_section("metadata", True):
         validate_run_metadata(run_metadata)
         selection = run_metadata.get("selection", {}) if isinstance(run_metadata, dict) else {}
         population = run_metadata.get("population", {}) if isinstance(run_metadata, dict) else {}
@@ -460,11 +478,14 @@ def render_report_html(
             .replace("__TABS_HTML__", tabs_html)
             .replace("__SCRIPT_JS__", REPORT_JS)
         )
+        html_content = html_content.replace(
+            "Comparacion de Propuestas de Rugosidad", "Exploración del espacio de acordes"
+        )
     else:
         html_content = (
             "<!DOCTYPE html><html lang='es'><head><meta charset='utf-8'/>"
-            "<title>Comparacion de Propuestas de Rugosidad</title></head><body>"
-            "<h1>Comparacion de Propuestas de Normalizacion de Rugosidad</h1>"
+            "<title>Exploración del espacio de acordes</title></head><body>"
+            "<h1>Exploración del espacio de acordes</h1>"
             "<h3>Resumen global</h3>"
             f"{table_html}{metadata_html}{tabs_html}"
             "</body></html>"

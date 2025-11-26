@@ -347,6 +347,11 @@ def parse_args() -> argparse.Namespace:
         help="Output directory (default: outputs/compare_proposals/<timestamp>).",
     )
     parser.add_argument(
+        "--sections",
+        default="all",
+        help="Sections to include in report (comma): scatter,heatmap,shepard,table,metadata,all. Default: all.",
+    )
+    parser.add_argument(
         "--seed",
         type=int,
         default=42,
@@ -792,6 +797,16 @@ def main() -> None:
         dist_simplex_cache,
         distance_cache,
     )
+    # Filtrar figuras según secciones para report_builder
+    sec_arg = (args.sections or "all").strip().lower()
+    sec_enabled = {key: True for key in ("scatter", "heatmap", "shepard", "table", "metadata")}
+    if sec_arg and sec_arg != "all":
+        parts = [p.strip() for p in sec_arg.split(",") if p.strip()]
+        if parts:
+            sec_enabled = {key: False for key in sec_enabled}
+            for p in parts:
+                if p in sec_enabled:
+                    sec_enabled[p] = True
     timer.mark("figures")
 
     if not results:
@@ -810,6 +825,8 @@ def main() -> None:
     json_path = output_dir / "metrics.json"
     json_path.write_text(metrics_df.to_json(orient="records", indent=2), encoding="utf-8")
 
+    # Secciones habilitadas (permite ocultar partes del reporte)
+
     report_path = output_dir / "report.html"
     # New report layout (tabs + centralized methods)
     render_report_html(
@@ -820,6 +837,7 @@ def main() -> None:
         run_metadata=run_metadata,
         metric_info=METRIC_INFO,
         highlight_threshold=FAMILY_HIGHLIGHT_THRESHOLD,
+        sections_enabled=sec_enabled,
     )
     timer.mark("report")
 

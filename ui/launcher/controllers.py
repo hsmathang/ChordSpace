@@ -21,6 +21,7 @@ class ExperimentRunRequest:
     df_override: Optional[pd.DataFrame]
     descriptor: Optional[str]
     output_dir: Path
+    report_profile: Optional[dict] = None
 
 
 class ControllerError(Exception):
@@ -40,12 +41,14 @@ class ExperimentDataGateway:
         df_override: Optional[pd.DataFrame] = None,
         descriptor: Optional[str] = None,
         progress_callback: Optional[Callable[[float, Optional[str]], None]] = None,
+        report_profile: Optional[dict] = None,
     ) -> dict:
         return experiment_inversions.run_experiment_with_args(
             args,
             df_override=df_override,
             descriptor=descriptor,
             progress_callback=progress_callback,
+            report_profile=report_profile,
         )
 
 
@@ -77,6 +80,7 @@ class ExperimentLauncherController:
         selected_ids: list[int],
         df_override: Optional[pd.DataFrame],
         descriptor: Optional[str],
+        report_profile: Optional[dict] = None,
     ) -> ExperimentRunRequest:
         output_dir = self.state.output_dir or default_output_dir
         if isinstance(output_dir, str):
@@ -115,6 +119,7 @@ class ExperimentLauncherController:
             df_override=df_override,
             descriptor=descriptor,
             output_dir=Path(output_dir),
+            report_profile=report_profile,
         )
 
     # ------------------------------------------------------------------ run
@@ -136,6 +141,7 @@ class ExperimentLauncherController:
                     df_override=request.df_override,
                     descriptor=request.descriptor,
                     progress_callback=progress_callback,
+                    report_profile=request.report_profile,
                 )
         finally:
             writer.flush()

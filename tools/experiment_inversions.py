@@ -51,6 +51,7 @@ from visualization import (
     visualizar_heatmap,
     graficar_shepard,
 )
+from services.reporting_service import render_figures_report
 from tools.query_registry import resolve_query_sql
 
 
@@ -432,6 +433,7 @@ def run_experiment_with_args(
     df_override: Optional[pd.DataFrame] = None,
     descriptor: Optional[str] = None,
     progress_callback: Optional[Callable[[float, Optional[str]], None]] = None,
+    report_profile: Optional[dict] = None,
 ) -> dict:
     def _report(percent: float, message: Optional[str] = None) -> None:
         if progress_callback is None:
@@ -558,6 +560,14 @@ def run_experiment_with_args(
     np.save(out_dir / "distances.npy", res.matriz_distancias)
     _report(90.0, "Guardando artefactos…")
 
+    profile = report_profile or {}
+    def _enabled(key: str, default: bool = True) -> bool:
+        try:
+            return bool(profile.get(key, default))
+        except Exception:
+            return default
+
+    figures_for_report = []
     if pops_specs:
         experiment_descriptor = " | ".join(pops_specs)
         ttl = f"{args.reduction} ({metric}) - joint"
@@ -567,12 +577,37 @@ def run_experiment_with_args(
     else:
         experiment_descriptor = f"Tipo {getattr(args, 'type', 'B')} | Query {getattr(args, 'query', QUERY_CHORDS_WITH_NAME)}"
         ttl = f"{args.reduction} ({metric}) - tipo {getattr(args, 'type', 'B')} - {getattr(args, 'query', QUERY_CHORDS_WITH_NAME)}"
-    fig_sc = visualizar_scatter_density(res.embeddings, acordes, res.X_original, title=ttl)
-    fig_hm = visualizar_heatmap(res.matriz_distancias, acordes, title="Matriz de Distancias")
-    fig_sh = graficar_shepard(res.embeddings, res.matriz_distancias, title="Grafico de Shepard")
-    fig_sc.write_html(out_dir / "scatter.html")
-    fig_hm.write_html(out_dir / "heatmap.html")
-    fig_sh.write_html(out_dir / "shepard.html")
+    if _enabled("scatter", True):
+        fig_sc = visualizar_scatter_density(res.embeddings, acordes, res.X_original, title=ttl)
+        figures_for_report.append(("Scatter", fig_sc))
+    if _enabled("heatmap", True):
+        fig_hm = visualizar_heatmap(res.matriz_distancias, acordes, title="Matriz de Distancias")
+        figures_for_report.append(("Heatmap", fig_hm))
+    if _enabled("shepard", True):
+        fig_sh = graficar_shepard(res.embeddings, res.matriz_distancias, title="Grafico de Shepard")
+        figures_for_report.append(("Shepard", fig_sh))
+
+    # Reporte HTML único usando el servicio de reportes
+    render_figures_report(
+        title=ttl,
+        figures=figures_for_report,
+        output_path=out_dir / "report.html",
+        sections_enabled={
+            "scatter": _enabled("scatter", True),
+            "heatmap": _enabled("heatmap", True),
+            "shepard": _enabled("shepard", True),
+            "table": False,
+            "metadata": True,
+        },
+        metrics=None,
+        metadata_rows=[
+            ("Modelo", res.nombre_modelo),
+            ("Métrica", metric),
+            ("Reducción", args.reduction),
+            ("Población", experiment_descriptor),
+            ("Total acordes", str(len(acordes))),
+        ],
+    )
 
     with (out_dir / "summary.txt").open("w", encoding="utf-8") as f:
         f.write("Experimento: inversiones\n")
