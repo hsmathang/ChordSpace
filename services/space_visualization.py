@@ -137,12 +137,68 @@ class VisualizationService:
         if config.sections == ["all"]:
              sections_enabled = {k: True for k in ["scatter", "heatmap", "shepard", "table", "metadata"]}
 
+        # Build minimal metadata if none provided, so the section is visible when selected.
+        run_metadata = result.config.population.metadata or {}
+        if not run_metadata:
+            df = result.population_df
+            total_rows = len(df)
+            try:
+                card_counts = df["n"].value_counts().sort_index()
+                card_summary = ", ".join(f"{k}n:{v}" for k, v in card_counts.items())
+                cards_list = sorted(card_counts.index.tolist())
+            except Exception:
+                card_summary = ""
+                cards_list = []
+            try:
+                if "span_semitones" in df:
+                    span_min = int(df["span_semitones"].min())
+                    span_max = int(df["span_semitones"].max())
+                else:
+                    span_min = span_max = None
+            except Exception:
+                span_min = span_max = None
+
+            filters_label_parts = []
+            if card_summary:
+                filters_label_parts.append(f"cardinalidades: {card_summary}")
+            if span_min is not None and span_max is not None:
+                filters_label_parts.append(f"span={span_min}-{span_max}")
+            filters_label = " | ".join(filters_label_parts) if filters_label_parts else ""
+
+            meta_src = result.config.population.metadata if isinstance(result.config.population.metadata, dict) else {}
+            run_metadata = {
+                "selection": {
+                    "rows_selected": total_rows,
+                    "rows_available": total_rows,
+                    "mode": "archivo",
+                    "payload_path": None,
+                },
+                "population": {
+                    "descriptors": [
+                        {
+                            "label": "Población generada",
+                            "rows": total_rows,
+                            "mode": "combinatorial",
+                            "combinatorial": {
+                                "alphabet": meta_src.get("alphabet") or [],
+                                "cardinalities": cards_list,
+                                "octave_min": meta_src.get("octave_min"),
+                                "octave_max": meta_src.get("octave_max"),
+                                "structural_mode": meta_src.get("structural_mode"),
+                            },
+                            "database": {},
+                            "filters": {"label": filters_label} if filters_label else {},
+                        }
+                    ]
+                }
+            }
+
         render_report_html(
             metrics_df=result.metrics_df,
             figures=figures,
             output_path=result.output_path / "report.html",
             seeds=result.config.execution.seeds,
-            run_metadata=result.config.population.metadata,
+            run_metadata=run_metadata,
             metric_info=METRIC_INFO,
             highlight_threshold=config.highlight_threshold,
             sections_enabled=sections_enabled
