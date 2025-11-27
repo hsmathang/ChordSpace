@@ -9,8 +9,10 @@ from typing import Any, Dict, List, Optional, Sequence, Tuple
 
 import numpy as np
 import plotly.graph_objects as go
+from scipy.spatial.distance import squareform
+from scipy.stats import linregress
 
-from tools.proposals_pipeline.metrics import BASE_VECTOR_METRICS
+from tools.proposals_pipeline.metrics import BASE_VECTOR_METRICS, MAX_SHEPARD_PAIRS
 from tools.proposals_pipeline.population import ChordEntry
 from visualisations.proposals import build_scatter_payload
 
@@ -95,11 +97,16 @@ def generate_figures(
     *,
     color_settings: ColorSettings,
     highlight_settings: HighlightSettings,
+    sections_enabled: Optional[Dict[str, bool]] = None
 ) -> List[Tuple[str, go.Figure]]:
     """Construye las figuras a partir de los payloads en paralelo."""
 
     if not payloads:
         return []
+
+    # Default to all enabled if not specified (legacy behavior)
+    if sections_enabled is None:
+        sections_enabled = {"scatter": True}
 
     totals = np.asarray(totals, dtype=float)
     pairs = np.asarray(pairs, dtype=float)
@@ -111,6 +118,10 @@ def generate_figures(
         reduction = payload["reduction"]
         figure_seed = payload["figure_seed"]
         embedding = np.asarray(payload["embedding"], dtype=float)
+
+        # Recuperar distancias originales
+        dist_original_condensed = distance_cache.get((preproc_id, metric))
+
         base_matrix = (
             np.asarray(preproc_cache[preproc_id], dtype=float)
             if metric in BASE_VECTOR_METRICS
@@ -124,49 +135,74 @@ def generate_figures(
         ).astype(float)
         substitution_options = payload.get("substitution_options")
 
-        color_modes: List[Tuple[str, Optional[float]]] = []
-        if preproc_id == "identity":
-            color_modes.append(("raw_total", None))
-        else:
-            for exp in color_settings.exponents:
-                color_modes.append(("pair_exp", exp))
-                color_modes.append(("types_exp", exp))
-
-        fig_title = f"{scenario_name} (seed {figure_seed})"
         figs: List[Tuple[str, go.Figure]] = []
-        for mode, exponent in color_modes:
-            vals, ctitle = _apply_color_mode(
-                mode,
-                exponent,
-                totals,
-                totals_adj,
-                pairs,
-                existing_counts,
-                settings=color_settings,
-            )
-            suffix = mode if exponent is None else f"{mode}_{int(round(exponent * 100)):03d}"
-            fig = build_scatter_figure(
-                embedding=embedding,
-                entries=entries,
-                color_values=vals,
-                pair_counts=pairs,
-                type_counts=existing_counts,
-                vectors=base_matrix,
-                adjusted_vectors=vectors_adjusted,
-                title=fig_title,
-                is_proposal=(preproc_id != "identity"),
-                color_title=ctitle,
-                meta={
-                    "scenario": scenario_name,
-                    "mode": mode,
-                    "exponent": exponent,
-                    "metric": metric,
-                    "reduction": reduction,
-                },
-                substitution_options=substitution_options,
-                highlight_settings=highlight_settings,
-            )
-            figs.append((f"{scenario_name}||{suffix}", fig))
+        fig_title_base = f"{scenario_name} (seed {figure_seed})"
+
+        # 1. SCATTER PLOTS
+        if sections_enabled.get("scatter", False):
+            color_modes: List[Tuple[str, Optional[float]]] = []
+            if preproc_id == "identity":
+                color_modes.append(("raw_total", None))
+            else:
+                for exp in color_settings.exponents:
+                    color_modes.append(("pair_exp", exp))
+                    color_modes.append(("types_exp", exp))
+
+            for mode, exponent in color_modes:
+                vals, ctitle = _apply_color_mode(
+                    mode,
+                    exponent,
+                    totals,
+                    totals_adj,
+                    pairs,
+                    existing_counts,
+                    settings=color_settings,
+                )
+                suffix = mode if exponent is None else f"{mode}_{int(round(exponent * 100)):03d}"
+                fig = build_scatter_figure(
+                    embedding=embedding,
+                    entries=entries,
+                    color_values=vals,
+                    pair_counts=pairs,
+                    type_counts=existing_counts,
+                    vectors=base_matrix,
+                    adjusted_vectors=vectors_adjusted,
+                    title=fig_title_base,
+                    is_proposal=(preproc_id != "identity"),
+                    color_title=ctitle,
+                    meta={
+                        "scenario": scenario_name,
+                        "mode": mode,
+                        "exponent": exponent,
+                        "metric": metric,
+                        "reduction": reduction,
+                    },
+                    substitution_options=substitution_options,
+                    highlight_settings=highlight_settings,
+                )
+                figs.append((f"{scenario_name}||{suffix}", fig))
+
+        # 2. HEATMAP
+        if sections_enabled.get("heatmap", False):
+            if dist_original_condensed is not None:
+                heatmap_fig = build_heatmap_figure(
+                    squareform(dist_original_condensed),
+                    entries,
+                    title=f"Heatmap: {scenario_name}"
+                )
+                figs.append((f"{scenario_name}||heatmap", heatmap_fig))
+
+        # 3. SHEPARD PLOT
+        if sections_enabled.get("shepard", False):
+            if dist_original_condensed is not None:
+                shepard_fig = build_shepard_figure(
+                    dist_original_condensed,
+                    embedding,
+                    title=f"Shepard: {scenario_name} (seed {figure_seed})",
+                    seed=figure_seed
+                )
+                figs.append((f"{scenario_name}||shepard", shepard_fig))
+
         return figs
 
     max_workers = min(len(payloads), max(1, os.cpu_count() or 1))
@@ -222,10 +258,116 @@ def build_scatter_figure(
     )
     return go.Figure(data=payload["data"], layout=payload["layout"])
 
+def build_heatmap_figure(
+    dist_matrix: np.ndarray,
+    entries: List[ChordEntry],
+    title: str
+) -> go.Figure:
+    """Genera un heatmap de la matriz de distancias ordenada por cardinalidad."""
+
+    # Ordenar por número de notas para que tenga estructura
+    indices_sorted = np.argsort([e.n_notes for e in entries])
+    dist_sorted = dist_matrix[indices_sorted][:, indices_sorted]
+
+    # Textos para hover
+    labels = [str(entries[i]) for i in indices_sorted]
+
+    fig = go.Figure(data=go.Heatmap(
+        z=dist_sorted,
+        x=labels,
+        y=labels,
+        colorscale='Viridis',
+        colorbar=dict(title="Distancia"),
+        hoverongaps=False
+    ))
+
+    fig.update_layout(
+        title=title,
+        width=800,
+        height=800,
+        xaxis_showticklabels=False,
+        yaxis_showticklabels=False
+    )
+    return fig
+
+def build_shepard_figure(
+    dist_original_condensed: np.ndarray,
+    embedding: np.ndarray,
+    title: str,
+    seed: int = 42
+) -> go.Figure:
+    """Genera un Shepard plot (dist original vs dist embedding) con subsampling."""
+
+    from scipy.spatial.distance import pdist
+
+    dist_emb_condensed = pdist(embedding, metric='euclidean')
+
+    n_pairs = len(dist_original_condensed)
+
+    if n_pairs > MAX_SHEPARD_PAIRS:
+        rng = np.random.RandomState(seed)
+        indices = rng.choice(n_pairs, MAX_SHEPARD_PAIRS, replace=False)
+        x = dist_original_condensed[indices]
+        y = dist_emb_condensed[indices]
+        sampled_label = f"(Subsampled {MAX_SHEPARD_PAIRS} pairs)"
+    else:
+        x = dist_original_condensed
+        y = dist_emb_condensed
+        sampled_label = "(All pairs)"
+
+    # Ajuste lineal
+    slope, intercept, r_value, p_value, std_err = linregress(x, y)
+    r2 = r_value**2
+
+    line_x = np.array([x.min(), x.max()])
+    line_y = slope * line_x + intercept
+
+    fig = go.Figure()
+
+    # Scatter points
+    fig.add_trace(go.Scattergl(
+        x=x,
+        y=y,
+        mode='markers',
+        marker=dict(size=3, opacity=0.5, color='#1f77b4'),
+        name='Pares'
+    ))
+
+    # Regression line
+    fig.add_trace(go.Scatter(
+        x=line_x,
+        y=line_y,
+        mode='lines',
+        line=dict(color='red', width=2),
+        name=f'Fit (R²={r2:.3f})'
+    ))
+
+    # Identity line (reference)
+    max_val = max(x.max(), y.max())
+    fig.add_trace(go.Scatter(
+        x=[0, max_val],
+        y=[0, max_val],
+        mode='lines',
+        line=dict(color='gray', dash='dash'),
+        name='Identidad'
+    ))
+
+    fig.update_layout(
+        title=f"{title} {sampled_label}<br>Slope: {slope:.3f}, R²: {r2:.3f}",
+        xaxis_title="Distancia Original",
+        yaxis_title="Distancia Embedding",
+        width=800,
+        height=600,
+        template="plotly_white"
+    )
+
+    return fig
 
 __all__ = [
     "ColorSettings",
     "HighlightSettings",
     "generate_figures",
     "build_scatter_figure",
+    "build_heatmap_figure",
+    "build_shepard_figure"
 ]
