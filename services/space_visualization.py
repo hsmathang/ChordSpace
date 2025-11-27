@@ -6,7 +6,7 @@ from __future__ import annotations
 
 import json
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any, Callable, Dict, List, Optional, Tuple
 import pandas as pd
 import numpy as np
 import plotly.graph_objects as go
@@ -84,7 +84,16 @@ class VisualizationService:
         # Let's write this service to fail if they are missing, but I will go back and add them.
         pass
 
-    def _generate_figures(self, result: ExperimentResult, entries: List[Any], totals, pairs) -> List[Tuple[str, go.Figure]]:
+    def _generate_figures(
+        self,
+        result: ExperimentResult,
+        entries: List[Any],
+        totals,
+        pairs,
+        sections_enabled: Dict[str, bool] | None = None,
+        *,
+        logger: Optional[Callable[[str], None]] = None,
+    ) -> List[Tuple[str, go.Figure]]:
         # Configure settings based on global constants (migrated from compare_proposals)
         # In a future iteration, these should be in VisualizationConfig completely.
         color_settings = ColorSettings(
@@ -120,22 +129,41 @@ class VisualizationService:
             distance_cache,
             color_settings=color_settings,
             highlight_settings=highlight_settings,
+            sections_enabled=sections_enabled,
+            logger=logger,
         )
 
-    def generate_report_full(self, result: ExperimentResult, config: VisualizationConfig) -> Path:
+    def generate_report_full(
+        self,
+        result: ExperimentResult,
+        config: VisualizationConfig,
+        *,
+        logger: Optional[Callable[[str], None]] = None,
+    ) -> Path:
         # Full implementation
         # 1. Rehydrate data
         from tools.proposals_pipeline.population import load_chords, stack_hist
+        if logger:
+            logger("[visualizacion] preparando acordes seleccionados…")
         entries = load_chords(dyads_query="", triads_query="", df_override=result.population_df)
         hist, totals, counts, pairs, notes = stack_hist(entries)
 
-        # 2. Generate Figures
-        figures = self._generate_figures(result, entries, totals, pairs)
-
-        # 3. Assemble HTML
+        # 2. Secciones activas según VisualizationConfig
         sections_enabled = {s: True for s in config.sections}
         if config.sections == ["all"]:
-             sections_enabled = {k: True for k in ["scatter", "heatmap", "shepard", "table", "metadata"]}
+            sections_enabled = {k: True for k in ["scatter", "heatmap", "shepard", "table", "secondary_metrics", "metadata"]}
+        if logger:
+            enabled_txt = ", ".join(k for k, enabled in sections_enabled.items() if enabled)
+            logger(f"[visualizacion] secciones activas: {enabled_txt}")
+        # 3. Generate Figures (respeta secciones)
+        figures = self._generate_figures(
+            result,
+            entries,
+            totals,
+            pairs,
+            sections_enabled=sections_enabled,
+            logger=logger,
+        )
 
         # Build minimal metadata if none provided, so the section is visible when selected.
         run_metadata = result.config.population.metadata or {}
@@ -193,6 +221,8 @@ class VisualizationService:
                 }
             }
 
+        if logger:
+            logger("[visualizacion] renderizando reporte HTML…")
         render_report_html(
             metrics_df=result.metrics_df,
             figures=figures,

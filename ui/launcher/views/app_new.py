@@ -403,6 +403,7 @@ class ExperimentLauncher(tk.Tk):
             "heatmap": tk.BooleanVar(value=True),
             "shepard": tk.BooleanVar(value=True),
             "table": tk.BooleanVar(value=True),
+            "secondary_metrics": tk.BooleanVar(value=False),
             "metadata": tk.BooleanVar(value=True),
         }
 
@@ -631,7 +632,14 @@ class ExperimentLauncher(tk.Tk):
     def _build_report_sections_frame(self, frame: ttk.Frame) -> None:
         ttk.Label(frame, text="Selecciona qué secciones incluir en el reporte HTML:").grid(row=0, column=0, sticky="w", pady=(0, 6))
         row = 1
-        for key, label in (("scatter", "Scatter"), ("heatmap", "Heatmap"), ("shepard", "Shepard"), ("table", "Tabla de métricas"), ("metadata", "Metadatos")):
+        for key, label in (
+            ("scatter", "Scatter"),
+            ("heatmap", "Heatmap"),
+            ("shepard", "Shepard"),
+            ("table", "Tabla de métricas"),
+            ("secondary_metrics", "Métricas secundarias"),
+            ("metadata", "Metadatos"),
+        ):
             var = self.section_vars[key]
             ttk.Checkbutton(frame, text=label, variable=var).grid(row=row, column=0, sticky="w", pady=2)
             row += 1
@@ -836,7 +844,13 @@ class ExperimentLauncher(tk.Tk):
         population_json = self._write_population_json(df_selected)
 
         # Build Configs from GUI state
-        pop_config = PopulationConfig(source_type="file", file_path=population_json)
+        run_metadata = self._build_population_metadata(df_selected, population_json)
+
+        pop_config = PopulationConfig(
+            source_type="file",
+            file_path=population_json,
+            metadata=run_metadata
+        )
 
         rough_config = RoughnessConfig(
             proposals=self._selected_proposals() or ["identity"],
@@ -903,7 +917,7 @@ class ExperimentLauncher(tk.Tk):
             self.log_queue.put(("progress", (80.0, "Generando visualizaciones...")))
 
             vis_service = VisualizationService()
-            report_path = vis_service.generate_report_full(result, vis_config)
+            report_path = vis_service.generate_report_full(result, vis_config, logger=_logger)
 
             self.compare_last_report = report_path
             self.log_queue.put(("compare_log", f"Reporte generado: {report_path}\n"))
@@ -944,6 +958,108 @@ class ExperimentLauncher(tk.Tk):
         active = [key for key, var in self.section_vars.items() if var.get()]
         if len(active) == len(self.section_vars): return "all"
         return ",".join(active)
+
+    def _parse_int_list(self, value: str) -> list[int]:
+        nums: list[int] = []
+        for token in re.split(r"[^\d-]+", value.strip()):
+            if not token:
+                continue
+            try:
+                nums.append(int(token))
+            except ValueError:
+                continue
+        return nums
+
+    def _build_population_metadata(self, df_selected: pd.DataFrame, payload_path: str) -> Dict[str, Any]:
+        total_selected = len(df_selected)
+        total_available = len(self.final_population_df) if self.final_population_df is not None else total_selected
+
+        selection = {
+            "rows_selected": total_selected,
+            "rows_available": total_available,
+            "mode": self.generation_mode_var.get(),
+            "payload_path": payload_path,
+        }
+
+        descriptor: Dict[str, Any] = {
+            "label": "Población generada",
+            "rows": total_selected,
+        }
+
+        filters_detail: Dict[str, Any] = {}
+        filters_label_parts: list[str] = []
+
+        if self.filter_enable_var.get():
+            cardinals = [n for n, var in self.filter_cardinality_vars.items() if var.get()]
+            if cardinals:
+                filters_detail["cardinalities"] = cardinals
+                filters_label_parts.append("cardinalidades=" + ", ".join(map(str, cardinals)))
+
+            span_min = self.filter_span_min_var.get().strip()
+            span_max = self.filter_span_max_var.get().strip()
+            if span_min or span_max:
+                filters_detail["span"] = {"min": span_min or None, "max": span_max or None}
+                filters_label_parts.append(f"span={span_min or '-'}-{span_max or '-'}")
+
+            max_internal = self.filter_max_internal_interval_var.get().strip()
+            if max_internal:
+                try:
+                    filters_detail["max_internal_interval"] = int(max_internal)
+                    filters_label_parts.append(f"intervalo_max={max_internal}")
+                except ValueError:
+                    pass
+
+            include_pcs = self._parse_int_list(self.filter_include_pcs_var.get())
+            exclude_pcs = self._parse_int_list(self.filter_exclude_pcs_var.get())
+            if include_pcs:
+                filters_detail["include_pitch_classes"] = include_pcs
+                filters_label_parts.append("pcs incluidas=" + ",".join(map(str, include_pcs)))
+            if exclude_pcs:
+                filters_detail["exclude_pitch_classes"] = exclude_pcs
+                filters_label_parts.append("pcs excluidas=" + ",".join(map(str, exclude_pcs)))
+
+            patterns = [p.strip() for p in self.filter_interval_var.get().split(";") if p.strip()]
+            if patterns:
+                filters_detail["interval_patterns"] = patterns
+                filters_label_parts.append("patrones=" + ", ".join(patterns))
+
+            filters_detail["interval_mode"] = self.filter_interval_mode_var.get()
+            filters_detail["pc_mode"] = self.filter_pc_mode_var.get()
+            filters_detail["scale_expand"] = bool(self.filter_scale_expand_var.get())
+        else:
+            filters_label_parts.append("sin filtros personalizados")
+
+        filters_label = " | ".join(filters_label_parts)
+
+        generation_mode = self.generation_mode_var.get()
+        if generation_mode == "combinatorial":
+            descriptor["mode"] = "combinatorial"
+            descriptor["combinatorial"] = {
+                "alphabet": self._parse_int_list(self.combinatorial_alphabet_var.get()),
+                "cardinalities": self._parse_int_list(self.combinatorial_cardinalities_var.get()),
+                "octave_min": self.combinatorial_octave_min_var.get().strip() or None,
+                "octave_max": self.combinatorial_octave_max_var.get().strip() or None,
+                "structural_mode": bool(self.structural_mode_var.get()),
+            }
+            descriptor["database"] = {}
+        else:
+            descriptor["mode"] = "database"
+            descriptor["database"] = {
+                "base_query": self.base_query_var.get(),
+                "population_query": self.pop_query_var.get(),
+                "filter_mode": self.filter_mode_var.get() if hasattr(self, "filter_mode_var") else None,
+            }
+            descriptor["combinatorial"] = {}
+
+        descriptor["filters"] = {"label": filters_label, "detail": filters_detail}
+
+        return {
+            "selection": selection,
+            "population": {
+                "descriptors": [descriptor]
+            }
+        }
+
 
     def _default_output_dir(self) -> Path:
         timestamp = dt.datetime.now().strftime("%Y%m%d_%H%M%S")

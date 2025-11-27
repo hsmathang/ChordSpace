@@ -5,7 +5,7 @@ from __future__ import annotations
 import os
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from dataclasses import dataclass
-from typing import Any, Dict, List, Optional, Sequence, Tuple
+from typing import Any, Callable, Dict, List, Optional, Sequence, Tuple
 
 import numpy as np
 import plotly.graph_objects as go
@@ -15,6 +15,17 @@ from scipy.stats import linregress
 from tools.proposals_pipeline.metrics import BASE_VECTOR_METRICS, MAX_SHEPARD_PAIRS
 from tools.proposals_pipeline.population import ChordEntry
 from visualisations.proposals import build_scatter_payload
+
+CARDINALITY_COLORS = ["#1f77b4", "#d62728", "#2ca02c", "#9467bd", "#8c564b", "#e377c2", "#7f7f7f"]
+
+
+def _cardinality_color(entry: ChordEntry) -> str:
+    idx = entry.n_notes % len(CARDINALITY_COLORS)
+    return CARDINALITY_COLORS[idx]
+
+
+def _entry_label(entry: ChordEntry) -> str:
+    return f"{entry} (n={getattr(entry, 'n_notes', '?')})"
 
 
 @dataclass(frozen=True)
@@ -97,7 +108,8 @@ def generate_figures(
     *,
     color_settings: ColorSettings,
     highlight_settings: HighlightSettings,
-    sections_enabled: Optional[Dict[str, bool]] = None
+    sections_enabled: Optional[Dict[str, bool]] = None,
+    logger: Optional[Callable[[str], None]] = None,
 ) -> List[Tuple[str, go.Figure]]:
     """Construye las figuras a partir de los payloads en paralelo."""
 
@@ -106,7 +118,7 @@ def generate_figures(
 
     # Default to all enabled if not specified (legacy behavior)
     if sections_enabled is None:
-        sections_enabled = {"scatter": True}
+        sections_enabled = {"scatter": True, "heatmap": True, "shepard": True}
 
     totals = np.asarray(totals, dtype=float)
     pairs = np.asarray(pairs, dtype=float)
@@ -140,6 +152,8 @@ def generate_figures(
 
         # 1. SCATTER PLOTS
         if sections_enabled.get("scatter", False):
+            if logger:
+                logger(f"[figuras] {scenario_name}: construyendo scatter principal…")
             color_modes: List[Tuple[str, Optional[float]]] = []
             if preproc_id == "identity":
                 color_modes.append(("raw_total", None))
@@ -183,25 +197,28 @@ def generate_figures(
                 figs.append((f"{scenario_name}||{suffix}", fig))
 
         # 2. HEATMAP
-        if sections_enabled.get("heatmap", False):
-            if dist_original_condensed is not None:
-                heatmap_fig = build_heatmap_figure(
-                    squareform(dist_original_condensed),
-                    entries,
-                    title=f"Heatmap: {scenario_name}"
-                )
-                figs.append((f"{scenario_name}||heatmap", heatmap_fig))
+        if sections_enabled.get("heatmap", False) and dist_original_condensed is not None:
+            if logger:
+                logger(f"[figuras] {scenario_name}: generando heatmap…")
+            heatmap_fig = build_heatmap_figure(
+                squareform(dist_original_condensed),
+                entries,
+                title=f"Heatmap: {scenario_name}"
+            )
+            figs.append((f"{scenario_name}||heatmap", heatmap_fig))
 
         # 3. SHEPARD PLOT
-        if sections_enabled.get("shepard", False):
-            if dist_original_condensed is not None:
-                shepard_fig = build_shepard_figure(
-                    dist_original_condensed,
-                    embedding,
-                    title=f"Shepard: {scenario_name} (seed {figure_seed})",
-                    seed=figure_seed
-                )
-                figs.append((f"{scenario_name}||shepard", shepard_fig))
+        if sections_enabled.get("shepard", False) and dist_original_condensed is not None:
+            if logger:
+                logger(f"[figuras] {scenario_name}: generando Shepard plot…")
+            shepard_fig = build_shepard_figure(
+                dist_original_condensed,
+                embedding,
+                entries=entries,
+                title=f"Shepard: {scenario_name} (seed {figure_seed})",
+                seed=figure_seed
+            )
+            figs.append((f"{scenario_name}||shepard", shepard_fig))
 
         return figs
 
@@ -261,61 +278,110 @@ def build_scatter_figure(
 def build_heatmap_figure(
     dist_matrix: np.ndarray,
     entries: List[ChordEntry],
-    title: str
+    title: str,
+    *,
+    label_threshold: int = 60,
 ) -> go.Figure:
     """Genera un heatmap de la matriz de distancias ordenada por cardinalidad."""
 
-    # Ordenar por número de notas para que tenga estructura
     indices_sorted = np.argsort([e.n_notes for e in entries])
     dist_sorted = dist_matrix[indices_sorted][:, indices_sorted]
 
-    # Textos para hover
-    labels = [str(entries[i]) for i in indices_sorted]
+    def _label(entry: ChordEntry) -> str:
+        acorde = getattr(entry, "acorde", None)
+        base_name = getattr(acorde, "name", None) or entry.identity_name or "Acorde"
+        intervals = getattr(acorde, "intervals", [])
+        try:
+            interval_txt = "[" + ",".join(str(int(i)) for i in intervals) + "]" if intervals else ""
+        except Exception:
+            interval_txt = ""
+        return f"{base_name} ({entry.n_notes}n){(' ' + interval_txt) if interval_txt else ''}"
 
-    fig = go.Figure(data=go.Heatmap(
-        z=dist_sorted,
-        x=labels,
-        y=labels,
-        colorscale='Viridis',
-        colorbar=dict(title="Distancia"),
-        hoverongaps=False
-    ))
+    labels = [_label(entries[i]) for i in indices_sorted]
+    hover_data: List[List[str]] = []
+    for row_idx in range(len(indices_sorted)):
+        row_hover: List[str] = []
+        for col_idx in range(len(indices_sorted)):
+            row_hover.append(f"{labels[row_idx]}<br>vs {labels[col_idx]}")
+        hover_data.append(row_hover)
+
+    show_labels = len(entries) <= label_threshold
+    tick_vals = list(range(len(labels))) if show_labels else None
+    tick_text = labels if show_labels else None
+
+    fig = go.Figure(
+        data=go.Heatmap(
+            z=dist_sorted,
+            x=list(range(len(labels))),
+            y=list(range(len(labels))),
+            colorscale="Turbo",
+            colorbar=dict(title="Distancia"),
+            hoverongaps=False,
+            text=hover_data,
+            hovertemplate="%{text}<br>Distancia=%{z:.3f}<extra></extra>",
+        )
+    )
 
     fig.update_layout(
         title=title,
-        width=800,
-        height=800,
-        xaxis_showticklabels=False,
-        yaxis_showticklabels=False
+        template="plotly_white",
+        width=min(1100, max(500, len(entries) * 10)),
+        height=min(1100, max(500, len(entries) * 10)),
+        xaxis=dict(
+            tickmode="array",
+            tickvals=tick_vals,
+            ticktext=tick_text,
+            showticklabels=show_labels,
+        ),
+        yaxis=dict(
+            tickmode="array",
+            tickvals=tick_vals,
+            ticktext=tick_text,
+            showticklabels=show_labels,
+        ),
     )
     return fig
 
 def build_shepard_figure(
     dist_original_condensed: np.ndarray,
     embedding: np.ndarray,
+    *,
+    entries: List[ChordEntry],
     title: str,
-    seed: int = 42
+    seed: int = 42,
 ) -> go.Figure:
     """Genera un Shepard plot (dist original vs dist embedding) con subsampling."""
 
     from scipy.spatial.distance import pdist
 
-    dist_emb_condensed = pdist(embedding, metric='euclidean')
-
-    n_pairs = len(dist_original_condensed)
+    dist_emb_condensed = pdist(embedding, metric="euclidean")
+    n = len(entries)
+    row_idx, col_idx = np.triu_indices(n, 1)
+    n_pairs = len(row_idx)
 
     if n_pairs > MAX_SHEPARD_PAIRS:
         rng = np.random.RandomState(seed)
         indices = rng.choice(n_pairs, MAX_SHEPARD_PAIRS, replace=False)
         x = dist_original_condensed[indices]
         y = dist_emb_condensed[indices]
-        sampled_label = f"(Subsampled {MAX_SHEPARD_PAIRS} pairs)"
+        rows = row_idx[indices]
+        cols = col_idx[indices]
+        sampled_label = f"(Subsample {MAX_SHEPARD_PAIRS} pairs)"
     else:
         x = dist_original_condensed
         y = dist_emb_condensed
+        rows = row_idx
+        cols = col_idx
         sampled_label = "(All pairs)"
 
-    # Ajuste lineal
+    hover_text = []
+    colors = []
+    for i, j in zip(rows, cols):
+        chord_a = _entry_label(entries[i])
+        chord_b = _entry_label(entries[j])
+        hover_text.append(f"{chord_a}<br>vs {chord_b}")
+        colors.append(_cardinality_color(entries[i]))
+
     slope, intercept, r_value, p_value, std_err = linregress(x, y)
     r2 = r_value**2
 
@@ -323,44 +389,44 @@ def build_shepard_figure(
     line_y = slope * line_x + intercept
 
     fig = go.Figure()
-
-    # Scatter points
-    fig.add_trace(go.Scattergl(
-        x=x,
-        y=y,
-        mode='markers',
-        marker=dict(size=3, opacity=0.5, color='#1f77b4'),
-        name='Pares'
-    ))
-
-    # Regression line
-    fig.add_trace(go.Scatter(
-        x=line_x,
-        y=line_y,
-        mode='lines',
-        line=dict(color='red', width=2),
-        name=f'Fit (R²={r2:.3f})'
-    ))
-
-    # Identity line (reference)
+    fig.add_trace(
+        go.Scattergl(
+            x=x,
+            y=y,
+            text=hover_text,
+            mode="markers",
+            marker=dict(size=5, opacity=0.65, color=colors),
+            name="Pares",
+            hovertemplate="%{text}<br>Dist original=%{x:.3f}<br>Dist embebida=%{y:.3f}<extra></extra>",
+        )
+    )
+    fig.add_trace(
+        go.Scatter(
+            x=line_x,
+            y=line_y,
+            mode="lines",
+            line=dict(color="red", width=2),
+            name=f"Fit (R^2={r2:.3f})",
+        )
+    )
     max_val = max(x.max(), y.max())
-    fig.add_trace(go.Scatter(
-        x=[0, max_val],
-        y=[0, max_val],
-        mode='lines',
-        line=dict(color='gray', dash='dash'),
-        name='Identidad'
-    ))
-
+    fig.add_trace(
+        go.Scatter(
+            x=[0, max_val],
+            y=[0, max_val],
+            mode="lines",
+            line=dict(color="gray", dash="dash"),
+            name="Identidad",
+        )
+    )
     fig.update_layout(
-        title=f"{title} {sampled_label}<br>Slope: {slope:.3f}, R²: {r2:.3f}",
-        xaxis_title="Distancia Original",
-        yaxis_title="Distancia Embedding",
+        title=f"{title} {sampled_label}<br>Pendiente: {slope:.3f}, R^2: {r2:.3f}",
+        xaxis_title="Distancia original",
+        yaxis_title="Distancia embebida",
         width=800,
         height=600,
-        template="plotly_white"
+        template="plotly_white",
     )
-
     return fig
 
 __all__ = [

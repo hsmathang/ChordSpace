@@ -10,6 +10,9 @@ from scipy.spatial.distance import pdist, squareform, jensenshannon
 from scipy.stats import linregress
 from sklearn.manifold import Isomap, MDS, TSNE
 from sklearn.metrics import silhouette_score, davies_bouldin_score
+from sklearn.linear_model import LogisticRegression
+from sklearn.model_selection import StratifiedKFold
+from sklearn.neighbors import NearestNeighbors
 
 try:  # pragma: no cover - UMAP opcional
     import umap  # type: ignore
@@ -167,6 +170,9 @@ def run_scenario_task(task: Dict[str, Any]) -> Dict[str, Any]:
         if not seed_rows:
             continue
 
+        t_red_end = time.perf_counter()
+        runtime_seconds = t_red_end - t_red_start
+
         summary = aggregate_seed_results(seed_rows, seed_list)
         summary.update(
             {
@@ -176,7 +182,9 @@ def run_scenario_task(task: Dict[str, Any]) -> Dict[str, Any]:
                 "preproc_id": preproc_id,
                 "figure_seed": figure_seed,
                 "reduction": reduction,
-                "hyperparams": hyperparams, # Agregar a summary también
+                "hyperparams": hyperparams,  # Agregar a summary también
+                "runtime_seconds": runtime_seconds,
+                "runtime_seconds_per_seed": runtime_seconds / len(seed_rows),
             }
         )
         results.append(summary)
@@ -195,9 +203,8 @@ def run_scenario_task(task: Dict[str, Any]) -> Dict[str, Any]:
                     "hyperparams": hyperparams,
                 }
             )
-        t_red_end = time.perf_counter()
         scenario_key = f"{reduction}:{scenario_name_base}"
-        reduction_timings.append((scenario_key, t_red_end - t_red_start))
+        reduction_timings.append((scenario_key, runtime_seconds))
 
     return {
         "warnings": warnings,
@@ -255,7 +262,7 @@ def compute_embeddings(
         kl_divergence = getattr(tsne, "kl_divergence_", None)
         params = {
             "perplexity": safe_perplexity,
-            "n_iter": tsne.n_iter,
+            "n_iter": getattr(tsne, "n_iter_", None),
             "kl_divergence": kl_divergence
         }
         return emb, params
@@ -402,6 +409,108 @@ def compute_cluster_metrics(
         "davies_bouldin": db
     }
 
+
+def compute_cardinality_neighbor_hits(
+    embedding: np.ndarray,
+    labels: np.ndarray,
+    *,
+    k_neighbors: int = 6,
+) -> Dict[str, float]:
+    """Calcula la proporción de vecinos con la misma cardinalidad por clase."""
+
+    n = len(labels)
+    if n <= 1:
+        return {}
+    k = min(max(k_neighbors, 1), n - 1)
+    try:
+        nbrs = NearestNeighbors(n_neighbors=k + 1, metric="euclidean").fit(embedding)
+        _, indices = nbrs.kneighbors(embedding)
+    except Exception:
+        return {}
+
+    indices = indices[:, 1:]
+    hits: Dict[int, List[float]] = {}
+    for idx in range(n):
+        target_label = int(labels[idx])
+        neigh_labels = labels[indices[idx]] if indices.shape[1] > 0 else np.array([], dtype=labels.dtype)
+        ratio = float(np.mean(neigh_labels == target_label)) if neigh_labels.size else 0.0
+        hits.setdefault(target_label, []).append(ratio)
+
+    return {f"knn_hit_card_{card}": float(np.mean(values)) for card, values in hits.items()}
+
+
+def compute_relative_rank_error(
+    dist_condensed: np.ndarray,
+    embedding: np.ndarray,
+) -> Optional[float]:
+    """Promedio de error relativo entre los rankings de distancias originales y embebidas."""
+
+    if dist_condensed.size == 0:
+        return None
+    dist_emb = pdist(embedding, metric="euclidean")
+    if dist_emb.size != dist_condensed.size:
+        return None
+
+    order_orig = np.argsort(dist_condensed)
+    order_emb = np.argsort(dist_emb)
+    ranks_orig = np.empty_like(order_orig)
+    ranks_emb = np.empty_like(order_emb)
+    ranks_orig[order_orig] = np.arange(len(order_orig))
+    ranks_emb[order_emb] = np.arange(len(order_emb))
+    denom = np.maximum(ranks_orig, 1)
+    errors = np.abs(ranks_orig - ranks_emb) / denom
+    return float(np.mean(errors))
+
+
+def compute_embedding_variance_ratio(embedding: np.ndarray) -> Dict[str, Optional[float]]:
+    """Relación de varianza explicada por cada componente del embedding."""
+
+    if embedding.size == 0:
+        return {"var_ratio_dim1": None, "var_ratio_dim2": None}
+
+    try:
+        cov = np.cov(embedding, rowvar=False)
+        eigvals = np.linalg.eigvalsh(cov)
+        eigvals = np.sort(np.clip(eigvals, 0.0, None))[::-1]
+        total = float(np.sum(eigvals))
+        if total <= 0:
+            return {"var_ratio_dim1": None, "var_ratio_dim2": None}
+        ratios = eigvals / total
+        dim1 = float(ratios[0]) if ratios.size > 0 else None
+        dim2 = float(ratios[1]) if ratios.size > 1 else None
+        return {"var_ratio_dim1": dim1, "var_ratio_dim2": dim2}
+    except Exception:
+        return {"var_ratio_dim1": None, "var_ratio_dim2": None}
+
+
+def compute_cardinality_logreg_accuracy(
+    embedding: np.ndarray,
+    labels: np.ndarray,
+    *,
+    max_splits: int = 5,
+) -> Optional[float]:
+    """Evalúa qué tan separables son las cardinalidades mediante regresión logística."""
+
+    unique_labels, counts = np.unique(labels, return_counts=True)
+    if unique_labels.size < 2 or embedding.shape[0] <= unique_labels.size:
+        return None
+
+    max_possible = int(np.min(counts))
+    n_splits = min(max_splits, max_possible)
+    if n_splits < 2:
+        return None
+
+    try:
+        skf = StratifiedKFold(n_splits=n_splits, shuffle=True, random_state=42)
+        scores: List[float] = []
+        for train_idx, test_idx in skf.split(embedding, labels):
+            model = LogisticRegression(max_iter=1000, multi_class="auto")
+            model.fit(embedding[train_idx], labels[train_idx])
+            scores.append(float(model.score(embedding[test_idx], labels[test_idx])))
+        return float(np.mean(scores)) if scores else None
+    except Exception:
+        return None
+
 def summarise_embedding_metrics(
     X_original: np.ndarray,
     embedding: np.ndarray,
@@ -443,6 +552,19 @@ def summarise_embedding_metrics(
     # Cluster stats
     metrics.update(compute_cluster_metrics(embedding, labels))
 
+    # Rank error y varianzas
+    metrics["relative_rank_error"] = compute_relative_rank_error(dist_condensed, embedding)
+    metrics.update(compute_embedding_variance_ratio(embedding))
+
+    # Separabilidad supervisada por cardinalidad
+    metrics["cardinality_logreg_acc"] = compute_cardinality_logreg_accuracy(embedding, labels)
+
+    # Hits por cardinalidad (vecindario en el embedding)
+    metrics.update(compute_cardinality_neighbor_hits(embedding, labels))
+
+    # Uso de memoria del embedding
+    metrics["embedding_mem_kb"] = float(embedding.nbytes / 1024.0)
+
     return metrics
 
 
@@ -470,8 +592,22 @@ def aggregate_seed_results(seed_rows: List[Dict[str, Any]], seeds: Sequence[int]
         "shepard_r2",
         "silhouette",
         "davies_bouldin",
-        "kl_divergence"
+        "kl_divergence",
+        "relative_rank_error",
+        "var_ratio_dim1",
+        "var_ratio_dim2",
+        "cardinality_logreg_acc",
+        "embedding_mem_kb",
     ]
+    card_metric_keys = sorted(
+        {
+            key
+            for row in seed_rows
+            for key in row.keys()
+            if key.startswith("knn_hit_card_")
+        }
+    )
+    metrics_keys.extend(card_metric_keys)
     summary: Dict[str, Any] = {"seeds": list(seeds)}
     for key in metrics_keys:
         values = [row.get(key) for row in seed_rows]

@@ -3,6 +3,8 @@
 from __future__ import annotations
 
 import html
+import math
+from collections import defaultdict
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Sequence, Tuple
 
@@ -91,55 +93,122 @@ def render_report_html(
     ranked_df["rank"] = compute_rank(ranked_df)
     ranked_df.sort_values(by="rank", inplace=True)
 
-    if include_section("table", True):
-        display_df = ranked_df[
-            [
-                "rank",
-                "scenario",
-                "metric",
-                "stress_mean",
-                "stress_std",
-                "trustworthiness_mean",
-                "trustworthiness_std",
-                "mixture_l1_mean_mean",
-                "mixture_l1_mean_std",
-                "seeds",
-            ]
-        ].copy()
-    else:
-        display_df = pd.DataFrame()
     table_html = ""
-    if not display_df.empty:
-        display_df["Stress"] = display_df.apply(
-            lambda row: format_value_with_std(row["stress_mean"], row["stress_std"]), axis=1
-        )
-        display_df["Trustworthiness"] = display_df.apply(
-            lambda row: format_value_with_std(row["trustworthiness_mean"], row["trustworthiness_std"]), axis=1
-        )
-        display_df["Mixture L1"] = display_df.apply(
-            lambda row: format_value_with_std(row["mixture_l1_mean_mean"], row["mixture_l1_mean_std"]), axis=1
-        )
-        display_df["Semillas"] = display_df["seeds"].apply(format_seed_list)
-        display_df = display_df.rename(
-            columns={"rank": "Ranking", "scenario": "Escenario", "metric": "Metrica"}
-        )
-        display_df = display_df[
-            ["Ranking", "Escenario", "Metrica", "Stress", "Trustworthiness", "Mixture L1", "Semillas"]
-        ]
-        table_html = display_df.to_html(index=False, float_format=lambda x: f"{x:.4f}")
+    secondary_table_html = ""
+    if include_section("table", True) and not ranked_df.empty:
+        def fmt_metric(row: pd.Series, mean_key: str, std_key: str, *, applies: bool = True) -> str:
+            if not applies:
+                return "N/A"
+            return format_value_with_std(row.get(mean_key), row.get(std_key))
 
-    # Opcionalmente filtrar figuras por secciones_enabled
-    filtered_figs: List[Tuple[str, go.Figure]] = []
+        def fmt_hyperparams(value: Any) -> str:
+            if isinstance(value, dict):
+                items = [f"{k}={v}" for k, v in value.items()]
+                return ", ".join(items) if items else "-"
+            return html.escape(str(value)) if value else "-"
+
+        display_df = pd.DataFrame(
+            {
+                "Ranking": ranked_df["rank"],
+                "Escenario": ranked_df["scenario"],
+                "Reducción": ranked_df.get("reduction", pd.Series(["-"] * len(ranked_df))),
+                "Métrica": ranked_df["metric"],
+                "Stress": ranked_df.apply(
+                    lambda row: fmt_metric(row, "stress_mean", "stress_std", applies=row.get("reduction") in {"MDS", "ISOMAP"}),
+                    axis=1
+                ),
+                "Trustworthiness": ranked_df.apply(
+                    lambda row: fmt_metric(row, "trustworthiness_mean", "trustworthiness_std"), axis=1
+                ),
+                "Continuidad": ranked_df.apply(
+                    lambda row: fmt_metric(row, "continuity_mean", "continuity_std"), axis=1
+                ),
+                "kNN recall": ranked_df.apply(
+                    lambda row: fmt_metric(row, "knn_recall_mean", "knn_recall_std"), axis=1
+                ),
+                "Shepard R²": ranked_df.apply(
+                    lambda row: fmt_metric(row, "shepard_r2_mean", "shepard_r2_std"), axis=1
+                ),
+                "Silhouette": ranked_df.apply(
+                    lambda row: fmt_metric(row, "silhouette_mean", "silhouette_std"), axis=1
+                ),
+                "Davies-Bouldin": ranked_df.apply(
+                    lambda row: fmt_metric(row, "davies_bouldin_mean", "davies_bouldin_std"), axis=1
+                ),
+                "KL (TSNE)": ranked_df.apply(
+                    lambda row: fmt_metric(row, "kl_divergence_mean", "kl_divergence_std", applies=row.get("reduction") == "TSNE"),
+                    axis=1
+                ),
+                "Mixture L1": ranked_df.apply(
+                    lambda row: fmt_metric(row, "mixture_l1_mean_mean", "mixture_l1_mean_std"), axis=1
+                ),
+                "Hiperparámetros": ranked_df["hyperparams"].apply(fmt_hyperparams)
+                if "hyperparams" in ranked_df.columns
+                else "-",
+                "Semillas": ranked_df["seeds"].apply(format_seed_list),
+            }
+        )
+        table_html = display_df.to_html(index=False, escape=True)
+
+    if include_section("secondary_metrics", False) and not ranked_df.empty:
+        def fmt_secondary(row: pd.Series, key: str) -> str:
+            return format_value_with_std(row.get(f"{key}_mean"), row.get(f"{key}_std"))
+
+        card_mean_cols = sorted(
+            {
+                col[:-5]
+                for col in ranked_df.columns
+                if col.startswith("knn_hit_card_") and col.endswith("_mean")
+            }
+        )
+        secondary_rows: List[Dict[str, Any]] = []
+        for _, row in ranked_df.iterrows():
+            sec_row: Dict[str, Any] = {
+                "Escenario": row["scenario"],
+                "MRRE": fmt_secondary(row, "relative_rank_error"),
+                "Var comp1": fmt_secondary(row, "var_ratio_dim1"),
+                "Var comp2": fmt_secondary(row, "var_ratio_dim2"),
+                "LogReg acc": fmt_secondary(row, "cardinality_logreg_acc"),
+                "Memoria (KB)": fmt_secondary(row, "embedding_mem_kb"),
+                "Tiempo (s)": (
+                    f"{float(row.get('runtime_seconds', 0.0)):.2f}"
+                    if row.get("runtime_seconds") is not None
+                    else "-"
+                ),
+            }
+            for base in card_mean_cols:
+                label = base.split("_")[-1]
+                sec_row[f"kNN n={label}"] = fmt_secondary(row, base)
+            secondary_rows.append(sec_row)
+        secondary_df = pd.DataFrame(secondary_rows)
+        secondary_table_html = (
+            "<h3>Métricas secundarias</h3>" + secondary_df.to_html(index=False, escape=True)
+        )
+
+    # Agrupar figuras por escenario y sección
+    figure_groups: Dict[str, Dict[str, go.Figure]] = defaultdict(dict)
+    scatter_prefixes = ("raw_total", "pair_exp", "types_exp")
     for title, fig in figures:
-        key = title.lower()
-        if key.startswith("scatter") and not include_section("scatter", True):
-            continue
-        if key.startswith("heatmap") and not include_section("heatmap", True):
-            continue
-        if key.startswith("shepard") and not include_section("shepard", True):
-            continue
-        filtered_figs.append((title, fig))
-    figure_map = {title: fig for title, fig in filtered_figs}
+        if "||" in title:
+            scenario_name, suffix = title.split("||", 1)
+        else:
+            scenario_name, suffix = title, "raw_total"
+        suffix_lower = suffix.lower()
+        if suffix_lower.startswith(scatter_prefixes):
+            if not include_section("scatter", True):
+                continue
+        elif suffix_lower == "heatmap":
+            if not include_section("heatmap", True):
+                continue
+            suffix = "heatmap"
+        elif suffix_lower == "shepard":
+            if not include_section("shepard", True):
+                continue
+            suffix = "shepard"
+        else:
+            if not include_section("scatter", True):
+                continue
+        figure_groups[scenario_name][suffix] = fig
 
     preferred_order = ["euclidean", "cosine", "js", "hellinger", "l1", "cityblock", "manhattan"]
 
@@ -150,6 +219,13 @@ def render_report_html(
     reductions_present = list(dict.fromkeys(ranked_df.get("reduction", pd.Series(["MDS"])).tolist()))
 
     include_js = True
+    def fig_to_html(fig_obj: go.Figure) -> str:
+        nonlocal include_js
+        if fig_obj is None:
+            return "<p>No hay figura disponible.</p>"
+        inner = to_html(fig_obj, include_plotlyjs="cdn" if include_js else False, full_html=False)
+        include_js = False
+        return inner
     subtab_counter = 0
 
     def render_card(row: Dict[str, Any], *, is_baseline: bool) -> str:
@@ -157,14 +233,21 @@ def render_report_html(
         if row is None:
             return ""
         scenario = row.get("scenario", "")
-        scenario_prefix = f"{scenario}||"
+        fig_bucket = figure_groups.get(scenario, {})
 
         card_highlight_info: Optional[Dict[str, Any]] = None
         panel_entries: List[Tuple[Tuple[int, float], str, Optional[float], str, str]] = []
-        for key, fig in figure_map.items():
-            if not key.startswith(scenario_prefix):
+        heatmap_html = ""
+        shepard_html = ""
+        for suffix, fig in fig_bucket.items():
+            suffix_lower = suffix.lower()
+            if suffix_lower == "heatmap":
+                heatmap_html = fig_to_html(fig)
                 continue
-            suffix = key[len(scenario_prefix) :]
+            if suffix_lower == "shepard":
+                shepard_html = fig_to_html(fig)
+                continue
+
             if suffix == "raw_total":
                 mode = "raw_total"
                 exponent = None
@@ -196,8 +279,7 @@ def render_report_html(
                             candidate_info = dict(fh)
                             if card_highlight_info is None or candidate_info.get("enabled"):
                                 card_highlight_info = candidate_info
-                inner_html = to_html(fig, include_plotlyjs="cdn" if include_js else False, full_html=False)
-                include_js = False
+                inner_html = fig_to_html(fig)
             else:
                 inner_html = "<p>No hay figura disponible.</p>"
 
@@ -208,95 +290,94 @@ def render_report_html(
             panel_entries.append((order, mode, exponent, suffix_label, inner_html))
 
         panel_entries.sort(key=lambda item: item[0])
-        if not panel_entries:
+        has_scatter = bool(panel_entries)
+        has_auxiliary = bool(heatmap_html or shepard_html)
+        if not has_scatter and not has_auxiliary:
             return ""
 
-        mode_defaults: Dict[str, float] = {}
-        for _, mode, exponent, _, _ in panel_entries:
-            if mode not in mode_defaults and exponent is not None:
-                mode_defaults[mode] = exponent
-
-        default_mode = panel_entries[0][1]
-        default_exponent = panel_entries[0][2]
-        if default_mode != "raw_total":
-            found = False
-            for _, mode, exponent, _, _ in panel_entries:
-                if mode == "pair_exp" and exponent is not None and abs(exponent - 1.0) < 1e-9:
-                    default_exponent = exponent
-                    found = True
-                    break
-            if not found:
-                _, default_mode, default_exponent, _, _ = panel_entries[0]
-
-        mode_labels = {
-            "raw_total": "Rugosidad bruta",
-            "pair_exp": "Normalizacion por pares",
-            "types_exp": "Normalizacion por tipos",
-        }
-
-        mode_order: List[str] = []
-        for _, mode, _, _, _ in panel_entries:
-            if mode not in mode_order:
-                mode_order.append(mode)
-
-        options_html: List[str] = []
-        for mode in mode_order:
-            label = mode_labels.get(mode, mode)
-            selected_attr = " selected" if mode == default_mode else ""
-            default_exp_val = mode_defaults.get(mode, 0.0)
-            options_html.append(
-                f"<option value='{mode}' data-default-exp='{default_exp_val:.2f}'{selected_attr}>{label}</option>"
-            )
-
-        panels_html: List[str] = []
-        for _, mode, exponent, suffix, inner_html in panel_entries:
-            target_id = f"card-{subtab_counter}-{suffix}"
-            is_active = mode == default_mode and (
-                (exponent is None and default_exponent is None)
-                or (
-                    exponent is not None
-                    and default_exponent is not None
-                    and abs(exponent - default_exponent) < 1e-9
-                )
-            )
-            exp_str = f"{exponent:.2f}" if exponent is not None else ""
-            style_attr = " style='display:block;'" if is_active else " style='display:none;'"
-            panels_html.append(
-                f"<div id='{target_id}' class='subtab-panel{' active' if is_active else ''}' "
-                f"data-mode='{mode}' data-exp='{exp_str}'{style_attr}>{inner_html}</div>"
-            )
-
-        stress = format_value_with_std(row.get("stress_mean"), row.get("stress_std"))
-        trust = format_value_with_std(row.get("trustworthiness_mean"), row.get("trustworthiness_std"))
-        mixture = format_value_with_std(row.get("mixture_l1_mean_mean"), row.get("mixture_l1_mean_std"))
-        seeds_text = format_seed_list(row.get("seeds"))
-        badge = "<span class='badge'>Base</span>" if is_baseline else ""
-        header = f"<div class='card-header'><strong>{scenario}</strong> {badge}</div>"
-        metrics_line = (
-            f"<div class='metrics-line'>Stress: {stress} | Trust: {trust} | Mixture L1: {mixture} | Semillas: {seeds_text}</div>"
-        )
-
-        default_exp_str = f"{default_exponent:.2f}" if default_exponent is not None else "0.00"
-        default_exp_display = f"{default_exponent:.2f}" if default_exponent is not None else "--"
-        slider_disabled_attr = "" if default_mode in {"pair_exp", "types_exp"} else " disabled"
-
-        controls = (
-            f"<div class='color-controls' data-default-mode='{default_mode}' data-default-exp='{default_exp_str}'>"
-            f"  <label>Color por:"
-            f"    <select id='card-{subtab_counter}-mode'>"
-            f"      {''.join(options_html)}"
-            f"    </select>"
-            f"  </label>"
-            f"  <label> Exponente:"
-            f"    <input id='card-{subtab_counter}-exp' type='range' min='0' max='1' step='0.05' "
-            f"value='{default_exp_str}'{slider_disabled_attr}/>"
-            f"    <span id='card-{subtab_counter}-exp-val'>{default_exp_display}</span>"
-            f"  </label>"
-            f"</div>"
-        )
+        controls_html = ""
+        panels_block = ""
+        inversion_controls_html = ""
         highlight_note_html = ""
-        highlight_enabled_flag = bool(card_highlight_info and card_highlight_info.get("enabled"))
-        inversion_controls_html = """
+        default_mode = "raw_total"
+        default_exponent = None
+
+        if has_scatter:
+            mode_defaults: Dict[str, float] = {}
+            for _, mode, exponent, _, _ in panel_entries:
+                if mode not in mode_defaults and exponent is not None:
+                    mode_defaults[mode] = exponent
+
+            default_mode = panel_entries[0][1]
+            default_exponent = panel_entries[0][2]
+            if default_mode != "raw_total":
+                found = False
+                for _, mode, exponent, _, _ in panel_entries:
+                    if mode == "pair_exp" and exponent is not None and abs(exponent - 1.0) < 1e-9:
+                        default_exponent = exponent
+                        found = True
+                        break
+                if not found:
+                    _, default_mode, default_exponent, _, _ = panel_entries[0]
+
+            mode_labels = {
+                "raw_total": "Rugosidad bruta",
+                "pair_exp": "Normalizacion por pares",
+                "types_exp": "Normalizacion por tipos",
+            }
+
+            mode_order: List[str] = []
+            for _, mode, _, _, _ in panel_entries:
+                if mode not in mode_order:
+                    mode_order.append(mode)
+
+            options_html: List[str] = []
+            for mode in mode_order:
+                label = mode_labels.get(mode, mode)
+                selected_attr = " selected" if mode == default_mode else ""
+                default_exp_val = mode_defaults.get(mode, 0.0)
+                options_html.append(
+                    f"<option value='{mode}' data-default-exp='{default_exp_val:.2f}'{selected_attr}>{label}</option>"
+                )
+
+            panels_html: List[str] = []
+            for _, mode, exponent, suffix, inner_html in panel_entries:
+                target_id = f"card-{subtab_counter}-{suffix}"
+                is_active = mode == default_mode and (
+                    (exponent is None and default_exponent is None)
+                    or (
+                        exponent is not None
+                        and default_exponent is not None
+                        and abs(exponent - default_exponent) < 1e-9
+                    )
+                )
+                exp_str = f"{exponent:.2f}" if exponent is not None else ""
+                style_attr = " style='display:block;'" if is_active else " style='display:none;'"
+                panels_html.append(
+                    f"<div id='{target_id}' class='subtab-panel{' active' if is_active else ''}' "
+                    f"data-mode='{mode}' data-exp='{exp_str}'{style_attr}>{inner_html}</div>"
+                )
+
+            panels_block = "<div class='subtab-panels'>" + "".join(panels_html) + "</div>"
+            default_exp_str = f"{default_exponent:.2f}" if default_exponent is not None else "0.00"
+            default_exp_display = f"{default_exponent:.2f}" if default_exponent is not None else "--"
+            slider_disabled_attr = "" if default_mode in {"pair_exp", "types_exp"} else " disabled"
+
+            controls_html = (
+                f"<div class='color-controls' data-default-mode='{default_mode}' data-default-exp='{default_exp_str}'>"
+                f"  <label>Color por:"
+                f"    <select id='card-{subtab_counter}-mode'>"
+                f"      {''.join(options_html)}"
+                f"    </select>"
+                f"  </label>"
+                f"  <label> Exponente:"
+                f"    <input id='card-{subtab_counter}-exp' type='range' min='0' max='1' step='0.05' "
+                f"value='{default_exp_str}'{slider_disabled_attr}/>"
+                f"    <span id='card-{subtab_counter}-exp-val'>{default_exp_display}</span>"
+                f"  </label>"
+                f"</div>"
+            )
+            inversion_controls_html = """
         <div class='inversion-controls'>
             <label><input type='checkbox' class='inversion-toggle' data-inversion-type='musical'> Resaltar inversiones musicales</label>
             <label><input type='checkbox' class='inversion-toggle' data-inversion-type='structural'> Resaltar inversiones estructurales</label>
@@ -309,6 +390,30 @@ def render_report_html(
             </label>
         </div>
         """
+            highlight_enabled_flag = bool(card_highlight_info and card_highlight_info.get("enabled"))
+            if highlight_enabled_flag:
+                highlight_note_html = "<p class='highlight-note'>Haz clic sobre un punto para resaltar su familia.</p>"
+            else:
+                highlight_note_html = "<p class='highlight-note muted'>Sin familias destacadas en este escenario.</p>"
+        else:
+            reason = (
+                "La sección Scatter está desactivada en la GUI."
+                if not include_section("scatter", True)
+                else "Scatter no generado para este escenario."
+            )
+            panels_block = f"<div class='subtab-panels empty'><p class='empty-panel'>{reason}</p></div>"
+            highlight_enabled_flag = False
+
+        stress = format_value_with_std(row.get("stress_mean"), row.get("stress_std"))
+        trust = format_value_with_std(row.get("trustworthiness_mean"), row.get("trustworthiness_std"))
+        mixture = format_value_with_std(row.get("mixture_l1_mean_mean"), row.get("mixture_l1_mean_std"))
+        seeds_text = format_seed_list(row.get("seeds"))
+        badge = "<span class='badge'>Base</span>" if is_baseline else ""
+        header = f"<div class='card-header'><strong>{scenario}</strong> {badge}</div>"
+        metrics_line = (
+            f"<div class='metrics-line'>Stress: {stress} | Trust: {trust} | Mixture L1: {mixture} | Semillas: {seeds_text}</div>"
+        )
+
         card_attrs = [
             f"data-sid='card-{subtab_counter}'",
             f"data-family-highlight='{'1' if highlight_enabled_flag else '0'}'",
@@ -323,16 +428,75 @@ def render_report_html(
 
         subtab_counter += 1
         card_attrs_str = " ".join(card_attrs)
-        panels_block = "<div class='subtab-panels'>" + "".join(panels_html) + "</div>"
         detail_panel = (
             "<div class='detail-panel' "
             "data-default-msg='Haz clic en un punto para ver el detalle completo.'>"
             "Haz clic en un punto para ver el detalle completo."
             "</div>"
         )
+        aux_sections = ""
+        if heatmap_html:
+            aux_sections += (
+                "<details class='aux-figure' open data-section='heatmap'>"
+                "<summary>Heatmap de distancias</summary>"
+                f"<div class='figure-body'>{heatmap_html}</div>"
+                "</details>"
+            )
+        if shepard_html:
+            aux_sections += (
+                "<details class='aux-figure' open data-section='shepard'>"
+                "<summary>Shepard (distancias originales vs reducidas)</summary>"
+                f"<div class='figure-body'>{shepard_html}</div>"
+                "</details>"
+            )
+
+        return (
+            f"<div class='plot-card' {card_attrs_str}>{header}{metrics_line}{controls_html}"
+            f"{highlight_note_html}{inversion_controls_html}{panels_block}{aux_sections}{detail_panel}</div>"
+        )
+        card_attrs = [
+            f"data-sid='card-{subtab_counter}'",
+            f"data-family-highlight='{'1' if highlight_enabled_flag else '0'}'",
+        ]
+        if card_highlight_info:
+            families_detected = int(card_highlight_info.get("families", 0) or 0)
+            threshold_limit = int(card_highlight_info.get("threshold", highlight_threshold) or highlight_threshold)
+            card_attrs.append(f"data-families='{families_detected}'")
+            card_attrs.append(f"data-highlight-threshold='{threshold_limit}'")
+        else:
+            card_attrs.append(f"data-highlight-threshold='{highlight_threshold}'")
+
+        subtab_counter += 1
+        card_attrs_str = " ".join(card_attrs)
+        if panels_html:
+            panels_block = "<div class='subtab-panels'>" + "".join(panels_html) + "</div>"
+        else:
+            panels_block = "<div class='subtab-panels'><p class='empty-panel'>Scatter no generado.</p></div>"
+        detail_panel = (
+            "<div class='detail-panel' "
+            "data-default-msg='Haz clic en un punto para ver el detalle completo.'>"
+            "Haz clic en un punto para ver el detalle completo."
+            "</div>"
+        )
+        aux_sections = ""
+        if heatmap_html:
+            aux_sections += (
+                "<div class='aux-figure'>"
+                "<h4>Heatmap de distancias</h4>"
+                f"{heatmap_html}"
+                "</div>"
+            )
+        if shepard_html:
+            aux_sections += (
+                "<div class='aux-figure'>"
+                "<h4>Shepard (distancias originales vs reducidas)</h4>"
+                f"{shepard_html}"
+                "</div>"
+            )
+
         return (
             f"<div class='plot-card' {card_attrs_str}>{header}{metrics_line}{controls}"
-            f"{highlight_note_html}{inversion_controls_html}{panels_block}{detail_panel}</div>"
+            f"{highlight_note_html}{inversion_controls_html}{panels_block}{aux_sections}{detail_panel}</div>"
         )
 
     outer_headers: List[str] = []
@@ -455,6 +619,41 @@ def render_report_html(
             clean = [html.escape(str(p)) for p in parts if p]
             if clean:
                 source_rows.append((f"Fuente {idx}", " | ".join(clean)))
+            detail = filt.get("detail")
+            if isinstance(detail, dict):
+                detail_lines: List[str] = []
+                cards = detail.get("cardinalities")
+                if cards:
+                    detail_lines.append("Cardinalidades filtradas: " + ", ".join(map(str, cards)))
+                span = detail.get("span")
+                if isinstance(span, dict):
+                    detail_lines.append(
+                        f"Span permitido: {span.get('min', '-')}-{span.get('max', '-')}"
+                    )
+                max_int = detail.get("max_internal_interval")
+                if max_int is not None:
+                    detail_lines.append(f"Intervalo interno máximo: {max_int}")
+                include_pcs = detail.get("include_pitch_classes")
+                if include_pcs:
+                    detail_lines.append("PCs incluidas: " + ", ".join(map(str, include_pcs)))
+                exclude_pcs = detail.get("exclude_pitch_classes")
+                if exclude_pcs:
+                    detail_lines.append("PCs excluidas: " + ", ".join(map(str, exclude_pcs)))
+                patterns = detail.get("interval_patterns")
+                if patterns:
+                    detail_lines.append("Patrones de intervalo: " + ", ".join(map(str, patterns)))
+                interval_mode = detail.get("interval_mode")
+                if interval_mode:
+                    detail_lines.append(f"Modo de intervalos: {interval_mode}")
+                pc_mode = detail.get("pc_mode")
+                if pc_mode:
+                    detail_lines.append(f"Modo de pitch classes: {pc_mode}")
+                if detail.get("scale_expand"):
+                    detail_lines.append("Extensión de escala activa")
+                if detail_lines:
+                    source_rows.append(
+                        (f"Fuente {idx} · filtros", "<br>".join(html.escape(line) for line in detail_lines))
+                    )
 
         def _render_meta_table(rows: list[tuple[str, str]]) -> str:
             if not rows:
@@ -470,10 +669,12 @@ def render_report_html(
             "</section>"
         )
 
+    combined_tables = table_html + secondary_table_html
+
     if REPORT_TEMPLATE:
         html_content = (
             REPORT_TEMPLATE.replace("__CSS__", REPORT_CSS)
-            .replace("__TABLE_HTML__", table_html)
+            .replace("__TABLE_HTML__", combined_tables)
             .replace("__METADATA_HTML__", metadata_html)
             .replace("__TABS_HTML__", tabs_html)
             .replace("__SCRIPT_JS__", REPORT_JS)
