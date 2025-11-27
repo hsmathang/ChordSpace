@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import time
 from typing import Any, Dict, List, Optional, Sequence, Tuple
+from dataclasses import dataclass, field
 
 import numpy as np
 from scipy.spatial.distance import pdist, squareform, jensenshannon
@@ -29,8 +30,171 @@ from metrics import (
 )
 
 BASE_VECTOR_METRICS = {"cosine", "euclidean", "l1", "l2", "cityblock", "manhattan"}
-_PARALLEL_CONTEXT: Dict[str, Any] | None = None
 MAX_SHEPARD_PAIRS = 20000  # Máximo de pares para cálculo de Shepard
+
+@dataclass
+class ScenarioResult:
+    """Encapsulates the result of evaluating a scenario."""
+    warnings: List[str] = field(default_factory=list)
+    results: List[Dict[str, Any]] = field(default_factory=list)
+    per_seed_records: List[Dict[str, Any]] = field(default_factory=list)
+    figure_payloads: List[Dict[str, Any]] = field(default_factory=list)
+    timings: List[Tuple[str, float]] = field(default_factory=list)
+
+class ScenarioEvaluator:
+    """Evaluates scenarios using a given context (population, caches)."""
+
+    def __init__(self, context: Dict[str, Any]):
+        self.context = context
+
+    def evaluate(self, task: Dict[str, Any]) -> ScenarioResult:
+        """Evaluates a single scenario task."""
+
+        entries: List[ChordEntry] = self.context["entries"]
+        preproc_cache: Dict[str, np.ndarray] = self.context["preproc_cache"]
+        dist_simplex_cache: Dict[str, np.ndarray] = self.context["dist_simplex_cache"]
+        distance_cache: Dict[Tuple[str, str], np.ndarray] = self.context["distance_cache"]
+
+        scenario = task["scenario"]
+        reductions: Sequence[str] = task["reductions"]
+        seed_list: Sequence[int] = task["seed_list"]
+        deterministic: bool = task["deterministic"]
+        jobs = task["jobs"]
+        mds_n_init = task["mds_n_init"]
+
+        scenario_name_base: str = scenario["name"]
+        metric: str = scenario["metric"]
+        preproc_id: str = scenario["preproc_id"]
+        description: str = scenario["description"]
+
+        X = np.asarray(preproc_cache[preproc_id], dtype=float)
+        simplex = np.asarray(dist_simplex_cache[preproc_id], dtype=float)
+        dist_condensed_base = distance_cache[(preproc_id, metric)]
+        dist_matrix_base = squareform(dist_condensed_base)
+
+        # Preparamos etiquetas para métricas de cluster (cardinalidad)
+        labels_card = np.array([e.n_notes for e in entries])
+
+        substitution_options = {
+            "susti_basic": {
+                "label": "susti_basic(vecino del espacio original)",
+                "description": f"Vecinos según la métrica '{metric}' del escenario.",
+                "distance_matrix": dist_matrix_base,
+                "metric": metric,
+            }
+        }
+
+        warnings: List[str] = []
+        results: List[Dict[str, Any]] = []
+        per_seed_records: List[Dict[str, Any]] = []
+        figure_payloads: List[Dict[str, Any]] = []
+        reduction_timings: List[Tuple[str, float]] = []
+
+        for reduction in reductions:
+            t_red_start = time.perf_counter()
+            dist_matrix = dist_matrix_base
+            base_matrix = X if metric in BASE_VECTOR_METRICS else simplex
+            # print(f"[pipeline] {scenario_name_base} -> {reduction} (n={len(entries)})") # Moved to logger or suppressed
+
+            nn_top1, nn_top2 = evaluate_nn_hits(dist_matrix, entries, simplex)
+            mix_mean, mix_max = evaluate_mixture_error(simplex, entries)
+
+            seed_rows: List[Dict[str, Any]] = []
+            figure_embedding: Optional[np.ndarray] = None
+            figure_seed: Optional[int] = None
+
+            # Captura hiperparámetros (comunes para todas las seeds)
+            hyperparams = {}
+
+            for seed in seed_list:
+                embedding, params = compute_embeddings(
+                    dist_condensed_base,
+                    reduction,
+                    seed,
+                    base_matrix=base_matrix,
+                    n_jobs=jobs,
+                    deterministic=deterministic,
+                    mds_n_init=mds_n_init,
+                )
+                if not hyperparams:
+                    hyperparams = params
+
+                # print(f"[pipeline] terminado {reduction} seed={seed} (n={len(entries)})")
+
+                metrics_summary = summarise_embedding_metrics(
+                    base_matrix,
+                    embedding,
+                    dist_matrix,
+                    dist_condensed_base,
+                    labels_card,
+                    seed
+                )
+
+                row: Dict[str, Any] = {
+                    "scenario": f"{reduction}:{scenario_name_base}",
+                    "description": description,
+                    "metric": metric,
+                    "preproc_id": preproc_id,
+                    "seed": seed,
+                    "reduction": reduction,
+                    "nn_hit_top1": nn_top1,
+                    "nn_hit_top2": nn_top2,
+                    "mixture_l1_mean": mix_mean,
+                    "mixture_l1_max": mix_max,
+                    "hyperparams": hyperparams,
+                    **metrics_summary,
+                }
+                seed_rows.append(row)
+                if figure_embedding is None:
+                    figure_embedding = embedding
+                    figure_seed = seed
+
+            if not seed_rows:
+                continue
+
+            t_red_end = time.perf_counter()
+            runtime_seconds = t_red_end - t_red_start
+
+            summary = aggregate_seed_results(seed_rows, seed_list)
+            summary.update(
+                {
+                    "scenario": f"{reduction}:{scenario_name_base}",
+                    "description": description,
+                    "metric": metric,
+                    "preproc_id": preproc_id,
+                    "figure_seed": figure_seed,
+                    "reduction": reduction,
+                    "hyperparams": hyperparams,
+                    "runtime_seconds": runtime_seconds,
+                    "runtime_seconds_per_seed": runtime_seconds / len(seed_rows),
+                }
+            )
+            results.append(summary)
+            per_seed_records.extend(seed_rows)
+            if figure_embedding is not None:
+                figure_payloads.append(
+                    {
+                        "scenario": f"{reduction}:{scenario_name_base}",
+                        "preproc_id": preproc_id,
+                        "metric": metric,
+                        "description": description,
+                        "reduction": reduction,
+                        "figure_seed": figure_seed,
+                        "embedding": figure_embedding,
+                        "substitution_options": substitution_options,
+                        "hyperparams": hyperparams,
+                    }
+                )
+            scenario_key = f"{reduction}:{scenario_name_base}"
+            reduction_timings.append((scenario_key, runtime_seconds))
+
+        return ScenarioResult(
+            warnings=warnings,
+            results=results,
+            per_seed_records=per_seed_records,
+            figure_payloads=figure_payloads,
+            timings=reduction_timings
+        )
 
 
 def metric_distance(metric: str, X: np.ndarray, dist_simplex: np.ndarray) -> np.ndarray:
@@ -55,163 +219,31 @@ def metric_distance(metric: str, X: np.ndarray, dist_simplex: np.ndarray) -> np.
     raise ValueError(f"Métrica desconocida: {metric}")
 
 
-def parallel_worker_setup(context: Dict[str, Any]) -> None:
-    """Inicializa el contexto compartido para los trabajadores."""
+# Global context removed. Parallel setup now done via class/closure or careful passing if needed.
+# For multiprocessing, we might need a top-level function that instantiates the evaluator.
 
-    global _PARALLEL_CONTEXT
-    _PARALLEL_CONTEXT = context
+_GLOBAL_EVALUATOR: Optional[ScenarioEvaluator] = None
+
+def parallel_worker_setup(context: Dict[str, Any]) -> None:
+    """Inicializa el contexto compartido para los trabajadores (compatibilidad con ProcessPoolExecutor)."""
+    global _GLOBAL_EVALUATOR
+    _GLOBAL_EVALUATOR = ScenarioEvaluator(context)
 
 
 def run_scenario_task(task: Dict[str, Any]) -> Dict[str, Any]:
-    """Ejecuta un escenario sobre todas las reducciones solicitadas."""
+    """Wrapper function for parallel execution that uses the global evaluator instance."""
+    if _GLOBAL_EVALUATOR is None:
+        raise RuntimeError("Global evaluator not initialized in worker process.")
 
-    if _PARALLEL_CONTEXT is None:  # pragma: no cover - validación
-        raise RuntimeError("Parallel context not initialised.")
-
-    entries = _PARALLEL_CONTEXT["entries"]
-    preproc_cache: Dict[str, np.ndarray] = _PARALLEL_CONTEXT["preproc_cache"]
-    dist_simplex_cache: Dict[str, np.ndarray] = _PARALLEL_CONTEXT["dist_simplex_cache"]
-    distance_cache: Dict[Tuple[str, str], np.ndarray] = _PARALLEL_CONTEXT["distance_cache"]
-
-    scenario = task["scenario"]
-    reductions: Sequence[str] = task["reductions"]
-    seed_list: Sequence[int] = task["seed_list"]
-    deterministic: bool = task["deterministic"]
-    jobs = task["jobs"]
-    mds_n_init = task["mds_n_init"]
-
-    scenario_name_base: str = scenario["name"]
-    metric: str = scenario["metric"]
-    preproc_id: str = scenario["preproc_id"]
-    description: str = scenario["description"]
-
-    X = np.asarray(preproc_cache[preproc_id], dtype=float)
-    simplex = np.asarray(dist_simplex_cache[preproc_id], dtype=float)
-    dist_condensed_base = distance_cache[(preproc_id, metric)]
-    dist_matrix_base = squareform(dist_condensed_base)
-
-    # Preparamos etiquetas para métricas de cluster (cardinalidad)
-    labels_card = np.array([e.n_notes for e in entries])
-
-    substitution_options = {
-        "susti_basic": {
-            "label": "susti_basic(vecino del espacio original)",
-            "description": f"Vecinos según la métrica '{metric}' del escenario.",
-            "distance_matrix": dist_matrix_base,
-            "metric": metric,
-        }
-    }
-
-    warnings: List[str] = []
-    results: List[Dict[str, Any]] = []
-    per_seed_records: List[Dict[str, Any]] = []
-    figure_payloads: List[Dict[str, Any]] = []
-    reduction_timings: List[Tuple[str, float]] = []
-
-    for reduction in reductions:
-        t_red_start = time.perf_counter()
-        dist_matrix = dist_matrix_base
-        base_matrix = X if metric in BASE_VECTOR_METRICS else simplex
-        print(f"[pipeline] {scenario_name_base} -> {reduction} (n={len(entries)})")
-
-        nn_top1, nn_top2 = evaluate_nn_hits(dist_matrix, entries, simplex)
-        mix_mean, mix_max = evaluate_mixture_error(simplex, entries)
-
-        seed_rows: List[Dict[str, Any]] = []
-        figure_embedding: Optional[np.ndarray] = None
-        figure_seed: Optional[int] = None
-
-        # Captura hiperparámetros (comunes para todas las seeds)
-        hyperparams = {}
-
-        for seed in seed_list:
-            embedding, params = compute_embeddings(
-                dist_condensed_base,
-                reduction,
-                seed,
-                base_matrix=base_matrix,
-                n_jobs=jobs,
-                deterministic=deterministic,
-                mds_n_init=mds_n_init,
-            )
-            if not hyperparams:
-                hyperparams = params
-
-            print(f"[pipeline] terminado {reduction} seed={seed} (n={len(entries)})")
-
-            metrics_summary = summarise_embedding_metrics(
-                base_matrix,
-                embedding,
-                dist_matrix,
-                dist_condensed_base,
-                labels_card,
-                seed
-            )
-
-            row: Dict[str, Any] = {
-                "scenario": f"{reduction}:{scenario_name_base}",
-                "description": description,
-                "metric": metric,
-                "preproc_id": preproc_id,
-                "seed": seed,
-                "reduction": reduction,
-                "nn_hit_top1": nn_top1,
-                "nn_hit_top2": nn_top2,
-                "mixture_l1_mean": mix_mean,
-                "mixture_l1_max": mix_max,
-                "hyperparams": hyperparams,
-                **metrics_summary,
-            }
-            seed_rows.append(row)
-            if figure_embedding is None:
-                figure_embedding = embedding
-                figure_seed = seed
-
-        if not seed_rows:
-            continue
-
-        t_red_end = time.perf_counter()
-        runtime_seconds = t_red_end - t_red_start
-
-        summary = aggregate_seed_results(seed_rows, seed_list)
-        summary.update(
-            {
-                "scenario": f"{reduction}:{scenario_name_base}",
-                "description": description,
-                "metric": metric,
-                "preproc_id": preproc_id,
-                "figure_seed": figure_seed,
-                "reduction": reduction,
-                "hyperparams": hyperparams,  # Agregar a summary también
-                "runtime_seconds": runtime_seconds,
-                "runtime_seconds_per_seed": runtime_seconds / len(seed_rows),
-            }
-        )
-        results.append(summary)
-        per_seed_records.extend(seed_rows)
-        if figure_embedding is not None:
-            figure_payloads.append(
-                {
-                    "scenario": f"{reduction}:{scenario_name_base}",
-                    "preproc_id": preproc_id,
-                    "metric": metric,
-                    "description": description,
-                    "reduction": reduction,
-                    "figure_seed": figure_seed,
-                    "embedding": figure_embedding,
-                    "substitution_options": substitution_options,
-                    "hyperparams": hyperparams,
-                }
-            )
-        scenario_key = f"{reduction}:{scenario_name_base}"
-        reduction_timings.append((scenario_key, runtime_seconds))
-
+    # Convert ScenarioResult to dict for serialization if needed, or just return as dict
+    # compatible with legacy callers.
+    result = _GLOBAL_EVALUATOR.evaluate(task)
     return {
-        "warnings": warnings,
-        "results": results,
-        "per_seed_records": per_seed_records,
-        "figure_payloads": figure_payloads,
-        "timings": reduction_timings,
+        "warnings": result.warnings,
+        "results": result.results,
+        "per_seed_records": result.per_seed_records,
+        "figure_payloads": result.figure_payloads,
+        "timings": result.timings
     }
 
 
@@ -618,6 +650,8 @@ def aggregate_seed_results(seed_rows: List[Dict[str, Any]], seeds: Sequence[int]
 
 
 __all__ = [
+    "ScenarioEvaluator",
+    "ScenarioResult",
     "metric_distance",
     "parallel_worker_setup",
     "run_scenario_task",

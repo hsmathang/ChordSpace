@@ -11,6 +11,7 @@ from tools.proposals_pipeline.metrics import (
     metric_distance,
     parallel_worker_setup,
     run_scenario_task,
+    ScenarioEvaluator,
 )
 
 
@@ -36,6 +37,7 @@ def run_experiment(
 
     scenario_tasks: List[Dict[str, Any]] = []
     expected_order: List[str] = []
+    warnings: List[str] = []
 
     for scenario in scenarios:
         preproc_id = scenario["preproc_id"]
@@ -71,7 +73,6 @@ def run_experiment(
     results: List[Dict[str, Any]] = []
     per_seed_records: List[Dict[str, Any]] = []
     figure_payloads: List[Dict[str, Any]] = []
-    warnings: List[str] = []
     scenario_time_details: List[Tuple[str, float]] = []
 
     if scenario_tasks:
@@ -81,6 +82,13 @@ def run_experiment(
             "dist_simplex_cache": dist_simplex_cache,
             "distance_cache": distance_cache,
         }
+
+        # We still use parallel_worker_setup for the global context workaround in multiprocessing
+        # BUT run_scenario_task now uses the global evaluator internally.
+        # Alternatively, we could instantiate ScenarioEvaluator inside run_scenario_task if we passed context in task,
+        # but passing large context (matrices) via pickling to every task is slow.
+        # So we keep the initializer strategy.
+
         use_parallel = len(scenario_tasks) > 1 and (cpu_count or 1) > 1
         if use_parallel:
             max_workers = min(len(scenario_tasks), cpu_count or 1)
@@ -98,14 +106,15 @@ def run_experiment(
                     figure_payloads.extend(res["figure_payloads"])
                     scenario_time_details.extend(res.get("timings", []))
         else:
-            parallel_worker_setup(context)
+            # For serial execution, we can just use the Evaluator directly without global state hack
+            evaluator = ScenarioEvaluator(context)
             for task in scenario_tasks:
-                res = run_scenario_task(task)
-                warnings.extend(res["warnings"])
-                results.extend(res["results"])
-                per_seed_records.extend(res["per_seed_records"])
-                figure_payloads.extend(res["figure_payloads"])
-                scenario_time_details.extend(res.get("timings", []))
+                res = evaluator.evaluate(task)
+                warnings.extend(res.warnings)
+                results.extend(res.results)
+                per_seed_records.extend(res.per_seed_records)
+                figure_payloads.extend(res.figure_payloads)
+                scenario_time_details.extend(res.timings)
 
     return {
         "results": results,

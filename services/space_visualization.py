@@ -41,61 +41,18 @@ class VisualizationService:
 
         report_path = result.output_path / "report.html"
 
-        # Regenerate figures from payloads and population data
-        # We need to rebuild the context (entries, totals, etc.) because `generate_figures` demands it.
-        # Ideally, `ExperimentResult` would contain `entries` or `stack_hist` output, but it contains raw DF.
-        # We need to re-parse the population DF into entries.
-        # This is a bit redundant but ensures we don't pickle complex objects in ExperimentResult unless necessary.
-
-        # Re-load entries from DF in result
-        from tools.proposals_pipeline.population import load_chords, stack_hist
-        entries = load_chords(
-            dyads_query="", triads_query="",
-            df_override=result.population_df
-        )
-        hist, totals, counts, pairs, notes = stack_hist(entries)
-
-        # Prepare caches (partially available in result, partially rebuilt)
-        # `generate_figures` needs:
-        # payloads, entries, totals, pairs, preproc_cache, dist_simplex_cache, distance_cache
-
-        # We have distance_cache in result.
-        # We DON'T have preproc_cache or dist_simplex_cache in result (I didn't add them to ExperimentResult to save space).
-        # However, `generate_figures` needs them to draw histograms/distributions if requested.
-        # If I want to support this without re-running preprocessing, I should have added them to ExperimentResult.
-        # For now, let's assume `generate_figures` handles missing cache gracefully OR we must accept it might fail if those are needed.
-        # Looking at `generate_figures` signature... it takes them as arguments.
-
-        # Update: `space_experiments.py` calls `pipeline_run` which returns `preproc_cache`.
-        # I should add `preproc_cache` and `dist_simplex_cache` to `ExperimentResult` to be safe.
-        # This seems necessary for a complete decoupled visualization service.
-
-        # Hack for now: Pass empty dicts and see if it explodes, or re-calculate.
-        # Re-calculating requires knowing the preprocessors used.
-        # Better: Add them to ExperimentResult.
-        # I will modify `domain.py` and `space_experiments.py` one more time to include caches.
-
-        # Wait, `visualization_payloads` (figure_payloads) contain the embedding coordinates.
-        # The histograms are drawn from `preproc_cache`.
-
-        # Let's assume for this step I will mock them or use what I have.
-        # But for correctness, I should add them.
-
-        # Let's write this service to fail if they are missing, but I will go back and add them.
-        pass
+        # This method is now redundant but kept for interface compatibility if needed.
+        # It just delegates to generate_report_full logic essentially.
+        return self.generate_report_full(result, config)
 
     def _generate_figures(
         self,
         result: ExperimentResult,
-        entries: List[Any],
-        totals,
-        pairs,
         sections_enabled: Dict[str, bool] | None = None,
         *,
         logger: Optional[Callable[[str], None]] = None,
     ) -> List[Tuple[str, go.Figure]]:
-        # Configure settings based on global constants (migrated from compare_proposals)
-        # In a future iteration, these should be in VisualizationConfig completely.
+        # Configure settings based on global constants
         color_settings = ColorSettings(
             per_pair_subtract=COLOR_PER_PAIR_SUBTRACT,
             per_note_subtract=COLOR_PER_NOTE_SUBTRACT,
@@ -113,20 +70,14 @@ class VisualizationService:
             fade_factor=FAMILY_HIGHLIGHT_UNSELECTED_OPACITY_FACTOR,
         )
 
-        # We need the caches. Since I haven't added them to Result yet, I will use empty dicts.
-        # This might break histogram plots but Scatter should work if payloads are correct.
-        preproc_cache = getattr(result, "preproc_cache", {})
-        dist_simplex_cache = getattr(result, "dist_simplex_cache", {})
-        distance_cache = result.dist_matrices
-
         return generate_figures(
             result.visualization_payloads,
-            entries,
-            totals,
-            pairs,
-            preproc_cache,
-            dist_simplex_cache,
-            distance_cache,
+            result.entries,
+            result.totals,
+            result.pairs,
+            result.preproc_cache,
+            result.dist_simplex_cache,
+            result.dist_matrices,
             color_settings=color_settings,
             highlight_settings=highlight_settings,
             sections_enabled=sections_enabled,
@@ -141,12 +92,12 @@ class VisualizationService:
         logger: Optional[Callable[[str], None]] = None,
     ) -> Path:
         # Full implementation
-        # 1. Rehydrate data
-        from tools.proposals_pipeline.population import load_chords, stack_hist
         if logger:
-            logger("[visualizacion] preparando acordes seleccionados…")
-        entries = load_chords(dyads_query="", triads_query="", df_override=result.population_df)
-        hist, totals, counts, pairs, notes = stack_hist(entries)
+            logger("[visualizacion] usando resultados cacheados en ExperimentResult (idempotente)")
+
+        # 1. Verify required data
+        if not result.entries or result.totals is None:
+             raise ValueError("ExperimentResult missing cached entries/totals. Re-run experiment.")
 
         # 2. Secciones activas según VisualizationConfig
         sections_enabled = {s: True for s in config.sections}
@@ -158,9 +109,6 @@ class VisualizationService:
         # 3. Generate Figures (respeta secciones)
         figures = self._generate_figures(
             result,
-            entries,
-            totals,
-            pairs,
             sections_enabled=sections_enabled,
             logger=logger,
         )

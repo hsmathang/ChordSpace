@@ -78,6 +78,10 @@ class ExperimentResult:
     dist_matrices: Dict[str, np.ndarray] = field(default_factory=dict)
     preproc_cache: Dict[str, np.ndarray] = field(default_factory=dict)
     dist_simplex_cache: Dict[str, np.ndarray] = field(default_factory=dict)
+    # Population caches for idempotency
+    entries: List[Any] = field(default_factory=list)
+    totals: Any = None
+    pairs: Any = None
     # Opaque payloads for visualization reconstruction (internal use)
     visualization_payloads: List[Dict[str, Any]] = field(default_factory=list)
     # Metadata
