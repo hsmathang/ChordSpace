@@ -8,7 +8,7 @@ from __future__ import annotations
 import time
 import json
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any, Dict, List, Optional, Tuple, Callable
 import pandas as pd
 import numpy as np
 
@@ -34,12 +34,18 @@ from pre_process import ModeloSetharesVec # For raw loading if needed, but handl
 
 class ExperimentService:
 
-    def run_experiment(self, config: ExperimentConfig) -> ExperimentResult:
+    def run_experiment(self, config: ExperimentConfig, logger: Optional[Callable[[str], None]] = None) -> ExperimentResult:
         """
         Runs the full experiment pipeline based on the provided configuration.
         """
         start_time = time.perf_counter()
         timing_log = []
+        def _log(msg: str) -> None:
+            if logger:
+                try:
+                    logger(msg)
+                except Exception:
+                    pass
 
         # 1. Load Population
         # We need to adapt the `load_chords` logic to use our `PopulationStore` or vice-versa.
@@ -49,6 +55,7 @@ class ExperimentService:
         print(f"[Experiment] Loading population source: {config.population.source_type}")
         store = get_population_store(config.population)
         pop_data = store.load(config.population)
+        _log(f"[población] cargada: {len(pop_data.dataframe)} acordes")
 
         # We need to convert this DataFrame into the list of ChordEntry objects expected by the pipeline
         # `load_chords` does this but it also fetches from DB. We want to inject the DF.
@@ -61,11 +68,13 @@ class ExperimentService:
             df_override=pop_data.dataframe
         )
         timing_log.append(("load_population", time.perf_counter() - start_time))
+        _log(f"[población] preparada en {timing_log[-1][1]:.2f}s")
 
         # 2. Prepare histograms (Stacking)
         t0 = time.perf_counter()
         hist, totals, counts, pairs, notes = stack_hist(entries)
         timing_log.append(("stack_histograms", time.perf_counter() - t0))
+        _log(f"[hist] stack en {timing_log[-1][1]:.2f}s")
 
         # 3. Build Scenarios (Roughness Proposals + Metrics)
         # Map RoughnessConfig to scenarios
@@ -89,9 +98,11 @@ class ExperimentService:
             preprocessors=PREPROCESSORS,
             include_identity=not config.roughness.disable_baseline
         )
+        _log(f"[escenarios] proposals={len(config.roughness.proposals)} · métricas={len(config.roughness.metrics)} · escenarios={len(scenarios)}")
 
         # 4. Run Pipeline (Reductions & Metrics)
         t0 = time.perf_counter()
+        _log(f"[pipeline] reducciones={config.reduction.methods} · seeds={config.execution.seeds}")
         run_output = pipeline_run(
             entries=entries,
             hist=hist,
@@ -106,6 +117,14 @@ class ExperimentService:
             cpu_count=None # Auto-detect
         )
         timing_log.append(("run_pipeline", time.perf_counter() - t0))
+        _log(f"[pipeline] completado en {timing_log[-1][1]:.2f}s")
+        scenario_times = run_output.get("scenario_time_details", [])
+        for red_name, t_secs in scenario_times:
+            _log(f"[pipeline] {red_name} -> {t_secs:.2f}s")
+        if scenario_times:
+            total_red_time = sum(t for _, t in scenario_times)
+            timing_log.append(("reductions_total", total_red_time))
+            _log(f"[pipeline] reducciones (suma) -> {total_red_time:.2f}s")
 
         # 5. Process Results
         t0 = time.perf_counter()
@@ -116,6 +135,7 @@ class ExperimentService:
         metrics_df = pd.DataFrame(results_list)
         metrics_df["rank"] = compute_rank(metrics_df)
         metrics_df.sort_values(by=["rank"], inplace=True)
+        _log(f"[métricas] filas={len(metrics_df)} en {time.perf_counter() - t0:.2f}s")
 
         # Extract embeddings if needed?
         # The pipeline returns `figure_payloads` which contain coordinates.
@@ -149,6 +169,7 @@ class ExperimentService:
             # Save Embeddings? (Optional, maybe large)
 
         timing_log.append(("total", time.perf_counter() - start_time))
+        _log(f"[total] {timing_log[-1][1]:.2f}s")
 
         return ExperimentResult(
             config=config,

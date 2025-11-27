@@ -340,6 +340,54 @@ class ExperimentLauncher(tk.Tk):
             "write", lambda *_: self._mark_population_dirty()
         )
 
+    def _build_chord_filters(self) -> data_access.ChordFilters | None:
+        """Construye un objeto ChordFilters a partir de los controles de filtros."""
+        if not self.filter_enable_var.get():
+            return None
+        filters = data_access.ChordFilters()
+
+        cards = [n for n, var in self.filter_cardinality_vars.items() if var.get()]
+        filters.cardinalities = cards or None
+
+        span_min = self.filter_span_min_var.get().strip()
+        span_max = self.filter_span_max_var.get().strip()
+        filters.span_min = int(span_min) if span_min else None
+        filters.span_max = int(span_max) if span_max else None
+
+        max_int = self.filter_max_internal_interval_var.get().strip()
+        filters.max_internal_interval = int(max_int) if max_int else None
+
+        def _parse_int_list(text: str) -> list[int]:
+            return [int(x) for x in text.split(",") if x.strip().isdigit()]
+
+        include_pcs = _parse_int_list(self.filter_include_pcs_var.get())
+        exclude_pcs = _parse_int_list(self.filter_exclude_pcs_var.get())
+        filters.include_pitch_classes = include_pcs or None
+        filters.exclude_pitch_classes = exclude_pcs or None
+        filters.include_pc_mode = self.filter_pc_mode_map.get(self.filter_pc_mode_var.get())
+
+        # Patrones de intervalos
+        patterns: list[list[int]] = []
+        raw_patterns = self.filter_interval_var.get().strip()
+        if raw_patterns:
+            for part in raw_patterns.split(";"):
+                vals = [int(x) for x in part.split(",") if x.strip().isdigit()]
+                if vals:
+                    patterns.append(vals)
+
+        interval_mode = self.filter_interval_mode_map.get(self.filter_interval_mode_var.get())
+        filters.interval_mode = interval_mode
+        if interval_mode == "exact" and patterns:
+            filters.interval_exact = patterns[0]
+            if len(patterns) > 1:
+                filters.interval_patterns = patterns[1:]
+        elif interval_mode == "subseq" and patterns:
+            filters.interval_patterns = patterns
+        elif interval_mode == "any_value" and patterns:
+            filters.interval_values = [v for pat in patterns for v in pat]
+
+        return filters
+
     def _init_combinatorial_vars(self) -> None:
         self.generation_mode_var = tk.StringVar(value="combinatorial")
         self.population_preset_var = tk.StringVar(value="diadas_estructurales_octava3")
@@ -560,16 +608,23 @@ class ExperimentLauncher(tk.Tk):
             pass
 
     def _build_experiment_params_frame(self, frame: ttk.Frame) -> None:
-        ttk.Label(frame, text="Reducción dimensional:").grid(row=0, column=0, sticky="w")
-        red_combo = ttk.Combobox(frame, textvariable=self.reduction_var, values=["MDS", "UMAP"], width=8, state="readonly")
-        red_combo.grid(row=0, column=1, padx=(4, 16), sticky="w")
-        ttk.Label(frame, text="Ejecución:").grid(row=0, column=2, sticky="w")
+        ttk.Label(frame, text="Reducciones:").grid(row=0, column=0, sticky="nw")
+        red_frame = ttk.Frame(frame)
+        red_frame.grid(row=0, column=1, columnspan=3, sticky="w", padx=(4, 0))
+        for idx, name in enumerate(self.reductions_order):
+            ttk.Checkbutton(
+                red_frame,
+                text=name,
+                variable=self.reduction_vars[name],
+            ).grid(row=0, column=idx, sticky="w", padx=(0, 10))
+
+        ttk.Label(frame, text="Ejecución:").grid(row=1, column=0, sticky="w", pady=(6, 0))
         exec_labels = list(self.exec_mode_label_to_value.keys())
         self.exec_mode_combo = ttk.Combobox(frame, textvariable=self.exec_mode_var, values=exec_labels, width=26, state="readonly")
-        self.exec_mode_combo.grid(row=0, column=3, sticky="w", padx=(4, 16))
-        ttk.Label(frame, text="n_jobs:").grid(row=1, column=0, sticky="w", pady=(6, 0))
+        self.exec_mode_combo.grid(row=1, column=1, sticky="w", padx=(4, 16), pady=(6, 0))
+        ttk.Label(frame, text="n_jobs:").grid(row=1, column=2, sticky="w", pady=(6, 0))
         self.n_jobs_entry = ttk.Entry(frame, textvariable=self.n_jobs_var, width=12)
-        self.n_jobs_entry.grid(row=1, column=1, sticky="w", padx=(4, 16), pady=(6, 0))
+        self.n_jobs_entry.grid(row=1, column=3, sticky="w", padx=(4, 16), pady=(6, 0))
         frame.columnconfigure(1, weight=1)
         frame.columnconfigure(3, weight=1)
 
@@ -624,7 +679,48 @@ class ExperimentLauncher(tk.Tk):
         self.filter_max_internal_entry = ttk.Entry(frame, textvariable=self.filter_max_internal_interval_var, width=8)
         self.filter_max_internal_entry.grid(row=4, column=1, sticky="w", pady=(6, 0))
 
-        # Simplified filter UI builder for brevity - assumed fully built as in original
+        row_offset = 1
+        ttk.Label(frame, text="Pitch classes (0-11):").grid(row=4 + row_offset, column=0, sticky="w", pady=(6, 0))
+        ttk.Entry(frame, textvariable=self.filter_include_pcs_var).grid(
+            row=4 + row_offset, column=1, sticky="we", pady=(6, 0)
+        )
+
+        ttk.Label(frame, text="Modo PC:").grid(row=5 + row_offset, column=0, sticky="w", pady=(4, 0))
+        ttk.Combobox(
+            frame,
+            textvariable=self.filter_pc_mode_var,
+            values=self.filter_pc_mode_labels,
+            state="readonly",
+            width=22,
+        ).grid(row=5 + row_offset, column=1, sticky="w", pady=(4, 0))
+
+        ttk.Checkbutton(
+            frame,
+            text="Expandir escala con transposiciones (usa PCs incluidas)",
+            variable=self.filter_scale_expand_var,
+            command=self._mark_population_dirty,
+        ).grid(row=6 + row_offset, column=0, columnspan=2, sticky="w", pady=(4, 0))
+
+        ttk.Label(frame, text="Excluir pitch classes:").grid(row=7 + row_offset, column=0, sticky="w", pady=(6, 0))
+        ttk.Entry(frame, textvariable=self.filter_exclude_pcs_var).grid(
+            row=7 + row_offset, column=1, sticky="we", pady=(6, 0)
+        )
+
+        ttk.Label(frame, text="Patrones intervalares (ej. 3,3; 5,2):").grid(row=8 + row_offset, column=0, sticky="w", pady=(6, 0))
+        ttk.Entry(frame, textvariable=self.filter_interval_var).grid(
+            row=8 + row_offset, column=1, sticky="we", pady=(6, 0)
+        )
+
+        ttk.Label(frame, text="Modo intervalos:").grid(row=9 + row_offset, column=0, sticky="w", pady=(6, 0))
+        ttk.Combobox(
+            frame,
+            textvariable=self.filter_interval_mode_var,
+            values=self.filter_interval_mode_labels,
+            state="readonly",
+            width=22,
+        ).grid(row=9 + row_offset, column=1, sticky="w", pady=(6, 0))
+
+        frame.columnconfigure(1, weight=1)
 
     def _build_compare_frame(self, frame: ttk.Frame) -> None:
         params = ttk.Frame(frame)
@@ -791,10 +887,17 @@ class ExperimentLauncher(tk.Tk):
     def _run_service_thread(self, exp_config: ExperimentConfig, vis_config: VisualizationConfig) -> None:
         try:
             self.log_queue.put(("compare_log", f"Iniciando experimento: {exp_config.name}\n"))
+            self.log_queue.put(("compare_log", f"[resumen] proposals={len(exp_config.roughness.proposals)} · métricas={len(exp_config.roughness.metrics)} · reducciones={len(exp_config.reduction.methods)} · seeds={len(exp_config.execution.seeds)}\n"))
             self.log_queue.put(("progress", (10.0, "Ejecutando pipeline...")))
 
+            def _logger(msg: str) -> None:
+                self.log_queue.put(("compare_log", msg if msg.endswith("\n") else msg + "\n"))
+
             service = ExperimentService()
-            result = service.run_experiment(exp_config)
+            result = service.run_experiment(exp_config, logger=_logger)
+            self.log_queue.put(("compare_log", f"[población] {len(result.population_df)} acordes\n"))
+            for stage, secs in (result.timing or []):
+                self.log_queue.put(("compare_log", f"[tiempo] {stage}: {secs:.2f}s\n"))
 
             self.log_queue.put(("compare_log", "Pipeline completado. Generando reporte...\n"))
             self.log_queue.put(("progress", (80.0, "Generando visualizaciones...")))
@@ -804,6 +907,10 @@ class ExperimentLauncher(tk.Tk):
 
             self.compare_last_report = report_path
             self.log_queue.put(("compare_log", f"Reporte generado: {report_path}\n"))
+            try:
+                self.compare_open_folder_button.configure(state=tk.NORMAL)
+            except Exception:
+                pass
             self.log_queue.put(("compare_status", "Completado"))
             self.log_queue.put(("progress", (100.0, "Listo")))
 
@@ -936,6 +1043,7 @@ class ExperimentLauncher(tk.Tk):
 
     def _run_population_job(self, mode: str) -> None:
         try:
+            log_messages: list[str] = []
             if mode == 'combinatorial':
                 df = generate_combinatorial_chords(
                     list(map(int, self.combinatorial_alphabet_var.get().split(','))),
@@ -944,10 +1052,27 @@ class ExperimentLauncher(tk.Tk):
                     list(map(int, self.combinatorial_cardinalities_var.get().split(','))),
                     structural_mode=self.structural_mode_var.get()
                 )
+                log_messages.append(f"[población] Combinatoria generada: {len(df)} acordes\n")
             else:
                 df = pd.DataFrame() # DB Logic placeholder
+                log_messages.append("[población] Fuente DB no implementada en app_new\n")
 
-            self.population_queue.put({"status": "ok", "df": df, "log_messages": []})
+            filters = self._build_chord_filters()
+            if filters:
+                before = len(df)
+                df = filter_dataframe(df, filters)
+                log_messages.append(f"[filtros] Aplicados filtros personalizados: {before} -> {len(df)} acordes\n")
+
+            # Resumen por cardinalidad
+            try:
+                counts = df['n'].value_counts().sort_index()
+                card_summary = ", ".join(f"{k}n: {v}" for k, v in counts.items())
+                if card_summary:
+                    log_messages.append(f"[resumen] Cardinalidades -> {card_summary}\n")
+            except Exception:
+                pass
+
+            self.population_queue.put({"status": "ok", "df": df, "log_messages": log_messages})
         except Exception as e:
             self.population_queue.put({"status": "error", "error": str(e)})
 
@@ -958,6 +1083,8 @@ class ExperimentLauncher(tk.Tk):
                 if payload['status'] == 'ok':
                     self.temporal_population_df = payload['df']
                     self._fill_population_tree(self.temporal_population_df)
+                    for msg in payload.get("log_messages", []):
+                        self._append_pop_log(msg)
                 self._set_population_busy(False)
                 self._population_worker = None
         except queue.Empty: pass
@@ -967,10 +1094,11 @@ class ExperimentLauncher(tk.Tk):
         if busy:
             self.pop_progress.grid()
             self.pop_progress.start()
-            self.pop_progress_text_var.set(msg)
+            self.pop_progress_text_var.set(msg or "Generando...")
         else:
             self.pop_progress.stop()
             self.pop_progress.grid_remove()
+            self.pop_progress_text_var.set("Listo.")
 
     def _on_add_to_final_population(self) -> None:
         if self.temporal_population_df is None: return
@@ -979,6 +1107,10 @@ class ExperimentLauncher(tk.Tk):
         self.final_population_df, _ = dedupe_population(self.final_population_df)
         self.final_population_df.reset_index(drop=True, inplace=True)
         self.pop_stats_var.set(f"Final: {len(self.final_population_df)} acordes")
+        try:
+            self.log_queue.put(("pop_log", f"[población] Temporal añadida a final: {len(self.temporal_population_df)} acordes -> Final {len(self.final_population_df)} acordes\n"))
+        except Exception:
+            pass
 
     def _clear_final_population(self) -> None:
         self.final_population_df = None
@@ -990,6 +1122,8 @@ class ExperimentLauncher(tk.Tk):
             try:
                 kind, payload = self.log_queue.get_nowait()
                 if kind == "compare_log": self._append_compare_log(payload)
+                elif kind == "log": self._append_log(payload)
+                elif kind == "pop_log": self._append_pop_log(payload)
                 elif kind == "compare_status": self.compare_status_var.set(payload)
                 elif kind == "progress": self._update_progress(payload[0], payload[1] if len(payload)>1 else None)
                 elif kind == "done":
@@ -1013,10 +1147,32 @@ class ExperimentLauncher(tk.Tk):
             except: pass
         self._temp_payloads.clear()
 
+    def _append_log(self, text: str) -> None:
+        if not hasattr(self, "log_widget"): return
+        self.log_widget.configure(state=tk.NORMAL)
+        self.log_widget.insert(tk.END, text)
+        self.log_widget.see(tk.END)
+        self.log_widget.configure(state=tk.DISABLED)
+
+    def _append_pop_log(self, text: str) -> None:
+        if not hasattr(self, "pop_log"): return
+        self.pop_log.configure(state=tk.NORMAL)
+        self.pop_log.insert(tk.END, text)
+        self.pop_log.see(tk.END)
+        self.pop_log.configure(state=tk.DISABLED)
+
     def _on_compare_open_folder_clicked(self) -> None:
         if self.compare_last_report:
-            try: subprocess.run(["xdg-open", str(self.compare_last_report.parent)])
-            except: pass
+            path = str(self.compare_last_report.parent)
+            try:
+                if os.name == "nt":
+                    os.startfile(path)  # type: ignore[attr-defined]
+                elif sys.platform == "darwin":
+                    subprocess.run(["open", path], check=False)
+                else:
+                    subprocess.run(["xdg-open", path], check=False)
+            except Exception:
+                pass
 
 def main() -> None:
     app = ExperimentLauncher()

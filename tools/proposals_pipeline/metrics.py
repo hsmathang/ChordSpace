@@ -102,6 +102,7 @@ def run_scenario_task(task: Dict[str, Any]) -> Dict[str, Any]:
         t_red_start = time.perf_counter()
         dist_matrix = dist_matrix_base
         base_matrix = X if metric in BASE_VECTOR_METRICS else simplex
+        print(f"[pipeline] {scenario_name_base} -> {reduction} (n={len(entries)})")
 
         nn_top1, nn_top2 = evaluate_nn_hits(dist_matrix, entries, simplex)
         mix_mean, mix_max = evaluate_mixture_error(simplex, entries)
@@ -120,6 +121,7 @@ def run_scenario_task(task: Dict[str, Any]) -> Dict[str, Any]:
                 deterministic=deterministic,
                 mds_n_init=mds_n_init,
             )
+            print(f"[pipeline] terminado {reduction} seed={seed} (n={len(entries)})")
             metrics_summary = summarise_embedding_metrics(base_matrix, embedding, dist_matrix)
             row: Dict[str, Optional[float]] = {
                 "scenario": f"{reduction}:{scenario_name_base}",
@@ -195,6 +197,8 @@ def compute_embeddings(
 
     reduction = reduction.upper()
     dist_matrix = squareform(dist_condensed)
+    n_samples = dist_matrix.shape[0]
+
     if reduction == "MDS":
         mds = MDS(
             n_components=2,
@@ -206,12 +210,15 @@ def compute_embeddings(
         )
         return mds.fit_transform(dist_matrix)
     if reduction == "TSNE":
+        # Evita que perplexity supere el número de muestras; en datasets pequeños TSNE se queja.
+        safe_perplexity = max(2, min(10, max(1, n_samples - 1)))
         tsne = TSNE(
             n_components=2,
             metric="precomputed",
-            perplexity=30,
-            init="pca",
+            perplexity=safe_perplexity,
+            init="random",
             learning_rate="auto",
+            verbose=1,
             random_state=seed if deterministic else None,
         )
         return tsne.fit_transform(dist_matrix)
@@ -221,11 +228,14 @@ def compute_embeddings(
     if reduction == "UMAP":
         if umap is None:
             raise RuntimeError("UMAP no está disponible en este entorno.")
+        n_neighbors = max(2, min(15, n_samples - 1))
         reducer = umap.UMAP(
             n_components=2,
             metric="precomputed",
             init="spectral",
             random_state=seed if deterministic else None,
+            n_neighbors=n_neighbors,
+            n_epochs=200,
         )
         return reducer.fit_transform(dist_matrix)
     raise ValueError(f"Reducción desconocida: {reduction}")
