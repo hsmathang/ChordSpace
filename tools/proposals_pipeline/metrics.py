@@ -7,7 +7,9 @@ from typing import Any, Dict, List, Optional, Sequence, Tuple
 
 import numpy as np
 from scipy.spatial.distance import pdist, squareform, jensenshannon
+from scipy.stats import linregress
 from sklearn.manifold import Isomap, MDS, TSNE
+from sklearn.metrics import silhouette_score, davies_bouldin_score
 
 try:  # pragma: no cover - UMAP opcional
     import umap  # type: ignore
@@ -25,6 +27,7 @@ from metrics import (
 
 BASE_VECTOR_METRICS = {"cosine", "euclidean", "l1", "l2", "cityblock", "manhattan"}
 _PARALLEL_CONTEXT: Dict[str, Any] | None = None
+MAX_SHEPARD_PAIRS = 20000  # Máximo de pares para cálculo de Shepard
 
 
 def metric_distance(metric: str, X: np.ndarray, dist_simplex: np.ndarray) -> np.ndarray:
@@ -83,6 +86,10 @@ def run_scenario_task(task: Dict[str, Any]) -> Dict[str, Any]:
     simplex = np.asarray(dist_simplex_cache[preproc_id], dtype=float)
     dist_condensed_base = distance_cache[(preproc_id, metric)]
     dist_matrix_base = squareform(dist_condensed_base)
+
+    # Preparamos etiquetas para métricas de cluster (cardinalidad)
+    labels_card = np.array([e.n_notes for e in entries])
+
     substitution_options = {
         "susti_basic": {
             "label": "susti_basic(vecino del espacio original)",
@@ -107,12 +114,15 @@ def run_scenario_task(task: Dict[str, Any]) -> Dict[str, Any]:
         nn_top1, nn_top2 = evaluate_nn_hits(dist_matrix, entries, simplex)
         mix_mean, mix_max = evaluate_mixture_error(simplex, entries)
 
-        seed_rows: List[Dict[str, Optional[float]]] = []
+        seed_rows: List[Dict[str, Any]] = []
         figure_embedding: Optional[np.ndarray] = None
         figure_seed: Optional[int] = None
 
+        # Captura hiperparámetros (comunes para todas las seeds)
+        hyperparams = {}
+
         for seed in seed_list:
-            embedding = compute_embeddings(
+            embedding, params = compute_embeddings(
                 dist_condensed_base,
                 reduction,
                 seed,
@@ -121,9 +131,21 @@ def run_scenario_task(task: Dict[str, Any]) -> Dict[str, Any]:
                 deterministic=deterministic,
                 mds_n_init=mds_n_init,
             )
+            if not hyperparams:
+                hyperparams = params
+
             print(f"[pipeline] terminado {reduction} seed={seed} (n={len(entries)})")
-            metrics_summary = summarise_embedding_metrics(base_matrix, embedding, dist_matrix)
-            row: Dict[str, Optional[float]] = {
+
+            metrics_summary = summarise_embedding_metrics(
+                base_matrix,
+                embedding,
+                dist_matrix,
+                dist_condensed_base,
+                labels_card,
+                seed
+            )
+
+            row: Dict[str, Any] = {
                 "scenario": f"{reduction}:{scenario_name_base}",
                 "description": description,
                 "metric": metric,
@@ -134,6 +156,7 @@ def run_scenario_task(task: Dict[str, Any]) -> Dict[str, Any]:
                 "nn_hit_top2": nn_top2,
                 "mixture_l1_mean": mix_mean,
                 "mixture_l1_max": mix_max,
+                "hyperparams": hyperparams,
                 **metrics_summary,
             }
             seed_rows.append(row)
@@ -153,6 +176,7 @@ def run_scenario_task(task: Dict[str, Any]) -> Dict[str, Any]:
                 "preproc_id": preproc_id,
                 "figure_seed": figure_seed,
                 "reduction": reduction,
+                "hyperparams": hyperparams, # Agregar a summary también
             }
         )
         results.append(summary)
@@ -168,6 +192,7 @@ def run_scenario_task(task: Dict[str, Any]) -> Dict[str, Any]:
                     "figure_seed": figure_seed,
                     "embedding": figure_embedding,
                     "substitution_options": substitution_options,
+                    "hyperparams": hyperparams,
                 }
             )
         t_red_end = time.perf_counter()
@@ -192,8 +217,10 @@ def compute_embeddings(
     n_jobs: Optional[int],
     deterministic: bool,
     mds_n_init: int,
-) -> np.ndarray:
-    """Genera un embedding 2D con la técnica de reducción solicitada."""
+) -> Tuple[np.ndarray, Dict[str, Any]]:
+    """Genera un embedding 2D con la técnica de reducción solicitada.
+    Retorna (embedding, hyperparams).
+    """
 
     reduction = reduction.upper()
     dist_matrix = squareform(dist_condensed)
@@ -208,7 +235,10 @@ def compute_embeddings(
             n_init=mds_n_init,
             n_jobs=n_jobs,
         )
-        return mds.fit_transform(dist_matrix)
+        emb = mds.fit_transform(dist_matrix)
+        params = {"n_init": mds_n_init}
+        return emb, params
+
     if reduction == "TSNE":
         # Evita que perplexity supere el número de muestras; en datasets pequeños TSNE se queja.
         safe_perplexity = max(2, min(10, max(1, n_samples - 1)))
@@ -221,23 +251,39 @@ def compute_embeddings(
             verbose=1,
             random_state=seed if deterministic else None,
         )
-        return tsne.fit_transform(dist_matrix)
+        emb = tsne.fit_transform(dist_matrix)
+        kl_divergence = getattr(tsne, "kl_divergence_", None)
+        params = {
+            "perplexity": safe_perplexity,
+            "n_iter": tsne.n_iter,
+            "kl_divergence": kl_divergence
+        }
+        return emb, params
+
     if reduction == "ISOMAP":
-        iso = Isomap(n_components=2, metric="precomputed")
-        return iso.fit_transform(dist_matrix)
+        n_neighbors_iso = 5 # Default sklearn
+        iso = Isomap(n_components=2, metric="precomputed", n_neighbors=n_neighbors_iso)
+        emb = iso.fit_transform(dist_matrix)
+        params = {"n_neighbors": n_neighbors_iso}
+        return emb, params
+
     if reduction == "UMAP":
         if umap is None:
             raise RuntimeError("UMAP no está disponible en este entorno.")
         n_neighbors = max(2, min(15, n_samples - 1))
+        n_epochs = 200
         reducer = umap.UMAP(
             n_components=2,
             metric="precomputed",
             init="spectral",
             random_state=seed if deterministic else None,
             n_neighbors=n_neighbors,
-            n_epochs=200,
+            n_epochs=n_epochs,
         )
-        return reducer.fit_transform(dist_matrix)
+        emb = reducer.fit_transform(dist_matrix)
+        params = {"n_neighbors": n_neighbors, "n_epochs": n_epochs}
+        return emb, params
+
     raise ValueError(f"Reducción desconocida: {reduction}")
 
 
@@ -292,52 +338,123 @@ def evaluate_mixture_error(
     return float(np.mean(errors_mean)), float(np.mean(errors_max))
 
 
+def compute_shepard_metrics(
+    dist_original_condensed: np.ndarray,
+    embedding: np.ndarray,
+    seed: int = 42
+) -> Dict[str, Optional[float]]:
+    """Calcula métricas de Shepard (slope, intercept, R2)."""
+
+    # Calcular distancias en el embedding
+    dist_emb_condensed = pdist(embedding, metric='euclidean')
+
+    n_pairs = len(dist_original_condensed)
+
+    # Subsampling si es necesario
+    if n_pairs > MAX_SHEPARD_PAIRS:
+        rng = np.random.RandomState(seed)
+        indices = rng.choice(n_pairs, MAX_SHEPARD_PAIRS, replace=False)
+        x = dist_original_condensed[indices]
+        y = dist_emb_condensed[indices]
+    else:
+        x = dist_original_condensed
+        y = dist_emb_condensed
+
+    try:
+        slope, intercept, r_value, p_value, std_err = linregress(x, y)
+        return {
+            "shepard_slope": float(slope),
+            "shepard_intercept": float(intercept),
+            "shepard_r2": float(r_value**2)
+        }
+    except Exception:
+        return {
+            "shepard_slope": None,
+            "shepard_intercept": None,
+            "shepard_r2": None
+        }
+
+def compute_cluster_metrics(
+    embedding: np.ndarray,
+    labels: np.ndarray
+) -> Dict[str, Optional[float]]:
+    """Calcula Silhouette y Davies-Bouldin scores."""
+
+    # Necesitamos al menos 2 clases y al menos 2 muestras para estas métricas
+    if len(np.unique(labels)) < 2 or len(labels) < 2:
+         return {
+            "silhouette": None,
+            "davies_bouldin": None
+        }
+
+    try:
+        sil = float(silhouette_score(embedding, labels))
+    except Exception:
+        sil = None
+
+    try:
+        db = float(davies_bouldin_score(embedding, labels))
+    except Exception:
+        db = None
+
+    return {
+        "silhouette": sil,
+        "davies_bouldin": db
+    }
+
 def summarise_embedding_metrics(
     X_original: np.ndarray,
     embedding: np.ndarray,
     dist_matrix: np.ndarray,
+    dist_condensed: np.ndarray,
+    labels: np.ndarray,
+    seed: int
 ) -> Dict[str, Optional[float]]:
     """Calcula métricas de calidad para un embedding."""
 
-    trust = None
+    metrics: Dict[str, Optional[float]] = {}
+
     try:
-        trust = float(compute_trustworthiness(X_original, embedding))
+        metrics["trustworthiness"] = float(compute_trustworthiness(X_original, embedding))
     except Exception:
-        trust = None
+        metrics["trustworthiness"] = None
     try:
-        cont = float(compute_continuity(X_original, embedding))
+        metrics["continuity"] = float(compute_continuity(X_original, embedding))
     except Exception:
-        cont = None
+        metrics["continuity"] = None
     try:
-        knn = float(compute_knn_recall(X_original, embedding))
+        metrics["knn_recall"] = float(compute_knn_recall(X_original, embedding))
     except Exception:
-        knn = None
+        metrics["knn_recall"] = None
     try:
-        rank_corr = float(compute_rank_correlation(X_original, embedding))
+        metrics["rank_corr"] = float(compute_rank_correlation(X_original, embedding))
     except Exception:
-        rank_corr = None
+        metrics["rank_corr"] = None
     try:
-        stress = float(kruskal_stress_1(dist_matrix, squareform(pdist(embedding, metric="euclidean"))))
+        # Nota: aquí calculamos stress comparando dist_matrix con euclidean en embedding.
+        # kruskal_stress_1 espera (observed, predicted).
+        metrics["stress"] = float(kruskal_stress_1(dist_matrix, squareform(pdist(embedding, metric="euclidean"))))
     except Exception:
-        stress = None
-    return {
-        "trustworthiness": trust,
-        "continuity": cont,
-        "knn_recall": knn,
-        "rank_corr": rank_corr,
-        "stress": stress,
-    }
+        metrics["stress"] = None
+
+    # Shepard stats
+    metrics.update(compute_shepard_metrics(dist_condensed, embedding, seed))
+
+    # Cluster stats
+    metrics.update(compute_cluster_metrics(embedding, labels))
+
+    return metrics
 
 
-def mean_std(values: Sequence[Optional[float]]) -> Tuple[Optional[float], Optional[float]]:
-    clean = [float(v) for v in values if v is not None and not np.isnan(v)]
+def mean_std(values: Sequence[Any]) -> Tuple[Optional[float], Optional[float]]:
+    clean = [float(v) for v in values if v is not None and not np.isnan(v) and isinstance(v, (int, float))]
     if not clean:
         return None, None
     arr = np.asarray(clean, dtype=float)
     return float(arr.mean()), float(arr.std(ddof=0))
 
 
-def aggregate_seed_results(seed_rows: List[Dict[str, Optional[float]]], seeds: Sequence[int]) -> Dict[str, Any]:
+def aggregate_seed_results(seed_rows: List[Dict[str, Any]], seeds: Sequence[int]) -> Dict[str, Any]:
     metrics_keys = [
         "nn_hit_top1",
         "nn_hit_top2",
@@ -348,6 +465,12 @@ def aggregate_seed_results(seed_rows: List[Dict[str, Optional[float]]], seeds: S
         "knn_recall",
         "rank_corr",
         "stress",
+        "shepard_slope",
+        "shepard_intercept",
+        "shepard_r2",
+        "silhouette",
+        "davies_bouldin",
+        "kl_divergence"
     ]
     summary: Dict[str, Any] = {"seeds": list(seeds)}
     for key in metrics_keys:

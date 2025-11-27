@@ -572,7 +572,7 @@ def compute_embeddings(
     mds_n_init: Optional[int] = None,
 ) -> np.ndarray:
     """Wrapper para mantener la API pública original."""
-    return pipeline_compute_embeddings(
+    emb, _ = pipeline_compute_embeddings(
         dist_condensed,
         reduction,
         seed,
@@ -581,6 +581,7 @@ def compute_embeddings(
         deterministic=deterministic,
         mds_n_init=mds_n_init,
     )
+    return emb
 
 
 def evaluate_nn_hits(
@@ -606,7 +607,25 @@ def summarise_embedding_metrics(
     dist_matrix: np.ndarray,
 ) -> Dict[str, Optional[float]]:
     """Wrapper para compatibilidad."""
-    return pipeline_summarise_embedding_metrics(X_original, embedding, dist_matrix)
+    # Para usar summarise_embedding_metrics nuevo se necesitan más argumentos.
+    # Esta función legacy probablemente no funcione con la nueva firma.
+    # Se debe actualizar para proveer defaults o usar la nueva lógica si es posible.
+    # Dado que summarise_embedding_metrics ahora requiere dist_condensed y labels,
+    # y aquí no los tenemos fácilmente (dist_matrix es cuadrada),
+    # hacemos un best effort reconstruyendo dist_condensed.
+    dist_condensed = squareform(dist_matrix)
+    # No tenemos labels aquí (cardinalidad), así que pasamos array de ceros para evitar error,
+    # aunque las métricas de cluster darán None.
+    labels = np.zeros(len(embedding))
+
+    return pipeline_summarise_embedding_metrics(
+        X_original,
+        embedding,
+        dist_matrix,
+        dist_condensed,
+        labels,
+        seed=0 # Dummy seed
+    )
 
 
 class TimingRecorder:
