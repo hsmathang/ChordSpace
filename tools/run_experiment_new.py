@@ -16,7 +16,8 @@ from services.domain import (
     RoughnessConfig,
     ReductionConfig,
     ExecutionConfig,
-    VisualizationConfig
+    VisualizationConfig,
+    AudioConfig,
 )
 from services.space_experiments import ExperimentService
 from services.space_visualization import VisualizationService
@@ -52,6 +53,7 @@ def parse_args():
     # Visualization Args
     parser.add_argument("--sections", default="all")
     parser.add_argument("--color-mode", default="log_per_pair")
+    parser.add_argument("--audio", action="store_true", help="Enable audio playback in report")
 
     # Metadata
     parser.add_argument("--run-metadata", help="Path to metadata JSON")
@@ -110,7 +112,8 @@ def main():
     sections = [s.strip() for s in args.sections.split(",") if s.strip()]
     vis_config = VisualizationConfig(
         sections=sections,
-        color_mode=args.color_mode
+        color_mode=args.color_mode,
+        audio=AudioConfig(enabled=args.audio)
     )
 
     experiment_config = ExperimentConfig(

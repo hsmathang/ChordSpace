@@ -87,6 +87,7 @@ def render_report_html(
     highlight_threshold: int = 2000,
     sections_enabled: Optional[Dict[str, bool]] = None,
     heatmap_data: Optional[Dict[str, Any]] = None,
+    audio_data: Optional[Dict[str, Any]] = None,
 ) -> None:
     metric_catalog = metric_info or METRIC_INFO_FALLBACK
 
@@ -430,6 +431,27 @@ def render_report_html(
 
         subtab_counter += 1
         card_attrs_str = " ".join(card_attrs)
+
+        # Audio Panel
+        audio_section = ""
+        if audio_data is not None:
+            audio_section = (
+                "<section class='audio-panel' data-role='audio-player'>"
+                "  <h4>Reproducción de audio</h4>"
+                "  <div class='audio-controls'>"
+                "    <label>Modo: "
+                "      <select class='audio-mode'>"
+                "        <option value='substitutions'>Sustituciones (perfil activo)</option>"
+                "        <option value='selection'>Travesía de selección</option>"
+                "      </select>"
+                "    </label>"
+                "    <button class='audio-play'>Play</button>"
+                "    <button class='audio-stop' disabled>Stop</button>"
+                "  </div>"
+                "  <div class='audio-status'>Ningún acorde seleccionado.</div>"
+                "</section>"
+            )
+
         detail_panel = (
             "<div class='detail-panel' "
             "data-default-msg='Haz clic en un punto para ver el detalle completo.'>"
@@ -454,7 +476,7 @@ def render_report_html(
 
         return (
             f"<div class='plot-card' {card_attrs_str}>{header}{metrics_line}{controls_html}"
-            f"{highlight_note_html}{inversion_controls_html}{panels_block}{aux_sections}{detail_panel}</div>"
+            f"{highlight_note_html}{inversion_controls_html}{panels_block}{aux_sections}{audio_section}{detail_panel}</div>"
         )
 
     outer_headers: List[str] = []
@@ -633,7 +655,12 @@ def render_report_html(
     js_prefix = ""
     if heatmap_data:
         json_payload = json.dumps(heatmap_data, ensure_ascii=False)
-        js_prefix = f"window.HEATMAP_DATA = {json_payload};\n"
+        js_prefix += f"window.HEATMAP_DATA = {json_payload};\n"
+
+    # Inject Audio Data if present
+    if audio_data:
+        json_payload_audio = json.dumps(audio_data, ensure_ascii=False)
+        js_prefix += f"window.AUDIO_DATA = {json_payload_audio};\n"
 
     final_js = js_prefix + REPORT_JS
 

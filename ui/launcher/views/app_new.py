@@ -28,6 +28,7 @@ from services.domain import (
     ReductionConfig,
     ExecutionConfig,
     VisualizationConfig,
+    AudioConfig,
 )
 from tools.compare_proposals import PREPROCESSORS, AVAILABLE_REDUCTIONS, PROPOSAL_INFO, METRIC_INFO
 from tools import data_access
@@ -182,6 +183,7 @@ class ExperimentLauncher(tk.Tk):
             "secondary_metrics": tk.BooleanVar(value=False),
             "metadata": tk.BooleanVar(value=True),
         }
+        self.audio_enabled_var = tk.BooleanVar(value=False)
 
     # --- UI Building (similar to original but using extracted widgets where possible) ---
 
@@ -480,6 +482,10 @@ class ExperimentLauncher(tk.Tk):
             ttk.Checkbutton(frame, text=label, variable=var).grid(row=row, column=0, sticky="w", pady=2)
             row += 1
 
+        ttk.Separator(frame, orient="horizontal").grid(row=row, column=0, sticky="ew", pady=8)
+        row += 1
+        ttk.Checkbutton(frame, text="Incluir reproducción de audio (experimental)", variable=self.audio_enabled_var).grid(row=row, column=0, sticky="w", pady=2)
+
     def _build_compare_frame(self, frame: ttk.Frame) -> None:
         params = ttk.Frame(frame)
         params.pack(fill=tk.BOTH, expand=True, padx=6, pady=(0,6))
@@ -541,7 +547,8 @@ class ExperimentLauncher(tk.Tk):
             output_dir=str(Path(self.output_var.get().strip()).resolve())
         )
         vis_config = VisualizationConfig(
-            sections=self._sections_arg().split(",") if self._sections_arg() != "all" else ["all"]
+            sections=self._sections_arg().split(",") if self._sections_arg() != "all" else ["all"],
+            audio=AudioConfig(enabled=self.audio_enabled_var.get())
         )
         experiment_config = ExperimentConfig(
             population=pop_config, roughness=rough_config, reduction=red_config, execution=exec_config, name="gui_experiment"
