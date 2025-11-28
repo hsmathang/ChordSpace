@@ -614,6 +614,10 @@ class ExperimentLauncher(tk.Tk):
                 elif kind == "progress": self._update_progress(payload[0], payload[1] if len(payload)>1 else None)
                 elif kind == "done":
                     self._set_controls_state(tk.NORMAL)
+                    if self.controller.last_report_path:
+                        self.compare_open_folder_button.configure(state=tk.NORMAL)
+                    else:
+                        self.compare_open_folder_button.configure(state=tk.DISABLED)
                     self.controller.cleanup_temp_files()
                 elif kind == "pop_job_done":
                     self._fill_population_tree(payload['df'])
