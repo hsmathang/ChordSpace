@@ -30,39 +30,82 @@ def _entry_label(entry: ChordEntry) -> str:
 
 def _generate_compact_labels(entries: List[ChordEntry]) -> List[str]:
     """Genera etiquetas compactas formato '0257 [2,5,2]'."""
-    labels = []
 
-    # Mapping for 10/11 -> A/B
-    digit_map = {10: 'A', 11: 'B'}
+    def _coerce_notes(raw: Any) -> List[int]:
+        values: List[int] = []
+        if isinstance(raw, (list, tuple, np.ndarray)):
+            for note in list(raw):
+                try:
+                    values.append(int(round(float(note))))
+                except Exception:
+                    continue
+        return values
+
+    def _notes_from_intervals(intervals: Sequence[Any]) -> List[int]:
+        seq = [0]
+        running = 0
+        for step in intervals:
+            try:
+                running += int(step)
+            except Exception:
+                continue
+            seq.append(running)
+        return seq
+
+    digit_map = {10: "A", 11: "B"}
+    labels: List[str] = []
 
     for entry in entries:
+        acorde = getattr(entry, "acorde", None)
+        intervals = getattr(acorde, "intervals", []) if acorde is not None else []
+        expected = None
         try:
-            # 1. PC Pattern
-            notes = getattr(getattr(entry, 'acorde', None), 'notes_abs', [])
-            if not notes:
-                pc_str = "?"
-            else:
-                pcs = sorted(list(set(n % 12 for n in notes)))
-                if pcs:
-                    base = pcs[0]
-                    norm = [(p - base) % 12 for p in pcs]
-                    chars = [digit_map.get(n, str(n)) for n in norm]
-                    pc_str = "".join(chars)
-                else:
-                    pc_str = ""
-
-            # 2. Intervals
-            intervals = getattr(getattr(entry, 'acorde', None), 'intervals', [])
-            if intervals:
-                int_str = "[" + ",".join(str(int(i)) for i in intervals) + "]"
-            else:
-                int_str = ""
-
-            # Combine
-            parts = [p for p in [pc_str, int_str] if p]
-            labels.append(" ".join(parts))
+            expected = int(getattr(entry, "n_notes", 0))
         except Exception:
-            labels.append("?")
+            expected = None
+
+        direct_notes: List[int] = []
+        interval_notes: List[int] = []
+        if acorde is not None:
+            direct_notes = _coerce_notes(getattr(acorde, "notes_abs", None))
+        if intervals:
+            interval_notes = _notes_from_intervals(intervals)
+
+        notes_abs: List[int]
+        if expected and len(direct_notes) != expected and len(interval_notes) == expected:
+            notes_abs = interval_notes
+        elif direct_notes:
+            notes_abs = direct_notes
+        elif interval_notes:
+            notes_abs = interval_notes
+        else:
+            fallback_len = expected if expected and expected > 0 else 1
+            notes_abs = list(range(fallback_len))
+
+        pcs: List[int] = []
+        for note in notes_abs:
+            try:
+                pcs.append(int(note) % 12)
+            except Exception:
+                continue
+
+        if pcs:
+            base = pcs[0]
+            normalized = [int((p - base) % 12) for p in pcs]
+            pc_str = "".join(digit_map.get(n, str(n)) for n in normalized)
+        else:
+            pc_str = "?"
+
+        if intervals:
+            try:
+                interval_str = "[" + ",".join(str(int(i)) for i in intervals) + "]"
+            except Exception:
+                interval_str = ""
+        else:
+            interval_str = ""
+
+        parts = [p for p in (pc_str, interval_str) if p]
+        labels.append(" ".join(parts) if parts else "?")
 
     return labels
 
@@ -325,6 +368,8 @@ def build_heatmap_figure(
 
     indices_sorted = np.argsort([e.n_notes for e in entries])
     dist_sorted = dist_matrix[indices_sorted][:, indices_sorted]
+    upper_mask = np.triu(np.ones_like(dist_sorted, dtype=bool))
+    masked = np.where(upper_mask, dist_sorted, np.nan)
 
     def _label(entry: ChordEntry) -> str:
         acorde = getattr(entry, "acorde", None)
@@ -350,7 +395,7 @@ def build_heatmap_figure(
 
     fig = go.Figure(
         data=go.Heatmap(
-            z=dist_sorted,
+            z=masked,
             x=list(range(len(labels))),
             y=list(range(len(labels))),
             colorscale="Turbo",
@@ -377,6 +422,7 @@ def build_heatmap_figure(
             tickvals=tick_vals,
             ticktext=tick_text,
             showticklabels=show_labels,
+            autorange="reversed",
         ),
     )
     return fig

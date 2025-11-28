@@ -1295,7 +1295,7 @@
       }
 
       // --------------------------------------------------------------------------------
-      // Dynamic Heatmap Coordination (lazy-loading per scenario)
+      // Dynamic Heatmap Coordination (lazy load + visibility aware)
       // --------------------------------------------------------------------------------
       const heatmapScriptCache = {};
       function loadHeatmapPayload(scenarioName, path) {
@@ -1323,7 +1323,7 @@
         const meta = rootData.metadata || {};
         const files = rootData.files || {};
         const labels = Array.isArray(meta.labels) ? meta.labels : [];
-        if (!labels.length || !files) return;
+        if (!labels.length) return;
 
         const header = card.querySelector('.card-header strong');
         if (!header) return;
@@ -1339,6 +1339,41 @@
 
         const cardinalities = Array.isArray(meta.cardinalities) ? meta.cardinalities : [];
         const totalPoints = labels.length;
+
+        function getBaseDimension(axis, fallback) {
+          const layout = heatmapContainer._fullLayout || heatmapContainer.layout || {};
+          if (typeof layout[axis] === 'number' && layout[axis] > 0) {
+            return layout[axis];
+          }
+          if (heatmapContainer.__heatmapDims && typeof heatmapContainer.__heatmapDims[axis] === 'number') {
+            return heatmapContainer.__heatmapDims[axis];
+          }
+          const measured = axis === 'width' ? heatmapContainer.clientWidth : heatmapContainer.clientHeight;
+          if (measured && measured > 0) {
+            heatmapContainer.__heatmapDims = heatmapContainer.__heatmapDims || {};
+            heatmapContainer.__heatmapDims[axis] = measured;
+            return measured;
+          }
+          return fallback;
+        }
+
+        function isPlotVisible(gd) {
+          if (!gd) return false;
+          let node = gd;
+          while (node && node !== card) {
+            if (node.nodeType !== 1) {
+              node = node.parentElement;
+              continue;
+            }
+            const style = window.getComputedStyle(node);
+            const opacity = parseFloat(style.opacity || '1');
+            if (style.display === 'none' || style.visibility === 'hidden' || opacity === 0) {
+              return false;
+            }
+            node = node.parentElement;
+          }
+          return true;
+        }
 
         loadHeatmapPayload(scenarioName, filePath).then(payload => {
           if (!payload || !Array.isArray(payload.condensed) || !payload.condensed.length) {
@@ -1430,7 +1465,19 @@
 
           function collectIndicesInRange(gd, xRange, yRange) {
             const indices = [];
-            if (!gd || !Array.isArray(gd.data)) {
+            const hasRange =
+              Array.isArray(xRange) &&
+              xRange.length === 2 &&
+              Array.isArray(yRange) &&
+              yRange.length === 2;
+            if (!gd || !Array.isArray(gd.data) || !hasRange) {
+              return indices;
+            }
+            const xMin = Math.min(Number(xRange[0]), Number(xRange[1]));
+            const xMax = Math.max(Number(xRange[0]), Number(xRange[1]));
+            const yMin = Math.min(Number(yRange[0]), Number(yRange[1]));
+            const yMax = Math.max(Number(yRange[0]), Number(yRange[1]));
+            if (![xMin, xMax, yMin, yMax].every(Number.isFinite)) {
               return indices;
             }
             gd.data.forEach(trace => {
@@ -1438,9 +1485,12 @@
                 return;
               }
               for (let i = 0; i < trace.x.length; i++) {
-                const xVal = trace.x[i];
-                const yVal = trace.y[i];
-                if (xVal >= xRange[0] && xVal <= xRange[1] && yVal >= yRange[0] && yVal <= yRange[1]) {
+                const xVal = Number(trace.x[i]);
+                const yVal = Number(trace.y[i]);
+                if (!Number.isFinite(xVal) || !Number.isFinite(yVal)) {
+                  continue;
+                }
+                if (xVal >= xMin && xVal <= xMax && yVal >= yMin && yVal <= yMax) {
                   const idx = extractIndexFromTrace(trace, i);
                   if (Number.isFinite(idx)) {
                     indices.push(idx);
@@ -1451,10 +1501,63 @@
             return indices;
           }
 
+          function getVisibleIndexSet() {
+            const visible = new Set();
+            let hasAny = false;
+            scatters.forEach(gd => {
+              if (!gd || !Array.isArray(gd.data)) {
+                return;
+              }
+              if (!isPlotVisible(gd)) {
+                return;
+              }
+              gd.data.forEach(trace => {
+                if (!trace || trace.visible === 'legendonly' || trace.visible === false) {
+                  return;
+                }
+                const len = Array.isArray(trace.x) ? trace.x.length : 0;
+                for (let i = 0; i < len; i++) {
+                  const idx = extractIndexFromTrace(trace, i);
+                  if (Number.isFinite(idx)) {
+                    visible.add(idx);
+                    hasAny = true;
+                  }
+                }
+              });
+            });
+            return hasAny ? visible : null;
+          }
+
+          let lastSubset = null;
+
+          function requestUpdate(indices) {
+            if (Array.isArray(indices)) {
+              lastSubset = indices.slice();
+            } else {
+              lastSubset = null;
+            }
+            updateHeatmap(indices);
+          }
+
           function updateHeatmap(subsetIndicesRaw) {
             let subsetIndices = dedupeValidIndices(subsetIndicesRaw || []);
+            const visibleSet = getVisibleIndexSet();
+
             if (!subsetIndices.length) {
-              subsetIndices = dedupeValidIndices(labels.map((_, i) => i));
+              if (visibleSet && visibleSet.size) {
+                subsetIndices = Array.from(visibleSet);
+              } else {
+                subsetIndices = dedupeValidIndices(labels.map((_, i) => i));
+              }
+            } else if (visibleSet && visibleSet.size) {
+              subsetIndices = subsetIndices.filter(i => visibleSet.has(i));
+              if (!subsetIndices.length) {
+                subsetIndices = Array.from(visibleSet);
+              }
+            }
+
+            if (!subsetIndices.length) {
+              subsetIndices = [0];
             }
 
             let items = subsetIndices.map(i => ({
@@ -1473,6 +1576,11 @@
               z[r] = new Array(size);
               text[r] = new Array(size);
               for (let c = 0; c < size; c++) {
+                if (c < r) {
+                  z[r][c] = NaN;
+                  text[r][c] = '';
+                  continue;
+                }
                 const dist = getDistance(items[r].originalIndex, items[c].originalIndex);
                 z[r][c] = Number.isFinite(dist) ? dist : 0;
                 text[r][c] = `${axesLabels[r]}<br>vs ${axesLabels[c]}`;
@@ -1482,6 +1590,8 @@
             const showLabels = size <= 30;
             const tickVals = showLabels ? items.map((_, i) => i) : null;
             const tickText = showLabels ? axesLabels : null;
+            const layoutWidth = getBaseDimension('width', 640);
+            const layoutHeight = getBaseDimension('height', 480);
 
             Plotly.react(heatmapContainer, [{
               type: 'heatmap',
@@ -1496,8 +1606,8 @@
             }], {
               title: `Heatmap: ${scenarioName} (Subset N=${size})`,
               template: 'plotly_white',
-              width: heatmapContainer.layout.width,
-              height: heatmapContainer.layout.height,
+              width: layoutWidth,
+              height: layoutHeight,
               xaxis: {
                 tickmode: 'array',
                 tickvals: tickVals,
@@ -1509,6 +1619,7 @@
                 tickvals: tickVals,
                 ticktext: tickText,
                 showticklabels: showLabels,
+                autorange: 'reversed',
               },
             });
           }
@@ -1516,35 +1627,68 @@
           scatters.forEach(gd => {
             gd.on('plotly_selected', (eventData) => {
               if (!eventData || !eventData.points || eventData.points.length === 0) {
-                updateHeatmap([]);
+                requestUpdate([]);
                 return;
               }
               const indices = collectIndicesFromPoints(gd, eventData.points);
-              updateHeatmap(indices);
+              requestUpdate(indices);
             });
 
             gd.on('plotly_deselect', () => {
-              updateHeatmap([]);
+              requestUpdate([]);
             });
 
-            gd.on('plotly_relayout', (eventData) => {
-              if (eventData['xaxis.range[0]'] || eventData['xaxis.range']) {
-                const xRange = [
-                  eventData['xaxis.range[0]'] || eventData['xaxis.range'][0],
-                  eventData['xaxis.range[1]'] || eventData['xaxis.range'][1],
-                ];
-                const yRange = [
-                  eventData['yaxis.range[0]'] || eventData['yaxis.range'][0],
-                  eventData['yaxis.range[1]'] || eventData['yaxis.range'][1],
-                ];
-
+            gd.on('plotly_relayout', (eventData = {}) => {
+              const hasXBracket =
+                Object.prototype.hasOwnProperty.call(eventData, 'xaxis.range[0]') &&
+                Object.prototype.hasOwnProperty.call(eventData, 'xaxis.range[1]');
+              const hasYBracket =
+                Object.prototype.hasOwnProperty.call(eventData, 'yaxis.range[0]') &&
+                Object.prototype.hasOwnProperty.call(eventData, 'yaxis.range[1]');
+              const hasXArray = Array.isArray(eventData['xaxis.range']) && eventData['xaxis.range'].length === 2;
+              const hasYArray = Array.isArray(eventData['yaxis.range']) && eventData['yaxis.range'].length === 2;
+              if ((hasXBracket || hasXArray) && (hasYBracket || hasYArray)) {
+                const xRange = hasXBracket
+                  ? [eventData['xaxis.range[0]'], eventData['xaxis.range[1]']]
+                  : eventData['xaxis.range'];
+                const yRange = hasYBracket
+                  ? [eventData['yaxis.range[0]'], eventData['yaxis.range[1]']]
+                  : eventData['yaxis.range'];
                 const indices = collectIndicesInRange(gd, xRange, yRange);
-                updateHeatmap(indices);
-              } else if (eventData['xaxis.autorange'] === true) {
-                updateHeatmap([]);
+                requestUpdate(indices);
+                return;
+              }
+              if (eventData['xaxis.autorange'] === true || eventData['yaxis.autorange'] === true) {
+                requestUpdate([]);
               }
             });
+
+            gd.on('plotly_restyle', () => {
+              if (lastSubset === null) {
+                requestUpdate(null);
+              } else {
+                requestUpdate(lastSubset.slice());
+              }
+            });
+
+            gd.on('plotly_legendclick', () => {
+              setTimeout(() => {
+                if (lastSubset === null) {
+                  requestUpdate(null);
+                } else {
+                  requestUpdate(lastSubset.slice());
+                }
+              }, 0);
+            });
+
+            gd.on('plotly_legenddoubleclick', () => {
+              setTimeout(() => {
+                requestUpdate(null);
+              }, 0);
+            });
           });
+
+          requestUpdate(null);
         });
       }
 
