@@ -1295,288 +1295,256 @@
       }
 
       // --------------------------------------------------------------------------------
-      // Dynamic Heatmap Coordination (Replaces logic for dynamic heatmap)
+      // Dynamic Heatmap Coordination (lazy-loading per scenario)
       // --------------------------------------------------------------------------------
-      function registerDynamicHeatmap(card) {
-        if (!window.HEATMAP_DATA) return;
+      const heatmapScriptCache = {};
+      function loadHeatmapPayload(scenarioName, path) {
+        if (!path) return Promise.resolve(null);
+        if (window.__HEATMAP_PAYLOADS && window.__HEATMAP_PAYLOADS[scenarioName]) {
+          return Promise.resolve(window.__HEATMAP_PAYLOADS[scenarioName]);
+        }
+        if (!heatmapScriptCache[scenarioName]) {
+          heatmapScriptCache[scenarioName] = new Promise(resolve => {
+            const script = document.createElement('script');
+            script.src = path;
+            script.onload = () => {
+              const payload = window.__HEATMAP_PAYLOADS ? window.__HEATMAP_PAYLOADS[scenarioName] : null;
+              resolve(payload || null);
+            };
+            script.onerror = () => resolve(null);
+            document.head.appendChild(script);
+          });
+        }
+        return heatmapScriptCache[scenarioName];
+      }
 
-        // Try to identify scenario name from the header
-        // Header is like: "ScenarioName (seed ...)" or just "ScenarioName" inside .card-header strong
-        // Actually, report_builder logic puts "scenario" directly in data attributes? No.
-        // It puts it in .card-header -> strong.
-        // But keys in HEATMAP_DATA are exactly the scenario name.
+      function registerDynamicHeatmap(card) {
+        const rootData = window.HEATMAP_DATA || {};
+        const meta = rootData.metadata || {};
+        const files = rootData.files || {};
+        const labels = Array.isArray(meta.labels) ? meta.labels : [];
+        if (!labels.length || !files) return;
+
         const header = card.querySelector('.card-header strong');
         if (!header) return;
         const scenarioName = header.textContent.trim();
-        const data = window.HEATMAP_DATA[scenarioName];
-        if (!data) return;
-
-        const labels = Array.isArray(data.labels) ? data.labels : [];
-        const totalPoints = labels.length;
-        if (!totalPoints) return;
-
-        const condensed = Array.isArray(data.condensed) ? data.condensed : [];
-        const condensedLength = condensed.length;
-        const matrixSize = Math.round((1 + Math.sqrt(1 + 8 * condensedLength)) / 2);
-        if (!Number.isFinite(matrixSize) || matrixSize <= 0) {
-          return;
-        }
-
-        const cardinalities = Array.isArray(data.cardinalities) ? data.cardinalities : null;
+        const filePath = files[scenarioName];
+        if (!filePath) return;
 
         const heatmapContainer = card.querySelector('.aux-figure[data-section="heatmap"] .js-plotly-plot');
         if (!heatmapContainer) return;
 
-        // We need to attach listeners to ALL scatter plots in this card
         const scatters = Array.from(card.querySelectorAll('.subtab-panel .js-plotly-plot'));
         if (!scatters.length) return;
 
-        // Reconstruct matrix logic
-        function getDistance(idx1, idx2) {
-          if (!Number.isFinite(idx1) || !Number.isFinite(idx2)) return NaN;
-          if (idx1 === idx2) return 0;
-          let i = Math.min(idx1, idx2);
-          let j = Math.max(idx1, idx2);
-          const k = Math.round((matrixSize * i) - (i * (i + 1) / 2) + j - i - 1);
-          if (k < 0 || k >= condensed.length) {
-            return NaN;
+        const cardinalities = Array.isArray(meta.cardinalities) ? meta.cardinalities : [];
+        const totalPoints = labels.length;
+
+        loadHeatmapPayload(scenarioName, filePath).then(payload => {
+          if (!payload || !Array.isArray(payload.condensed) || !payload.condensed.length) {
+            return;
           }
-          return condensed[k];
-        }
+          if (card.__heatmapBound) return;
+          card.__heatmapBound = true;
 
-        // We assume indices in scatter plot correspond to indices in data.labels / data.condensed.
-        // scatter.customdata[7] is global_id, but the *index* in the array usually matches?
-        // Wait, entries are passed to build_scatter_figure in the same order as build_heatmap_figure?
-        // YES, `entries` list is shared.
-        // However, build_heatmap_figure sorts entries by cardinality!
-        // build_scatter_figure does NOT sort entries (it iterates entries).
-        // So the indices in Scatter (0..N-1) match `entries` order.
-        // But Heatmap indices match `sorted(entries)` order.
-        // We need the mapping.
-        // Fortunately, we can deduce sorting from N notes?
-        // Or better: The static Heatmap already has sorted axes.
-        // If we reconstruct, we should respect the Heatmap's sorting?
-        // Or we can just build a new Heatmap from the subset.
-        // The user requirement: "Ordenar los acordes como ahora (por cardinalidad)".
-        // So, given a subset of indices (from Scatter, original order), we must:
-        // 1. Map to Chord objects (or at least their Cardinality + Label).
-        // 2. Sort them by Cardinality.
-        // 3. Build the sub-matrix.
+          const condensed = payload.condensed;
+          const matrixSize = Math.round((1 + Math.sqrt(1 + 8 * condensed.length)) / 2);
+          if (!Number.isFinite(matrixSize) || matrixSize <= 0) {
+            return;
+          }
 
-        // We need cardinality info for sorting.
-        // We can parse it from labels? "C (3n)..."
-        // Or we can assume `data.labels` is in original order?
-        // data.labels came from `_generate_compact_labels(result.entries)`, so it IS original order.
-        // We also need `n_notes` for sorting.
-        // Scatter customdata[2] usually has 'n_notes' (or family size? check build_scatter_payload).
-        // build_scatter_payload: customdata = [family_id, name, family_size, ...?]
-        // Actually `visualisations/proposals.py`:
-        // customdata columns:
-        // 0: family_id
-        // 1: name
-        // 2: family_size
-        // 3: n_notes (Added? Let's check.)
-        // I should check `visualisations/proposals.py`.
-        // If I can't check, I can regex the label: "047 [4,3]" -> Length of interval vector + 1?
-        // Label format: "047 [4,3]". Comma count + 1 = intervals. +1 note.
-        // "047" len = 3.
-        // Or just parse the stored labels.
+          function getDistance(idx1, idx2) {
+            if (!Number.isFinite(idx1) || !Number.isFinite(idx2)) return NaN;
+            if (idx1 === idx2) return 0;
+            let i = Math.min(idx1, idx2);
+            let j = Math.max(idx1, idx2);
+            const k = Math.round((matrixSize * i) - (i * (i + 1) / 2) + j - i - 1);
+            if (k < 0 || k >= condensed.length) {
+              return NaN;
+            }
+            return condensed[k];
+          }
 
-        // Helper to parse N from label or just count.
-        function getCardinality(idx) {
+          function getCardinality(idx) {
             if (cardinalities && Number.isFinite(cardinalities[idx])) {
-                return Number(cardinalities[idx]);
+              return Number(cardinalities[idx]);
             }
             const label = labels[idx] || '';
             const match = label.match(/\[(.*?)\]/);
             if (match) {
-                const parts = match[1].split(',').filter(Boolean);
-                return parts.length + 1;
+              const parts = match[1].split(',').filter(Boolean);
+              return parts.length + 1;
             }
-            const first = label.split(' ')[0];
+            const first = label.split(' ')[0] || '';
             return first.length || 0;
-        }
+          }
 
-        function dedupeValidIndices(source) {
+          function dedupeValidIndices(source) {
             const unique = new Set();
             source.forEach(idx => {
-                if (Number.isFinite(idx) && idx >= 0 && idx < totalPoints) {
-                    unique.add(Number(idx));
-                }
+              if (Number.isFinite(idx) && idx >= 0 && idx < totalPoints) {
+                unique.add(Number(idx));
+              }
             });
             return Array.from(unique);
-        }
+          }
 
-        function extractIndexFromTrace(trace, pointIdx) {
+          function extractIndexFromTrace(trace, pointIdx) {
             if (!trace) return null;
             if (trace.customdata && trace.customdata[pointIdx] && trace.customdata[pointIdx].length >= 8) {
-                const value = Number(trace.customdata[pointIdx][7]);
-                if (Number.isFinite(value)) {
-                    return value;
-                }
+              const value = Number(trace.customdata[pointIdx][7]);
+              if (Number.isFinite(value)) {
+                return value;
+              }
             }
             if (typeof pointIdx === 'number') {
-                return pointIdx;
+              return pointIdx;
             }
             return null;
-        }
+          }
 
-        function collectIndicesFromPoints(gd, points) {
+          function collectIndicesFromPoints(gd, points) {
             const indices = [];
             if (!Array.isArray(points)) {
-                return indices;
+              return indices;
             }
             points.forEach(pt => {
-                if (!pt) return;
-                if (pt.customdata && pt.customdata.length >= 8) {
-                    const candidate = Number(pt.customdata[7]);
-                    if (Number.isFinite(candidate)) {
-                        indices.push(candidate);
-                        return;
-                    }
+              if (!pt) return;
+              if (pt.customdata && pt.customdata.length >= 8) {
+                const candidate = Number(pt.customdata[7]);
+                if (Number.isFinite(candidate)) {
+                  indices.push(candidate);
+                  return;
                 }
-                if (gd && gd.data && typeof pt.curveNumber === 'number') {
-                    const trace = gd.data[pt.curveNumber];
-                    const fallback = extractIndexFromTrace(trace, pt.pointIndex);
-                    if (Number.isFinite(fallback)) {
-                        indices.push(fallback);
-                    }
+              }
+              if (gd && gd.data && typeof pt.curveNumber === 'number') {
+                const trace = gd.data[pt.curveNumber];
+                const fallback = extractIndexFromTrace(trace, pt.pointIndex);
+                if (Number.isFinite(fallback)) {
+                  indices.push(fallback);
                 }
+              }
             });
             return indices;
-        }
+          }
 
-        function collectIndicesInRange(gd, xRange, yRange) {
+          function collectIndicesInRange(gd, xRange, yRange) {
             const indices = [];
             if (!gd || !Array.isArray(gd.data)) {
-                return indices;
+              return indices;
             }
             gd.data.forEach(trace => {
-                if (!trace || !Array.isArray(trace.x) || !Array.isArray(trace.y)) {
-                    return;
+              if (!trace || !Array.isArray(trace.x) || !Array.isArray(trace.y)) {
+                return;
+              }
+              for (let i = 0; i < trace.x.length; i++) {
+                const xVal = trace.x[i];
+                const yVal = trace.y[i];
+                if (xVal >= xRange[0] && xVal <= xRange[1] && yVal >= yRange[0] && yVal <= yRange[1]) {
+                  const idx = extractIndexFromTrace(trace, i);
+                  if (Number.isFinite(idx)) {
+                    indices.push(idx);
+                  }
                 }
-                for (let i = 0; i < trace.x.length; i++) {
-                    const xVal = trace.x[i];
-                    const yVal = trace.y[i];
-                    if (xVal >= xRange[0] && xVal <= xRange[1] && yVal >= yRange[0] && yVal <= yRange[1]) {
-                        const idx = extractIndexFromTrace(trace, i);
-                        if (Number.isFinite(idx)) {
-                            indices.push(idx);
-                        }
-                    }
-                }
+              }
             });
             return indices;
-        }
+          }
 
-        let originalState = null; // Store original heatmap data to restore on reset
-
-        function updateHeatmap(subsetIndicesRaw) {
+          function updateHeatmap(subsetIndicesRaw) {
             let subsetIndices = dedupeValidIndices(subsetIndicesRaw || []);
             if (!subsetIndices.length) {
-                 subsetIndices = dedupeValidIndices(labels.map((_, i) => i));
+              subsetIndices = dedupeValidIndices(labels.map((_, i) => i));
             }
 
-            // 1. Sort subset by Cardinality
             let items = subsetIndices.map(i => ({
-                originalIndex: i,
-                label: labels[i],
-                n: getCardinality(i)
+              originalIndex: i,
+              label: labels[i],
+              n: getCardinality(i),
             }));
 
-            // Sort by n
             items.sort((a, b) => a.n - b.n);
-
-            // 2. Build Matrix
             const size = items.length;
-            const z = new Array(size);
             const axesLabels = items.map(x => x.label);
-
-            // Hover text
+            const z = new Array(size);
             const text = new Array(size);
 
             for (let r = 0; r < size; r++) {
-                z[r] = new Array(size);
-                text[r] = new Array(size);
-                for (let c = 0; c < size; c++) {
-                    const dist = getDistance(items[r].originalIndex, items[c].originalIndex);
-                    z[r][c] = dist;
-                    text[r][c] = `${axesLabels[r]}<br>vs ${axesLabels[c]}`;
-                }
+              z[r] = new Array(size);
+              text[r] = new Array(size);
+              for (let c = 0; c < size; c++) {
+                const dist = getDistance(items[r].originalIndex, items[c].originalIndex);
+                z[r][c] = Number.isFinite(dist) ? dist : 0;
+                text[r][c] = `${axesLabels[r]}<br>vs ${axesLabels[c]}`;
+              }
             }
 
-            // 3. Labels behavior
-            // "Usar estas etiquetas ... cuando el número de acordes visibles sea razonable (p.ej. ≤30)."
             const showLabels = size <= 30;
             const tickVals = showLabels ? items.map((_, i) => i) : null;
             const tickText = showLabels ? axesLabels : null;
 
             Plotly.react(heatmapContainer, [{
-                type: 'heatmap',
-                z: z,
-                x: items.map((_, i) => i),
-                y: items.map((_, i) => i),
-                colorscale: 'Turbo',
-                colorbar: { title: 'Distancia' },
-                hoverongaps: false,
-                text: text,
-                hovertemplate: "%{text}<br>Distancia=%{z:.3f}<extra></extra>"
+              type: 'heatmap',
+              z: z,
+              x: items.map((_, i) => i),
+              y: items.map((_, i) => i),
+              colorscale: 'Turbo',
+              colorbar: { title: 'Distancia' },
+              hoverongaps: false,
+              text: text,
+              hovertemplate: "%{text}<br>Distancia=%{z:.3f}<extra></extra>",
             }], {
-                title: `Heatmap: ${scenarioName} (Subset N=${size})`,
-                template: 'plotly_white',
-                width: heatmapContainer.layout.width,
-                height: heatmapContainer.layout.height,
-                xaxis: {
-                    tickmode: 'array',
-                    tickvals: tickVals,
-                    ticktext: tickText,
-                    showticklabels: showLabels
-                },
-                yaxis: {
-                    tickmode: 'array',
-                    tickvals: tickVals,
-                    ticktext: tickText,
-                    showticklabels: showLabels
-                }
+              title: `Heatmap: ${scenarioName} (Subset N=${size})`,
+              template: 'plotly_white',
+              width: heatmapContainer.layout.width,
+              height: heatmapContainer.layout.height,
+              xaxis: {
+                tickmode: 'array',
+                tickvals: tickVals,
+                ticktext: tickText,
+                showticklabels: showLabels,
+              },
+              yaxis: {
+                tickmode: 'array',
+                tickvals: tickVals,
+                ticktext: tickText,
+                showticklabels: showLabels,
+              },
             });
-        }
+          }
 
-        // Attach to Scatters
-        scatters.forEach(gd => {
+          scatters.forEach(gd => {
             gd.on('plotly_selected', (eventData) => {
-                if (!eventData || !eventData.points || eventData.points.length === 0) {
-                     updateHeatmap([]); // Reset
-                     return;
-                }
-                const indices = collectIndicesFromPoints(gd, eventData.points);
-                updateHeatmap(indices);
+              if (!eventData || !eventData.points || eventData.points.length === 0) {
+                updateHeatmap([]);
+                return;
+              }
+              const indices = collectIndicesFromPoints(gd, eventData.points);
+              updateHeatmap(indices);
             });
 
             gd.on('plotly_deselect', () => {
-                updateHeatmap([]);
+              updateHeatmap([]);
             });
 
-            // If we want zoom support (plotly_relayout):
             gd.on('plotly_relayout', (eventData) => {
-                // Check for axis ranges
-                if (eventData['xaxis.range[0]'] || eventData['xaxis.range']) {
-                    // Start Timer or debounce?
-                    // We need to find points inside range.
-                    const xRange = [
-                        eventData['xaxis.range[0]'] || eventData['xaxis.range'][0],
-                        eventData['xaxis.range[1]'] || eventData['xaxis.range'][1]
-                    ];
-                    const yRange = [
-                        eventData['yaxis.range[0]'] || eventData['yaxis.range'][0],
-                        eventData['yaxis.range[1]'] || eventData['yaxis.range'][1]
-                    ];
+              if (eventData['xaxis.range[0]'] || eventData['xaxis.range']) {
+                const xRange = [
+                  eventData['xaxis.range[0]'] || eventData['xaxis.range'][0],
+                  eventData['xaxis.range[1]'] || eventData['xaxis.range'][1],
+                ];
+                const yRange = [
+                  eventData['yaxis.range[0]'] || eventData['yaxis.range'][0],
+                  eventData['yaxis.range[1]'] || eventData['yaxis.range'][1],
+                ];
 
-                    const indices = collectIndicesInRange(gd, xRange, yRange);
-                    updateHeatmap(indices);
-                } else if (eventData['xaxis.autorange'] === true) {
-                     updateHeatmap([]);
-                }
+                const indices = collectIndicesInRange(gd, xRange, yRange);
+                updateHeatmap(indices);
+              } else if (eventData['xaxis.autorange'] === true) {
+                updateHeatmap([]);
+              }
             });
+          });
         });
       }
 

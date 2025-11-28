@@ -7,6 +7,8 @@ from __future__ import annotations
 import json
 from pathlib import Path
 from typing import Any, Callable, Dict, List, Optional, Tuple
+import shutil
+import re
 import pandas as pd
 import numpy as np
 import plotly.graph_objects as go
@@ -118,32 +120,73 @@ class VisualizationService:
         heatmap_data: Optional[Dict[str, Any]] = None
         HEATMAP_LIMIT = 1500  # Hard limit for browser performance
 
-        if sections_enabled.get("heatmap", False) and len(result.entries) <= HEATMAP_LIMIT:
-            heatmap_data = {}
+        def _slugify(name: str) -> str:
+            slug = re.sub(r"[^A-Za-z0-9]+", "_", name).strip("_")
+            return slug or "scenario"
+
+        if (
+            sections_enabled.get("heatmap", False)
+            and len(result.entries) <= HEATMAP_LIMIT
+            and result.output_path is not None
+        ):
             if logger:
                 logger(f"[visualizacion] generando payload de heatmaps dinámicos (N={len(result.entries)})...")
 
-            # Generate metadata once
             labels = _generate_compact_labels(result.entries)
             cardinalities = [
                 int(getattr(entry, "n_notes", 0) or 0)
                 for entry in result.entries
             ]
 
+            heatmap_dir = result.output_path / "heatmaps"
+            if heatmap_dir.exists():
+                shutil.rmtree(heatmap_dir)
+            heatmap_dir.mkdir(parents=True, exist_ok=True)
+
+            heatmap_files: Dict[str, str] = {}
+            slug_counts: Dict[str, int] = {}
+
             for payload in result.visualization_payloads:
                 scenario_name = payload["scenario"]
                 preproc_id = payload["preproc_id"]
                 metric = payload["metric"]
 
-                # Retrieve condensed distance matrix
                 dist_condensed = result.dist_matrices.get((preproc_id, metric))
+                if dist_condensed is None:
+                    continue
+                if scenario_name in heatmap_files:
+                    continue
 
-                if dist_condensed is not None and scenario_name not in heatmap_data:
-                    heatmap_data[scenario_name] = {
-                        "condensed": dist_condensed.tolist() if isinstance(dist_condensed, np.ndarray) else list(dist_condensed),
+                condensed_list = (
+                    dist_condensed.tolist()
+                    if isinstance(dist_condensed, np.ndarray)
+                    else list(dist_condensed)
+                )
+
+                base_slug = _slugify(scenario_name)
+                count = slug_counts.get(base_slug, 0)
+                slug_counts[base_slug] = count + 1
+                slug = base_slug if count == 0 else f"{base_slug}_{count+1}"
+
+                script_path = heatmap_dir / f"{slug}.js"
+                payload_json = json.dumps({"condensed": condensed_list}, ensure_ascii=False)
+                script_content = (
+                    "(function(){window.__HEATMAP_PAYLOADS=window.__HEATMAP_PAYLOADS||{};"
+                    f"window.__HEATMAP_PAYLOADS[{json.dumps(scenario_name)}]={payload_json};"
+                    "})();"
+                )
+                script_path.write_text(script_content, encoding="utf-8")
+                relative_path = script_path.relative_to(result.output_path).as_posix()
+                heatmap_files[scenario_name] = relative_path
+
+            if heatmap_files:
+                heatmap_data = {
+                    "metadata": {
                         "labels": labels,
                         "cardinalities": cardinalities,
-                    }
+                    },
+                    "files": heatmap_files,
+                }
 
         # Build minimal metadata if none provided, so the section is visible when selected.
         run_metadata = result.config.population.metadata or {}
