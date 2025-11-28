@@ -28,6 +28,45 @@ def _entry_label(entry: ChordEntry) -> str:
     return f"{entry} (n={getattr(entry, 'n_notes', '?')})"
 
 
+def _generate_compact_labels(entries: List[ChordEntry]) -> List[str]:
+    """Genera etiquetas compactas formato '0257 [2,5,2]'."""
+    labels = []
+
+    # Mapping for 10/11 -> A/B
+    digit_map = {10: 'A', 11: 'B'}
+
+    for entry in entries:
+        try:
+            # 1. PC Pattern
+            notes = getattr(getattr(entry, 'acorde', None), 'notes_abs', [])
+            if not notes:
+                pc_str = "?"
+            else:
+                pcs = sorted(list(set(n % 12 for n in notes)))
+                if pcs:
+                    base = pcs[0]
+                    norm = [(p - base) % 12 for p in pcs]
+                    chars = [digit_map.get(n, str(n)) for n in norm]
+                    pc_str = "".join(chars)
+                else:
+                    pc_str = ""
+
+            # 2. Intervals
+            intervals = getattr(getattr(entry, 'acorde', None), 'intervals', [])
+            if intervals:
+                int_str = "[" + ",".join(str(int(i)) for i in intervals) + "]"
+            else:
+                int_str = ""
+
+            # Combine
+            parts = [p for p in [pc_str, int_str] if p]
+            labels.append(" ".join(parts))
+        except Exception:
+            labels.append("?")
+
+    return labels
+
+
 @dataclass(frozen=True)
 class ColorSettings:
     per_pair_subtract: float
@@ -435,5 +474,6 @@ __all__ = [
     "generate_figures",
     "build_scatter_figure",
     "build_heatmap_figure",
-    "build_shepard_figure"
+    "build_shepard_figure",
+    "_generate_compact_labels"
 ]
