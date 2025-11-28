@@ -123,8 +123,12 @@ class VisualizationService:
             if logger:
                 logger(f"[visualizacion] generando payload de heatmaps dinámicos (N={len(result.entries)})...")
 
-            # Generate labels once
+            # Generate metadata once
             labels = _generate_compact_labels(result.entries)
+            cardinalities = [
+                int(getattr(entry, "n_notes", 0) or 0)
+                for entry in result.entries
+            ]
 
             for payload in result.visualization_payloads:
                 scenario_name = payload["scenario"]
@@ -132,26 +136,14 @@ class VisualizationService:
                 metric = payload["metric"]
 
                 # Retrieve condensed distance matrix
-                # Note: result.dist_matrices keys are (preproc_id, metric) tuples
                 dist_condensed = result.dist_matrices.get((preproc_id, metric))
 
-                if dist_condensed is not None:
-                    # Convert to list for JSON serialization
-                    # We store it by scenario name.
-                    # If multiple entries share scenario name (different seeds?), logic might be tricky.
-                    # Usually scenario name is unique per payload in visualization list?
-                    # Actually payload list is flat. "scenario" field in payload is "config.name" + params.
-
-                    # We need a unique key for JS to find it.
-                    # The report builder groups figures by 'scenario' name.
-                    # So we use scenario_name as key.
-
-                    # Check if key already exists (shouldn't if 1:1, but safeguards)
-                    if scenario_name not in heatmap_data:
-                        heatmap_data[scenario_name] = {
-                            "condensed": dist_condensed.tolist() if isinstance(dist_condensed, np.ndarray) else list(dist_condensed),
-                            "labels": labels
-                        }
+                if dist_condensed is not None and scenario_name not in heatmap_data:
+                    heatmap_data[scenario_name] = {
+                        "condensed": dist_condensed.tolist() if isinstance(dist_condensed, np.ndarray) else list(dist_condensed),
+                        "labels": labels,
+                        "cardinalities": cardinalities,
+                    }
 
         # Build minimal metadata if none provided, so the section is visible when selected.
         run_metadata = result.config.population.metadata or {}

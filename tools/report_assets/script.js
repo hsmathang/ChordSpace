@@ -1311,6 +1311,19 @@
         const data = window.HEATMAP_DATA[scenarioName];
         if (!data) return;
 
+        const labels = Array.isArray(data.labels) ? data.labels : [];
+        const totalPoints = labels.length;
+        if (!totalPoints) return;
+
+        const condensed = Array.isArray(data.condensed) ? data.condensed : [];
+        const condensedLength = condensed.length;
+        const matrixSize = Math.round((1 + Math.sqrt(1 + 8 * condensedLength)) / 2);
+        if (!Number.isFinite(matrixSize) || matrixSize <= 0) {
+          return;
+        }
+
+        const cardinalities = Array.isArray(data.cardinalities) ? data.cardinalities : null;
+
         const heatmapContainer = card.querySelector('.aux-figure[data-section="heatmap"] .js-plotly-plot');
         if (!heatmapContainer) return;
 
@@ -1320,18 +1333,15 @@
 
         // Reconstruct matrix logic
         function getDistance(idx1, idx2) {
+          if (!Number.isFinite(idx1) || !Number.isFinite(idx2)) return NaN;
           if (idx1 === idx2) return 0;
-          if (idx1 > idx2) { const t = idx1; idx1 = idx2; idx2 = t; }
-          // Condensed index formula:
-          // k = N*i - i*(i+1)/2 + j - i - 1
-          // BUT this depends on N of the FULL dataset.
-          // We need N.
-          // N is derived from condensed length: L = N*(N-1)/2.
-          // N^2 - N - 2L = 0 -> N = (1 + sqrt(1 + 8L))/2
-          const L = data.condensed.length;
-          const N = (1 + Math.sqrt(1 + 8 * L)) / 2;
-          const k = (N * idx1) - (idx1 * (idx1 + 1) / 2) + idx2 - idx1 - 1;
-          return data.condensed[k];
+          let i = Math.min(idx1, idx2);
+          let j = Math.max(idx1, idx2);
+          const k = Math.round((matrixSize * i) - (i * (i + 1) / 2) + j - i - 1);
+          if (k < 0 || k >= condensed.length) {
+            return NaN;
+          }
+          return condensed[k];
         }
 
         // We assume indices in scatter plot correspond to indices in data.labels / data.condensed.
@@ -1373,42 +1383,105 @@
         // Or just parse the stored labels.
 
         // Helper to parse N from label or just count.
-        function getN(label) {
-            // "047 [4,3]" -> [4,3] -> 2 intervals -> 3 notes.
+        function getCardinality(idx) {
+            if (cardinalities && Number.isFinite(cardinalities[idx])) {
+                return Number(cardinalities[idx]);
+            }
+            const label = labels[idx] || '';
             const match = label.match(/\[(.*?)\]/);
             if (match) {
-                const parts = match[1].split(',');
+                const parts = match[1].split(',').filter(Boolean);
                 return parts.length + 1;
             }
-            // Fallback: length of PC part? "047" -> 3.
             const first = label.split(' ')[0];
-            return first.length;
+            return first.length || 0;
+        }
+
+        function dedupeValidIndices(source) {
+            const unique = new Set();
+            source.forEach(idx => {
+                if (Number.isFinite(idx) && idx >= 0 && idx < totalPoints) {
+                    unique.add(Number(idx));
+                }
+            });
+            return Array.from(unique);
+        }
+
+        function extractIndexFromTrace(trace, pointIdx) {
+            if (!trace) return null;
+            if (trace.customdata && trace.customdata[pointIdx] && trace.customdata[pointIdx].length >= 8) {
+                const value = Number(trace.customdata[pointIdx][7]);
+                if (Number.isFinite(value)) {
+                    return value;
+                }
+            }
+            if (typeof pointIdx === 'number') {
+                return pointIdx;
+            }
+            return null;
+        }
+
+        function collectIndicesFromPoints(gd, points) {
+            const indices = [];
+            if (!Array.isArray(points)) {
+                return indices;
+            }
+            points.forEach(pt => {
+                if (!pt) return;
+                if (pt.customdata && pt.customdata.length >= 8) {
+                    const candidate = Number(pt.customdata[7]);
+                    if (Number.isFinite(candidate)) {
+                        indices.push(candidate);
+                        return;
+                    }
+                }
+                if (gd && gd.data && typeof pt.curveNumber === 'number') {
+                    const trace = gd.data[pt.curveNumber];
+                    const fallback = extractIndexFromTrace(trace, pt.pointIndex);
+                    if (Number.isFinite(fallback)) {
+                        indices.push(fallback);
+                    }
+                }
+            });
+            return indices;
+        }
+
+        function collectIndicesInRange(gd, xRange, yRange) {
+            const indices = [];
+            if (!gd || !Array.isArray(gd.data)) {
+                return indices;
+            }
+            gd.data.forEach(trace => {
+                if (!trace || !Array.isArray(trace.x) || !Array.isArray(trace.y)) {
+                    return;
+                }
+                for (let i = 0; i < trace.x.length; i++) {
+                    const xVal = trace.x[i];
+                    const yVal = trace.y[i];
+                    if (xVal >= xRange[0] && xVal <= xRange[1] && yVal >= yRange[0] && yVal <= yRange[1]) {
+                        const idx = extractIndexFromTrace(trace, i);
+                        if (Number.isFinite(idx)) {
+                            indices.push(idx);
+                        }
+                    }
+                }
+            });
+            return indices;
         }
 
         let originalState = null; // Store original heatmap data to restore on reset
 
-        function updateHeatmap(subsetIndices) {
-            // subsetIndices are indices into the ORIGINAL `entries` list (0..N-1)
-
-            if (subsetIndices.length === 0) {
-                 // Should revert.
-                 // If we have stored original state, restore it.
-                 // Actually Plotly.react with original args?
-                 // We don't have original args easily unless we read them from DOM before first update.
-                 // But the static heatmap is sorted.
-                 // The easiest "Reset" is to just NOT update if we detect it's a reset action (autoscale).
-                 // But `plotly_selected` with empty points means deselection -> Show ALL?
-                 // Yes.
-                 // If show ALL, we just pass ALL indices.
-                 subsetIndices = data.labels.map((_, i) => i);
+        function updateHeatmap(subsetIndicesRaw) {
+            let subsetIndices = dedupeValidIndices(subsetIndicesRaw || []);
+            if (!subsetIndices.length) {
+                 subsetIndices = dedupeValidIndices(labels.map((_, i) => i));
             }
 
             // 1. Sort subset by Cardinality
-            // Map to objects
             let items = subsetIndices.map(i => ({
                 originalIndex: i,
-                label: data.labels[i],
-                n: getN(data.labels[i])
+                label: labels[i],
+                n: getCardinality(i)
             }));
 
             // Sort by n
@@ -1475,35 +1548,7 @@
                      updateHeatmap([]); // Reset
                      return;
                 }
-                // points[i].pointIndex gives the index in the trace's data arrays.
-                // Assuming traces are concatenated or we only have one trace?
-                // `build_scatter_figure` creates separate traces for different families/groups if configured?
-                // Usually it creates one main trace for points.
-                // But `proposals_pipeline` might split colors?
-                // `build_scatter_payload` in `visualisations/proposals.py` usually outputs 1 trace for the main scatter.
-                // It might output multiple traces if "families" are separate?
-                // Let's assume pointIndex maps to our data if we account for trace offsets?
-                // Actually `customdata` usually carries the ID or index.
-                // But we need the index into `entries`.
-                // If customdata doesn't have it, we rely on pointIndex.
-                // But we must be sure.
-                // `build_scatter_figure` iterates `entries` and pushes to lists.
-                // So pointIndex 0 = entries[0].
-                // Unless there are multiple traces.
-                // If there are multiple traces, pointIndex is relative to trace.
-                // We need to map back.
-                // Let's use `customdata` to be safe if possible?
-                // `customdata` has `family_id` etc.
-                // Maybe we can match by name?
-                // Or just iterate and map.
-
-                // For now, assume single trace or simple index mapping?
-                // Actually `figures.py`: `build_scatter_figure` calls `build_scatter_payload`.
-                // `visualisations/proposals.py`: `build_scatter_payload` creates `Scattergl` trace.
-                // It creates ONE trace with all points.
-                // So `pointIndex` is reliable.
-
-                const indices = eventData.points.map(p => p.pointIndex);
+                const indices = collectIndicesFromPoints(gd, eventData.points);
                 updateHeatmap(indices);
             });
 
@@ -1517,8 +1562,6 @@
                 if (eventData['xaxis.range[0]'] || eventData['xaxis.range']) {
                     // Start Timer or debounce?
                     // We need to find points inside range.
-                    // Access full data from gd.data[0].x / y
-                    const trace = gd.data[0];
                     const xRange = [
                         eventData['xaxis.range[0]'] || eventData['xaxis.range'][0],
                         eventData['xaxis.range[1]'] || eventData['xaxis.range'][1]
@@ -1528,13 +1571,7 @@
                         eventData['yaxis.range[1]'] || eventData['yaxis.range'][1]
                     ];
 
-                    const indices = [];
-                    for(let i=0; i<trace.x.length; i++) {
-                        if (trace.x[i] >= xRange[0] && trace.x[i] <= xRange[1] &&
-                            trace.y[i] >= yRange[0] && trace.y[i] <= yRange[1]) {
-                            indices.push(i);
-                        }
-                    }
+                    const indices = collectIndicesInRange(gd, xRange, yRange);
                     updateHeatmap(indices);
                 } else if (eventData['xaxis.autorange'] === true) {
                      updateHeatmap([]);
