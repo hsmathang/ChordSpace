@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import html
 import math
+import json
 from collections import defaultdict
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Sequence, Tuple
@@ -85,6 +86,7 @@ def render_report_html(
     metric_info: Optional[Dict[str, Dict[str, str]]] = None,
     highlight_threshold: int = 2000,
     sections_enabled: Optional[Dict[str, bool]] = None,
+    heatmap_data: Optional[Dict[str, Any]] = None,
 ) -> None:
     metric_catalog = metric_info or METRIC_INFO_FALLBACK
 
@@ -454,50 +456,6 @@ def render_report_html(
             f"<div class='plot-card' {card_attrs_str}>{header}{metrics_line}{controls_html}"
             f"{highlight_note_html}{inversion_controls_html}{panels_block}{aux_sections}{detail_panel}</div>"
         )
-        card_attrs = [
-            f"data-sid='card-{subtab_counter}'",
-            f"data-family-highlight='{'1' if highlight_enabled_flag else '0'}'",
-        ]
-        if card_highlight_info:
-            families_detected = int(card_highlight_info.get("families", 0) or 0)
-            threshold_limit = int(card_highlight_info.get("threshold", highlight_threshold) or highlight_threshold)
-            card_attrs.append(f"data-families='{families_detected}'")
-            card_attrs.append(f"data-highlight-threshold='{threshold_limit}'")
-        else:
-            card_attrs.append(f"data-highlight-threshold='{highlight_threshold}'")
-
-        subtab_counter += 1
-        card_attrs_str = " ".join(card_attrs)
-        if panels_html:
-            panels_block = "<div class='subtab-panels'>" + "".join(panels_html) + "</div>"
-        else:
-            panels_block = "<div class='subtab-panels'><p class='empty-panel'>Scatter no generado.</p></div>"
-        detail_panel = (
-            "<div class='detail-panel' "
-            "data-default-msg='Haz clic en un punto para ver el detalle completo.'>"
-            "Haz clic en un punto para ver el detalle completo."
-            "</div>"
-        )
-        aux_sections = ""
-        if heatmap_html:
-            aux_sections += (
-                "<div class='aux-figure'>"
-                "<h4>Heatmap de distancias</h4>"
-                f"{heatmap_html}"
-                "</div>"
-            )
-        if shepard_html:
-            aux_sections += (
-                "<div class='aux-figure'>"
-                "<h4>Shepard (distancias originales vs reducidas)</h4>"
-                f"{shepard_html}"
-                "</div>"
-            )
-
-        return (
-            f"<div class='plot-card' {card_attrs_str}>{header}{metrics_line}{controls}"
-            f"{highlight_note_html}{inversion_controls_html}{panels_block}{aux_sections}{detail_panel}</div>"
-        )
 
     outer_headers: List[str] = []
     outer_bodies: List[str] = []
@@ -671,13 +629,21 @@ def render_report_html(
 
     combined_tables = table_html + secondary_table_html
 
+    # Inject Heatmap Data if present
+    js_prefix = ""
+    if heatmap_data:
+        json_payload = json.dumps(heatmap_data, ensure_ascii=False)
+        js_prefix = f"window.HEATMAP_DATA = {json_payload};\n"
+
+    final_js = js_prefix + REPORT_JS
+
     if REPORT_TEMPLATE:
         html_content = (
             REPORT_TEMPLATE.replace("__CSS__", REPORT_CSS)
             .replace("__TABLE_HTML__", combined_tables)
             .replace("__METADATA_HTML__", metadata_html)
             .replace("__TABS_HTML__", tabs_html)
-            .replace("__SCRIPT_JS__", REPORT_JS)
+            .replace("__SCRIPT_JS__", final_js)
         )
         html_content = html_content.replace(
             "Comparacion de Propuestas de Rugosidad", "Exploración del espacio de acordes"
@@ -689,6 +655,7 @@ def render_report_html(
             "<h1>Exploración del espacio de acordes</h1>"
             "<h3>Resumen global</h3>"
             f"{table_html}{metadata_html}{tabs_html}"
+            f"<script>{final_js}</script>"
             "</body></html>"
         )
 

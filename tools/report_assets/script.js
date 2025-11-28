@@ -1294,9 +1294,259 @@
         });
       }
 
+      // --------------------------------------------------------------------------------
+      // Dynamic Heatmap Coordination (Replaces logic for dynamic heatmap)
+      // --------------------------------------------------------------------------------
+      function registerDynamicHeatmap(card) {
+        if (!window.HEATMAP_DATA) return;
+
+        // Try to identify scenario name from the header
+        // Header is like: "ScenarioName (seed ...)" or just "ScenarioName" inside .card-header strong
+        // Actually, report_builder logic puts "scenario" directly in data attributes? No.
+        // It puts it in .card-header -> strong.
+        // But keys in HEATMAP_DATA are exactly the scenario name.
+        const header = card.querySelector('.card-header strong');
+        if (!header) return;
+        const scenarioName = header.textContent.trim();
+        const data = window.HEATMAP_DATA[scenarioName];
+        if (!data) return;
+
+        const heatmapContainer = card.querySelector('.aux-figure[data-section="heatmap"] .js-plotly-plot');
+        if (!heatmapContainer) return;
+
+        // We need to attach listeners to ALL scatter plots in this card
+        const scatters = Array.from(card.querySelectorAll('.subtab-panel .js-plotly-plot'));
+        if (!scatters.length) return;
+
+        // Reconstruct matrix logic
+        function getDistance(idx1, idx2) {
+          if (idx1 === idx2) return 0;
+          if (idx1 > idx2) { const t = idx1; idx1 = idx2; idx2 = t; }
+          // Condensed index formula:
+          // k = N*i - i*(i+1)/2 + j - i - 1
+          // BUT this depends on N of the FULL dataset.
+          // We need N.
+          // N is derived from condensed length: L = N*(N-1)/2.
+          // N^2 - N - 2L = 0 -> N = (1 + sqrt(1 + 8L))/2
+          const L = data.condensed.length;
+          const N = (1 + Math.sqrt(1 + 8 * L)) / 2;
+          const k = (N * idx1) - (idx1 * (idx1 + 1) / 2) + idx2 - idx1 - 1;
+          return data.condensed[k];
+        }
+
+        // We assume indices in scatter plot correspond to indices in data.labels / data.condensed.
+        // scatter.customdata[7] is global_id, but the *index* in the array usually matches?
+        // Wait, entries are passed to build_scatter_figure in the same order as build_heatmap_figure?
+        // YES, `entries` list is shared.
+        // However, build_heatmap_figure sorts entries by cardinality!
+        // build_scatter_figure does NOT sort entries (it iterates entries).
+        // So the indices in Scatter (0..N-1) match `entries` order.
+        // But Heatmap indices match `sorted(entries)` order.
+        // We need the mapping.
+        // Fortunately, we can deduce sorting from N notes?
+        // Or better: The static Heatmap already has sorted axes.
+        // If we reconstruct, we should respect the Heatmap's sorting?
+        // Or we can just build a new Heatmap from the subset.
+        // The user requirement: "Ordenar los acordes como ahora (por cardinalidad)".
+        // So, given a subset of indices (from Scatter, original order), we must:
+        // 1. Map to Chord objects (or at least their Cardinality + Label).
+        // 2. Sort them by Cardinality.
+        // 3. Build the sub-matrix.
+
+        // We need cardinality info for sorting.
+        // We can parse it from labels? "C (3n)..."
+        // Or we can assume `data.labels` is in original order?
+        // data.labels came from `_generate_compact_labels(result.entries)`, so it IS original order.
+        // We also need `n_notes` for sorting.
+        // Scatter customdata[2] usually has 'n_notes' (or family size? check build_scatter_payload).
+        // build_scatter_payload: customdata = [family_id, name, family_size, ...?]
+        // Actually `visualisations/proposals.py`:
+        // customdata columns:
+        // 0: family_id
+        // 1: name
+        // 2: family_size
+        // 3: n_notes (Added? Let's check.)
+        // I should check `visualisations/proposals.py`.
+        // If I can't check, I can regex the label: "047 [4,3]" -> Length of interval vector + 1?
+        // Label format: "047 [4,3]". Comma count + 1 = intervals. +1 note.
+        // "047" len = 3.
+        // Or just parse the stored labels.
+
+        // Helper to parse N from label or just count.
+        function getN(label) {
+            // "047 [4,3]" -> [4,3] -> 2 intervals -> 3 notes.
+            const match = label.match(/\[(.*?)\]/);
+            if (match) {
+                const parts = match[1].split(',');
+                return parts.length + 1;
+            }
+            // Fallback: length of PC part? "047" -> 3.
+            const first = label.split(' ')[0];
+            return first.length;
+        }
+
+        let originalState = null; // Store original heatmap data to restore on reset
+
+        function updateHeatmap(subsetIndices) {
+            // subsetIndices are indices into the ORIGINAL `entries` list (0..N-1)
+
+            if (subsetIndices.length === 0) {
+                 // Should revert.
+                 // If we have stored original state, restore it.
+                 // Actually Plotly.react with original args?
+                 // We don't have original args easily unless we read them from DOM before first update.
+                 // But the static heatmap is sorted.
+                 // The easiest "Reset" is to just NOT update if we detect it's a reset action (autoscale).
+                 // But `plotly_selected` with empty points means deselection -> Show ALL?
+                 // Yes.
+                 // If show ALL, we just pass ALL indices.
+                 subsetIndices = data.labels.map((_, i) => i);
+            }
+
+            // 1. Sort subset by Cardinality
+            // Map to objects
+            let items = subsetIndices.map(i => ({
+                originalIndex: i,
+                label: data.labels[i],
+                n: getN(data.labels[i])
+            }));
+
+            // Sort by n
+            items.sort((a, b) => a.n - b.n);
+
+            // 2. Build Matrix
+            const size = items.length;
+            const z = new Array(size);
+            const axesLabels = items.map(x => x.label);
+
+            // Hover text
+            const text = new Array(size);
+
+            for (let r = 0; r < size; r++) {
+                z[r] = new Array(size);
+                text[r] = new Array(size);
+                for (let c = 0; c < size; c++) {
+                    const dist = getDistance(items[r].originalIndex, items[c].originalIndex);
+                    z[r][c] = dist;
+                    text[r][c] = `${axesLabels[r]}<br>vs ${axesLabels[c]}`;
+                }
+            }
+
+            // 3. Labels behavior
+            // "Usar estas etiquetas ... cuando el número de acordes visibles sea razonable (p.ej. ≤30)."
+            const showLabels = size <= 30;
+            const tickVals = showLabels ? items.map((_, i) => i) : null;
+            const tickText = showLabels ? axesLabels : null;
+
+            Plotly.react(heatmapContainer, [{
+                type: 'heatmap',
+                z: z,
+                x: items.map((_, i) => i),
+                y: items.map((_, i) => i),
+                colorscale: 'Turbo',
+                colorbar: { title: 'Distancia' },
+                hoverongaps: false,
+                text: text,
+                hovertemplate: "%{text}<br>Distancia=%{z:.3f}<extra></extra>"
+            }], {
+                title: `Heatmap: ${scenarioName} (Subset N=${size})`,
+                template: 'plotly_white',
+                width: heatmapContainer.layout.width,
+                height: heatmapContainer.layout.height,
+                xaxis: {
+                    tickmode: 'array',
+                    tickvals: tickVals,
+                    ticktext: tickText,
+                    showticklabels: showLabels
+                },
+                yaxis: {
+                    tickmode: 'array',
+                    tickvals: tickVals,
+                    ticktext: tickText,
+                    showticklabels: showLabels
+                }
+            });
+        }
+
+        // Attach to Scatters
+        scatters.forEach(gd => {
+            gd.on('plotly_selected', (eventData) => {
+                if (!eventData || !eventData.points || eventData.points.length === 0) {
+                     updateHeatmap([]); // Reset
+                     return;
+                }
+                // points[i].pointIndex gives the index in the trace's data arrays.
+                // Assuming traces are concatenated or we only have one trace?
+                // `build_scatter_figure` creates separate traces for different families/groups if configured?
+                // Usually it creates one main trace for points.
+                // But `proposals_pipeline` might split colors?
+                // `build_scatter_payload` in `visualisations/proposals.py` usually outputs 1 trace for the main scatter.
+                // It might output multiple traces if "families" are separate?
+                // Let's assume pointIndex maps to our data if we account for trace offsets?
+                // Actually `customdata` usually carries the ID or index.
+                // But we need the index into `entries`.
+                // If customdata doesn't have it, we rely on pointIndex.
+                // But we must be sure.
+                // `build_scatter_figure` iterates `entries` and pushes to lists.
+                // So pointIndex 0 = entries[0].
+                // Unless there are multiple traces.
+                // If there are multiple traces, pointIndex is relative to trace.
+                // We need to map back.
+                // Let's use `customdata` to be safe if possible?
+                // `customdata` has `family_id` etc.
+                // Maybe we can match by name?
+                // Or just iterate and map.
+
+                // For now, assume single trace or simple index mapping?
+                // Actually `figures.py`: `build_scatter_figure` calls `build_scatter_payload`.
+                // `visualisations/proposals.py`: `build_scatter_payload` creates `Scattergl` trace.
+                // It creates ONE trace with all points.
+                // So `pointIndex` is reliable.
+
+                const indices = eventData.points.map(p => p.pointIndex);
+                updateHeatmap(indices);
+            });
+
+            gd.on('plotly_deselect', () => {
+                updateHeatmap([]);
+            });
+
+            // If we want zoom support (plotly_relayout):
+            gd.on('plotly_relayout', (eventData) => {
+                // Check for axis ranges
+                if (eventData['xaxis.range[0]'] || eventData['xaxis.range']) {
+                    // Start Timer or debounce?
+                    // We need to find points inside range.
+                    // Access full data from gd.data[0].x / y
+                    const trace = gd.data[0];
+                    const xRange = [
+                        eventData['xaxis.range[0]'] || eventData['xaxis.range'][0],
+                        eventData['xaxis.range[1]'] || eventData['xaxis.range'][1]
+                    ];
+                    const yRange = [
+                        eventData['yaxis.range[0]'] || eventData['yaxis.range'][0],
+                        eventData['yaxis.range[1]'] || eventData['yaxis.range'][1]
+                    ];
+
+                    const indices = [];
+                    for(let i=0; i<trace.x.length; i++) {
+                        if (trace.x[i] >= xRange[0] && trace.x[i] <= xRange[1] &&
+                            trace.y[i] >= yRange[0] && trace.y[i] <= yRange[1]) {
+                            indices.push(i);
+                        }
+                    }
+                    updateHeatmap(indices);
+                } else if (eventData['xaxis.autorange'] === true) {
+                     updateHeatmap([]);
+                }
+            });
+        });
+      }
+
       document.querySelectorAll('.plot-card').forEach(card => {
         registerCardFilters(card);
         registerCardHighlight(card);
         registerCardDetail(card);
+        registerDynamicHeatmap(card); // New function
       });
     })();
