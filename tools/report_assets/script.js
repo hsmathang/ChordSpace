@@ -1714,7 +1714,7 @@
 
             if (!this.masterGain) {
                 this.masterGain = this.context.createGain();
-                this.masterGain.gain.value = 0.8;
+                this.masterGain.gain.value = 0.55;
                 this.masterGain.connect(this.context.destination);
             }
         }
@@ -1733,6 +1733,8 @@
             const attack = (options.attackMs || 15) / 1000;
             const release = (options.releaseMs || 150) / 1000;
             const duration = (options.durationSec || 1.0);
+            const perNoteGain = 1 / Math.max(freqs.length, 1);
+            const peakGain = Math.min(Math.max(options.maxGain || 0.95, 0.1), 1.0) * perNoteGain;
 
             const now = this.context.currentTime;
             const end = now + duration + release;
@@ -1747,8 +1749,8 @@
             gain.connect(this.masterGain);
 
             gain.gain.setValueAtTime(0, now);
-            gain.gain.linearRampToValueAtTime(1.0, now + attack);
-            gain.gain.setValueAtTime(1.0, now + duration);
+            gain.gain.linearRampToValueAtTime(peakGain, now + attack);
+            gain.gain.setValueAtTime(peakGain, now + duration);
             gain.gain.linearRampToValueAtTime(0.0, end);
 
             osc.start(now);
@@ -1775,6 +1777,12 @@
             const nodes = [];
             chordList.forEach(item => {
             const freqs = item.freqs || [];
+            if (!freqs.length) {
+                t += duration + gap;
+                return;
+            }
+            const perNoteGain = 1 / Math.max(freqs.length, 1);
+            const peakGain = Math.min(Math.max(options.maxGain || 0.95, 0.1), 1.0) * perNoteGain;
             freqs.forEach(freq => {
                 const osc = this.context.createOscillator();
                 const gain = this.context.createGain();
@@ -1784,8 +1792,8 @@
                 gain.connect(this.masterGain);
 
                 gain.gain.setValueAtTime(0, t);
-                gain.gain.linearRampToValueAtTime(1.0, t + attack);
-                gain.gain.setValueAtTime(1.0, t + duration);
+                gain.gain.linearRampToValueAtTime(peakGain, t + attack);
+                gain.gain.setValueAtTime(peakGain, t + duration);
                 gain.gain.linearRampToValueAtTime(0.0, t + duration + release);
 
                 osc.start(t);
@@ -1823,6 +1831,15 @@
         let currentQueue = [];      // [{ id, freqs, label }, ...]
         let lastClickedId = null;
         let lastSelectionIds = [];
+
+        function escapeHtml(str) {
+            return String(str || "")
+                .replace(/&/g, "&amp;")
+                .replace(/</g, "&lt;")
+                .replace(/>/g, "&gt;")
+                .replace(/"/g, "&quot;")
+                .replace(/'/g, "&#39;");
+        }
 
         function chordFromId(id) {
             const key = String(id);
@@ -1867,9 +1884,16 @@
             return chords;
         }
 
-        function updateStatus(text) {
+        function updateStatus(text, queue = null) {
             if (!status) return;
-            status.textContent = text;
+            if (queue && queue.length) {
+                const listHtml = queue
+                    .map((item, idx) => `<div class="audio-queue-item">${idx + 1}. ${escapeHtml(item.label || `Chord ${item.id}`)}</div>`)
+                    .join("");
+                status.innerHTML = `<div class="audio-status-summary">${escapeHtml(text)}</div><div class="audio-queue">${listHtml}</div>`;
+            } else {
+                status.textContent = text;
+            }
         }
 
         function rebuildQueue() {
@@ -1886,14 +1910,14 @@
             if (!queue.length) {
                 updateStatus('No hay sustituciones disponibles para este acorde.');
             } else {
-                updateStatus(`Sustituciones para el acorde ${queue[0].label} (${queue.length} elementos).`);
+                updateStatus(`Sustituciones para el acorde ${queue[0].label} (${queue.length} elementos).`, queue);
             }
             } else if (mode === 'selection') {
             queue = buildSelectionQueue();
             if (!queue.length) {
-                updateStatus('Selecciona una región en el scatter para reproducir.');
+                updateStatus('Selecciona una region en el scatter para reproducir.');
             } else {
-                updateStatus(`Reproducción de selección: ${queue.length} acordes.`);
+                updateStatus(`Reproduccion de seleccion: ${queue.length} acordes.`, queue);
             }
             }
 
