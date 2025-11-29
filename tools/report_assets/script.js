@@ -1692,10 +1692,292 @@
         });
       }
 
+      // --------------------------------------------------------------------------------
+      // Audio Engine (Web Audio API)
+      // --------------------------------------------------------------------------------
+      class AudioEngine {
+        constructor(config) {
+            this.masterGain = null;
+            this.currentNodes = [];
+            this.sampleRate = (config && config.sampleRate) || 44100;
+        }
+
+        _ensureContext() {
+            if (window.__CHORDSPACE_AUDIO_CONTEXT) {
+                this.context = window.__CHORDSPACE_AUDIO_CONTEXT;
+            } else {
+                const AudioCtx = window.AudioContext || window.webkitAudioContext;
+                if (!AudioCtx) return;  // graceful degradation
+                this.context = new AudioCtx();
+                window.__CHORDSPACE_AUDIO_CONTEXT = this.context;
+            }
+
+            if (!this.masterGain) {
+                this.masterGain = this.context.createGain();
+                this.masterGain.gain.value = 0.8;
+                this.masterGain.connect(this.context.destination);
+            }
+        }
+
+        stop() {
+            this.currentNodes.forEach(node => {
+            try { node.stop(); } catch (e) {}
+            });
+            this.currentNodes = [];
+        }
+
+        playChord(freqs, options = {}) {
+            this._ensureContext();
+            if (!this.context || !Array.isArray(freqs) || !freqs.length) return;
+
+            const attack = (options.attackMs || 15) / 1000;
+            const release = (options.releaseMs || 150) / 1000;
+            const duration = (options.durationSec || 1.0);
+
+            const now = this.context.currentTime;
+            const end = now + duration + release;
+            const nodes = [];
+
+            freqs.forEach(freq => {
+            const osc = this.context.createOscillator();
+            const gain = this.context.createGain();
+            osc.type = 'sine';
+            osc.frequency.value = Number(freq) || 440;
+            osc.connect(gain);
+            gain.connect(this.masterGain);
+
+            gain.gain.setValueAtTime(0, now);
+            gain.gain.linearRampToValueAtTime(1.0, now + attack);
+            gain.gain.setValueAtTime(1.0, now + duration);
+            gain.gain.linearRampToValueAtTime(0.0, end);
+
+            osc.start(now);
+            osc.stop(end);
+            nodes.push(osc);
+            });
+
+            this.currentNodes = nodes;
+        }
+
+        playSequence(chordList, options = {}) {
+            // chordList: [{ freqs, label, id }, ...]
+            this._ensureContext();
+            if (!this.context || !Array.isArray(chordList) || !chordList.length) return;
+
+            this.stop();
+
+            const gap = options.gapSec || 0.1;
+            const duration = options.durationSec || 1.0;
+            const attack = (options.attackMs || 15) / 1000;
+            const release = (options.releaseMs || 150) / 1000;
+            let t = this.context.currentTime;
+
+            const nodes = [];
+            chordList.forEach(item => {
+            const freqs = item.freqs || [];
+            freqs.forEach(freq => {
+                const osc = this.context.createOscillator();
+                const gain = this.context.createGain();
+                osc.type = 'sine';
+                osc.frequency.value = Number(freq) || 440;
+                osc.connect(gain);
+                gain.connect(this.masterGain);
+
+                gain.gain.setValueAtTime(0, t);
+                gain.gain.linearRampToValueAtTime(1.0, t + attack);
+                gain.gain.setValueAtTime(1.0, t + duration);
+                gain.gain.linearRampToValueAtTime(0.0, t + duration + release);
+
+                osc.start(t);
+                osc.stop(t + duration + release);
+                nodes.push(osc);
+            });
+            t += duration + gap;
+            });
+
+            this.currentNodes = nodes;
+        }
+    }
+
+    function registerCardAudio(card) {
+        const rootAudioData = window.AUDIO_DATA;
+        if (!rootAudioData || !rootAudioData.chords) return;
+
+        const engine = new AudioEngine(rootAudioData.config || {});
+        const panel = card.querySelector('.audio-panel[data-role="audio-player"]');
+        if (!panel) return;
+
+        const modeSelect = panel.querySelector('.audio-mode');
+        const btnPlay = panel.querySelector('.audio-play');
+        const btnStop = panel.querySelector('.audio-stop');
+        const status = panel.querySelector('.audio-status');
+
+        // We assume one main scatter per card (same used for dynamic heatmap)
+        const scatter = card.querySelector('.subtab-panel.active .js-plotly-plot')
+                        || card.querySelector('.subtab-panel .js-plotly-plot');
+        if (!scatter || !scatter.layout || !scatter.layout.meta) return;
+
+        const meta = scatter.layout.meta || {};
+        const chordsMap = rootAudioData.chords;
+
+        let currentQueue = [];      // [{ id, freqs, label }, ...]
+        let lastClickedId = null;
+        let lastSelectionIds = [];
+
+        function chordFromId(id) {
+            const key = String(id);
+            const raw = chordsMap[key];
+            if (!raw || !Array.isArray(raw.freqs) || !raw.freqs.length) return null;
+            return {
+            id,
+            freqs: raw.freqs,
+            label: raw.label || `Chord ${id}`,
+            };
+        }
+
+        function buildSubstitutionQueue(globalId) {
+            const neighborsByProfile = meta.substitutionNeighbors || null;
+            const profiles = meta.substitutionProfiles || {};
+            if (!neighborsByProfile) return [];
+
+            let profileKey = profiles.default;
+            if (scatter.__substitutionProfile && neighborsByProfile[scatter.__substitutionProfile]) {
+            profileKey = scatter.__substitutionProfile;
+            }
+            if (!profileKey || !neighborsByProfile[profileKey]) return [];
+
+            const neighborList = neighborsByProfile[profileKey][String(globalId)] || [];
+            const chords = [];
+            const baseChord = chordFromId(globalId);
+            if (baseChord) chords.push(baseChord);
+            neighborList.forEach(item => {
+            const c = chordFromId(Number(item.neighbor));
+            if (c) chords.push(c);
+            });
+            return chords;
+        }
+
+        function buildSelectionQueue() {
+            const ids = lastSelectionIds;
+            const chords = [];
+            ids.forEach(id => {
+            const c = chordFromId(id);
+            if (c) chords.push(c);
+            });
+            return chords;
+        }
+
+        function updateStatus(text) {
+            if (!status) return;
+            status.textContent = text;
+        }
+
+        function rebuildQueue() {
+            const mode = modeSelect ? modeSelect.value : 'substitutions';
+            let queue = [];
+
+            if (mode === 'substitutions') {
+            if (lastClickedId == null) {
+                updateStatus('Haz clic en un punto para escuchar el acorde y sus sustituciones.');
+                currentQueue = [];
+                return;
+            }
+            queue = buildSubstitutionQueue(lastClickedId);
+            if (!queue.length) {
+                updateStatus('No hay sustituciones disponibles para este acorde.');
+            } else {
+                updateStatus(`Sustituciones para el acorde ${queue[0].label} (${queue.length} elementos).`);
+            }
+            } else if (mode === 'selection') {
+            queue = buildSelectionQueue();
+            if (!queue.length) {
+                updateStatus('Selecciona una región en el scatter para reproducir.');
+            } else {
+                updateStatus(`Reproducción de selección: ${queue.length} acordes.`);
+            }
+            }
+
+            currentQueue = queue;
+        }
+
+        // Scatter events
+
+        scatter.on('plotly_click', ev => {
+            const pt = ev.points && ev.points[0];
+            if (!pt || !pt.customdata || pt.customdata.length < 8) return;
+            const gid = Number(pt.customdata[7]);
+            if (!Number.isFinite(gid)) return;
+            lastClickedId = gid;
+            if (modeSelect && modeSelect.value === 'substitutions') {
+            rebuildQueue();
+            }
+        });
+
+        scatter.on('plotly_selected', ev => {
+            const points = (ev && ev.points) || [];
+            const ids = [];
+            points.forEach(pt => {
+            if (!pt || !pt.customdata || pt.customdata.length < 8) return;
+            const gid = Number(pt.customdata[7]);
+            if (Number.isFinite(gid)) ids.push(gid);
+            });
+            lastSelectionIds = Array.from(new Set(ids));
+            if (modeSelect && modeSelect.value === 'selection') {
+            rebuildQueue();
+            }
+        });
+
+        scatter.on('plotly_deselect', () => {
+            lastSelectionIds = [];
+            if (modeSelect && modeSelect.value === 'selection') {
+            rebuildQueue();
+            }
+        });
+
+        // Respond when the substitution profile UI changes
+        card.addEventListener('substitutionProfileChanged', () => {
+            if (modeSelect && modeSelect.value === 'substitutions') {
+            rebuildQueue();
+            }
+        });
+
+        if (modeSelect) {
+            modeSelect.addEventListener('change', () => {
+            rebuildQueue();
+            });
+        }
+
+        // Buttons
+
+        btnPlay.addEventListener('click', () => {
+            if (!currentQueue.length) {
+            rebuildQueue();
+            if (!currentQueue.length) return;
+            }
+            engine.stop();
+            engine.playSequence(currentQueue, {
+            durationSec: 1.0,
+            gapSec: 0.15,
+            attackMs: 15,
+            releaseMs: 150,
+            });
+            if (btnStop) btnStop.disabled = false;
+        });
+
+        btnStop.addEventListener('click', () => {
+            engine.stop();
+            if (btnStop) btnStop.disabled = true;
+        });
+
+        // Initial status
+        rebuildQueue();
+    }
+
       document.querySelectorAll('.plot-card').forEach(card => {
         registerCardFilters(card);
         registerCardHighlight(card);
         registerCardDetail(card);
-        registerDynamicHeatmap(card); // New function
+        registerDynamicHeatmap(card);
+        registerCardAudio(card); // New function
       });
     })();

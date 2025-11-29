@@ -4,7 +4,7 @@ Contains configuration dataclasses, result structures, and core domain types.
 """
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Union, Tuple
+from typing import Any, Dict, List, Optional, Tuple
 import pandas as pd
 import numpy as np
 
@@ -59,11 +59,17 @@ class ExperimentConfig:
     name: str = "experiment"
 
 @dataclass
+class AudioConfig:
+    """Configuration for audio playback in reports."""
+    enabled: bool = False
+
+@dataclass
 class VisualizationConfig:
     """Configuration for report generation."""
     sections: List[str] = field(default_factory=lambda: ["scatter", "heatmap", "shepard", "table", "metadata"])
     color_mode: str = "log_per_pair"
     highlight_threshold: int = 2000
+    audio: AudioConfig = field(default_factory=AudioConfig)
 
 @dataclass
 class ExperimentResult:

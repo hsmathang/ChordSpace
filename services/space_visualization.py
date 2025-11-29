@@ -32,6 +32,44 @@ from tools.compare_proposals import (
 )
 from tools.reporting import render_report_html
 
+
+def midi_to_freqs(notes: List[int]) -> List[float]:
+    """Converts a list of MIDI note numbers to frequencies (Hz)."""
+    return [440.0 * (2.0 ** ((n - 69) / 12.0)) for n in notes]
+
+
+def build_audio_descriptors(result: ExperimentResult) -> Dict[str, Any]:
+    """Builds a dictionary mapping chord index to audio properties (frequencies, label)."""
+    chords: Dict[int, Dict[str, Any]] = {}
+    for idx, entry in enumerate(result.entries):
+        acorde = getattr(entry, "acorde", None)
+        if acorde is None:
+            continue
+
+        freqs = getattr(acorde, "frequencies", None)
+        if not freqs:
+            notes_abs = getattr(acorde, "notes_abs", None) or []
+            freqs = midi_to_freqs(notes_abs)
+
+        try:
+            freqs_list = [float(f) for f in freqs]
+        except Exception:
+            continue
+
+        chords[idx] = {
+            "freqs": freqs_list,
+            "label": entry.identity_name or getattr(acorde, "name", "") or f"Chord {idx}",
+            "n_notes": int(getattr(entry, "n_notes", len(freqs_list))),
+        }
+
+    return {
+        "chords": chords,
+        "config": {
+            "sampleRate": 44100,
+        },
+    }
+
+
 class VisualizationService:
 
     def generate_report(self, result: ExperimentResult, config: VisualizationConfig) -> Path:
@@ -188,6 +226,13 @@ class VisualizationService:
                     "files": heatmap_files,
                 }
 
+        # 5. Build Audio Data (if enabled)
+        audio_data: Optional[Dict[str, Any]] = None
+        if config.audio.enabled:
+            if logger:
+                logger(f"[visualizacion] generando datos de audio (N={len(result.entries)})...")
+            audio_data = build_audio_descriptors(result)
+
         # Build minimal metadata if none provided, so the section is visible when selected.
         run_metadata = result.config.population.metadata or {}
         if not run_metadata:
@@ -255,7 +300,8 @@ class VisualizationService:
             metric_info=METRIC_INFO,
             highlight_threshold=config.highlight_threshold,
             sections_enabled=sections_enabled,
-            heatmap_data=heatmap_data  # Pass the extra payload
+            heatmap_data=heatmap_data,  # Pass the extra payload
+            audio_data=audio_data       # Pass the audio payload
         )
 
         return result.output_path / "report.html"
