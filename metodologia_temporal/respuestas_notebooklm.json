@@ -1,0 +1,1123 @@
+{
+    "metadata": {
+        "protocolo_version": "2.0",
+        "fecha_inicio": "2026-02-16",
+        "descripcion": "Respuestas de NotebookLM vía MCP para preguntas tipo A de preguntas_CONTEXTUALIZADAS.json. Diseñado para consumo por un agente redactor en fase posterior.",
+        "notebooks_usados": {
+            "psicoacustica": {
+                "id": "27d02df9-0405-4ae0-b1d5-58675f73cc49",
+                "title": "PDFs_Tesis_Psicoacustica",
+                "sources": 39
+            },
+            "armonia": {
+                "id": "8dedc0d4-9af1-482a-b779-e9733609414a",
+                "title": "PDFs_Tesis_Armonia",
+                "sources": 70
+            },
+            "math": {
+                "id": "3f51c34d-3ad5-4fc2-b2d0-2e0f48a144b8",
+                "title": "PDFs_Tesis_Math_viz",
+                "sources": 42
+            },
+            "computacion": {
+                "id": "14fa63f0-279b-4348-b50e-5d350542b25b",
+                "title": "PDFs_Tesis_Computacion_ML",
+                "sources": 52
+            },
+            "dimred": {
+                "id": "43913228-e430-45cb-9489-c3b27904f02c",
+                "title": "Reducción de Dimensionalidad (Metodología)",
+                "sources": 40
+            }
+        },
+        "politica_consulta": "Consultar AL MENOS 4 de los 5 notebooks por pregunta tipo A. El tema_notebook_sugerido indica el notebook primario (prompt completo); los demás reciben prompt adaptado buscando evidencia complementaria.",
+        "total_consultas": 5,
+        "exitosas": 5,
+        "fallidas": 0
+    },
+    "respuestas": [
+        {
+            "id": "Q-003",
+            "tipo": "A",
+            "pregunta_original": "¿Es necesario definir N como todo {0,...,127} o basta con el subrango usado experimentalmente?",
+            "tema_primario": "math",
+            "notebooks_consultados": [
+                "math",
+                "psicoacustica",
+                "armonia",
+                "computacion",
+                "dimred"
+            ],
+            "quality_gates_passed": true,
+            "fecha_consulta": "2026-02-16T14:37:00-05:00",
+            "respuesta_para_insertar": "El dominio teórico del modelo se define formalmente sobre el espacio de alturas lineales (linear pitch space), donde cada nota es un número real $p$ y la distancia métrica refleja la proximidad logarítmica de la frecuencia fundamental \\cite{Tymoczko2011}. Si bien el estándar MIDI discretiza este continuo en $n \\in \\{0, \\dots, 127\\}$, la aplicación del modelo de rugosidad psicoacústica requiere restringir el dominio experimental a un subrango de octavas específico por dos razones fundamentales. Primero, la validez perceptual: la disonancia sensorial depende del ancho de banda crítico, el cual varía con el registro y altera la percepción de intervalos idénticos en alturas graves o agudas \\cite{Cubarsi2019, Sethares1993}. Segundo, la tratabilidad computacional: el espacio combinatorio de acordes crece exponencialmente con $N$ (alcanzando magnitudes del orden de $10^{26}$ para subconjuntos de 88 teclas), haciendo imperativa la restricción del rango para el análisis \\cite{BuongiornoNardelli2020}. Por consiguiente, se adopta la estrategia de definir el espacio de solución sobre un subconjunto restringido $S \\subset \\mathbb{Z}^n$ basado en límites instrumentales o perceptuales \\cite{QuickHudak2011, Chew2014}, manteniendo la formulación general del modelo invariante ante traslaciones de registro teóricas pero acotada en la experimentación numérica.",
+            "evidencia_por_notebook": {
+                "math": {
+                    "notebook_title": "PDFs_Tesis_Math_viz",
+                    "afirmaciones": [
+                        {
+                            "afirmacion": "El espacio de alturas se modela como espacio lineal real (o Z) donde la distancia refleja proximidad física en el teclado, distinta del espacio circular de pitch classes.",
+                            "fuente": "Tymoczko, 2011",
+                            "ubicacion": "p. 40, Sec. 2.1"
+                        },
+                        {
+                            "afirmacion": "La disonancia sensorial no es invariante bajo traslación de registro; cambiar la octava altera la evaluación de rugosidad debido a la variación del ancho de banda crítico.",
+                            "fuente": "Cubarsí, 2019",
+                            "ubicacion": "p. 2, 18"
+                        },
+                        {
+                            "afirmacion": "El uso del rango completo (88 teclas) genera un espacio de combinaciones que supera 10^26, justificando restricción del dominio o clases de equivalencia.",
+                            "fuente": "Buongiorno Nardelli, 2020",
+                            "ubicacion": "p. 2"
+                        },
+                        {
+                            "afirmacion": "En generación algorítmica es práctica estándar restringir el espacio de soluciones a un subconjunto S⊆Z^n por restricciones instrumentales.",
+                            "fuente": "Quick & Hudak, 2011",
+                            "ubicacion": "p. 3, Eq. 5"
+                        },
+                        {
+                            "afirmacion": "Los sistemas de reconocimiento se enfocan en rangos específicos (C1 a B6) para evitar ruido en bajas frecuencias.",
+                            "fuente": "Chew, 2014",
+                            "ubicacion": "p. 199, Sec. 11.3.1"
+                        }
+                    ]
+                },
+                "psicoacustica": {
+                    "notebook_title": "PDFs_Tesis_Psicoacustica",
+                    "afirmaciones": [
+                        {
+                            "afirmacion": "La rugosidad aumenta drásticamente en registros bajos (<130 Hz, C3) porque el ancho de banda crítico (~100 Hz) abarca intervalos musicales mucho mayores en semitonos.",
+                            "fuente": "Eerola & Lahdelma, 2022",
+                            "ubicacion": "[1]-[3]"
+                        },
+                        {
+                            "afirmacion": "La consonancia sensorial presenta relación no lineal (U invertida) respecto al registro: decrece en graves (rugosidad) y agudos (sharpness). Registros medios C4-C5 obtienen máxima consonancia.",
+                            "fuente": "Eerola & Lahdelma, 2022",
+                            "ubicacion": "[5]-[6]"
+                        },
+                        {
+                            "afirmacion": "La disonancia sensorial NO es invariante bajo transposición: las curvas de disonancia cambian al variar frecuencias absolutas, rompiendo la invarianza traslacional.",
+                            "fuente": "Sethares, 1993; Bernardes et al., 2016",
+                            "ubicacion": "[7]-[10]"
+                        },
+                        {
+                            "afirmacion": "El ERB varía: 34.7 Hz para F#2 (646 cents = tritono) vs 184.4 Hz para F#6 (216 cents = tono entero). La resolución de intervalos es mucho más pobre en graves.",
+                            "fuente": "Rogala et al., 2017",
+                            "ubicacion": "[11]-[12]"
+                        },
+                        {
+                            "afirmacion": "Se predice y confirma que estímulos <130 Hz (C3) saturan rugosidad: una tétrada de una octava tendría todos los fundamentales en la misma banda crítica.",
+                            "fuente": "Eerola & Lahdelma, 2022",
+                            "ubicacion": "[2]"
+                        },
+                        {
+                            "afirmacion": "La función de disonancia parametrizada incluye términos de escalado de frecuencia (s1*f1 + s2), confirmando que la rugosidad para un intervalo dado cambia numéricamente según el registro.",
+                            "fuente": "Sethares, 1993",
+                            "ubicacion": "[13], [7]"
+                        },
+                        {
+                            "afirmacion": "La precisión de identificación de intervalos armónicos cae drásticamente en la segunda octava (65.4-130.8 Hz) vs cuarta y sexta octavas.",
+                            "fuente": "Rogala et al., 2017",
+                            "ubicacion": "[14]-[16]"
+                        }
+                    ]
+                },
+                "armonia": {
+                    "notebook_title": "PDFs_Tesis_Armonia",
+                    "afirmaciones": [
+                        {
+                            "afirmacion": "La explosión combinatoria (>10^26 combinaciones para 88 teclas) obliga a imponer clases de equivalencia OPTIC para reducir a 238 set classes.",
+                            "fuente": "Buongiorno Nardelli, 2020",
+                            "ubicacion": "[1]"
+                        },
+                        {
+                            "afirmacion": "Para modelar voicings sensibles al registro sin redundancia se define una 'región fundamental' delimitada por desigualdades (tonos en orden no descendente, abarcando máx. una octava).",
+                            "fuente": "Callender, Quinn & Tymoczko, 2008",
+                            "ubicacion": "[3]-[6]"
+                        },
+                        {
+                            "afirmacion": "Calificaciones de consonancia disminuyen bajo ~130 Hz (C3) por rugosidad y sobre ~1046 Hz (C6) por sharpness. Relación cúbica entre registro y consonancia.",
+                            "fuente": "Eerola & Lahdelma, 2022",
+                            "ubicacion": "[7]-[9]"
+                        },
+                        {
+                            "afirmacion": "Es práctica común limitar acordes a los que caben en una sola octava para controlar variables experimentales.",
+                            "fuente": "Eerola & Lahdelma, 2022",
+                            "ubicacion": "[10]-[11]"
+                        },
+                        {
+                            "afirmacion": "Para voice-leading con altura específica se formaliza como vectores Z^n restringidos a [a,b]^n con límites del instrumento; algoritmos greedy podan el espacio.",
+                            "fuente": "Quick & Hudak, 2012",
+                            "ubicacion": "[14]-[17]"
+                        },
+                        {
+                            "afirmacion": "Colecciones con >6 notas funcionan más como escalas/texturas que como acordes perceptuales discretos.",
+                            "fuente": "Tymoczko, 2023",
+                            "ubicacion": "[18]-[19]"
+                        }
+                    ]
+                },
+                "computacion": {
+                    "notebook_title": "PDFs_Tesis_Computacion_ML",
+                    "afirmaciones": [
+                        {
+                            "afirmacion": "Trabajar en espacios cociente S/R (equivalencias OPT) reduce soluciones teóricamente infinitas a clases finitas sin perder validez musical.",
+                            "fuente": "Quick & Hudak, 2013",
+                            "ubicacion": "[1]-[3]"
+                        },
+                        {
+                            "afirmacion": "Tokenización por tuplas dinámicas (Raíz, Naturaleza, Extensión, Bajo) reduce vocabulario de miles a decenas sin sacrificar expresividad.",
+                            "fuente": "Dalmazzo et al., 2023",
+                            "ubicacion": "[4]-[5]"
+                        },
+                        {
+                            "afirmacion": "Es práctica común restringir entrada al rango de piano (A0-C8, N=88) usando vectores many-hot o piano-roll, asumiendo cobertura de información armónica relevante.",
+                            "fuente": "Chen & Su; Chord2Vec",
+                            "ubicacion": "[6]-[7]"
+                        },
+                        {
+                            "afirmacion": "Para espacio de salida exponencial (2^N combinaciones), se valida usar capas sigmoides por nota o NADE en lugar de softmax sobre vocabulario fijo.",
+                            "fuente": "Madjiheurem et al., 2016",
+                            "ubicacion": "[8]-[9]"
+                        },
+                        {
+                            "afirmacion": "Pitchclass2vec aprende embeddings de notas individuales para capturar similitud semántica, reduciendo dimensionalidad del problema combinatorio.",
+                            "fuente": "Lazzari et al., 2023",
+                            "ubicacion": "[10]-[12]"
+                        },
+                        {
+                            "afirmacion": "DFT sobre chroma vectors proyecta el espacio combinatorio discreto a espacio continuo de coeficientes de Fourier (Tonal Interval Space).",
+                            "fuente": "Yust et al., 2022",
+                            "ubicacion": "[18]-[20]"
+                        }
+                    ]
+                },
+                "dimred": {
+                    "notebook_title": "Reducción de Dimensionalidad (Metodología)",
+                    "afirmaciones": [
+                        {
+                            "afirmacion": "MDS clásico tiene complejidad O(N³) temporal y O(N²) espacial, haciéndolo inviable para conjuntos grandes de acordes.",
+                            "fuente": "Yang et al., 2006",
+                            "ubicacion": "pp. 1-2"
+                        },
+                        {
+                            "afirmacion": "UMAP escala como O(N^1.14), manteniendo tiempos razonables donde t-SNE y MDS fallarían con crecimiento combinatorio.",
+                            "fuente": "McInnes et al., 2018",
+                            "ubicacion": "pp. 22, 38-42"
+                        },
+                        {
+                            "afirmacion": "Para N<500, las aproximaciones de UMAP pueden degradar la calidad del embedding. Se recomienda precaución o implementaciones exactas.",
+                            "fuente": "McInnes et al., 2018",
+                            "ubicacion": "p. 49"
+                        },
+                        {
+                            "afirmacion": "Landmark MDS selecciona subconjunto representativo para construir esqueleto del espacio y luego proyecta los restantes, reduciendo complejidad.",
+                            "fuente": "Delicado & Pachón-García, 2024; Yang et al., 2006",
+                            "ubicacion": "p. 6; p. 4"
+                        },
+                        {
+                            "afirmacion": "El crowding problem: el área 2D no basta para acomodar puntos moderadamente distantes de 12D. t-SNE/UMAP mitigan con distribuciones de cola pesada.",
+                            "fuente": "van der Maaten & Hinton, 2008; McInnes et al., 2018",
+                            "ubicacion": "pp. 2583-2585; p. 15"
+                        },
+                        {
+                            "afirmacion": "UMAP preserva mejor estructura global bajo submuestreo que t-SNE (análisis de distancia de Procrustes).",
+                            "fuente": "McInnes et al., 2018",
+                            "ubicacion": "p. 35"
+                        }
+                    ]
+                }
+            },
+            "bibtex": [
+                "@book{Tymoczko2011,\n  author = {Tymoczko, Dmitri},\n  title = {A Geometry of Music: Harmony and Counterpoint in the Extended Common Practice},\n  publisher = {Oxford University Press},\n  year = {2011}\n}",
+                "@article{Cubarsi2019,\n  author = {Cubarsí, Rafael},\n  title = {Harmonic distance in intervals and chords},\n  journal = {Journal of Mathematics and Music},\n  volume = {13},\n  number = {3},\n  year = {2019}\n}",
+                "@article{BuongiornoNardelli2020,\n  author = {Buongiorno Nardelli, Marco},\n  title = {Topology of Networks in Generalized Musical Spaces},\n  journal = {Leonardo Music Journal},\n  volume = {30},\n  pages = {38--43},\n  year = {2020}\n}",
+                "@book{Chew2014,\n  author = {Chew, Elaine},\n  title = {Mathematical and Computational Modeling of Tonality},\n  publisher = {Springer},\n  year = {2014}\n}",
+                "@inproceedings{QuickHudak2011,\n  author = {Quick, Donya and Hudak, Paul},\n  title = {Computing with Chord Spaces},\n  booktitle = {Proc. MCM 2009},\n  year = {2011}\n}",
+                "@article{Eerola2022,\n  author = {Eerola, Tuomas and Lahdelma, Imre},\n  title = {Register impacts perceptual consonance through roughness and sharpness},\n  journal = {Psychonomic Bulletin \\& Review},\n  volume = {29},\n  pages = {800--808},\n  year = {2022},\n  doi = {10.3758/s13423-021-02033-5}\n}",
+                "@article{Sethares1993,\n  author = {Sethares, William A.},\n  title = {Local consonance and the relationship between timbre and scale},\n  journal = {JASA},\n  volume = {94},\n  number = {3},\n  pages = {1218--1228},\n  year = {1993}\n}",
+                "@article{Bernardes2016,\n  author = {Bernardes, G. and Cocharro, D. and Caetano, M. and Guedes, C. and Davies, M.E.P.},\n  title = {A multi-level tonal interval space for modelling pitch relatedness and musical consonance},\n  journal = {JNMR},\n  volume = {45},\n  number = {4},\n  pages = {281--294},\n  year = {2016}\n}",
+                "@article{Rogala2017,\n  author = {Rogala, T. and Miśkiewicz, A. and Rogowski, P.},\n  title = {Identification of Harmonic Musical Intervals: The Effect of Pitch Register and Tone Duration},\n  journal = {Archives of Acoustics},\n  volume = {42},\n  number = {4},\n  pages = {591--600},\n  year = {2017}\n}",
+                "@article{Masina2024,\n  author = {Masina, Isabella and Lo Presti, Giuseppe},\n  title = {Triad's consonance and dissonance: combining roughness and compactness models},\n  journal = {Eur. Phys. J. Plus},\n  volume = {139},\n  number = {79},\n  year = {2024}\n}",
+                "@article{Callender2008,\n  author = {Callender, C. and Quinn, I. and Tymoczko, D.},\n  title = {Generalized Voice-Leading Spaces},\n  journal = {Science},\n  volume = {320},\n  pages = {346--348},\n  year = {2008}\n}",
+                "@article{Tymoczko2023,\n  author = {Tymoczko, Dmitri},\n  title = {Approximate Set Theory},\n  journal = {Journal of Music Theory},\n  volume = {67},\n  number = {1},\n  year = {2023}\n}",
+                "@inproceedings{Dalmazzo2023,\n  author = {Dalmazzo, D. and Déguérnel, K. and Sturm, B.L.T.},\n  title = {The Chordinator: Chord Progression Modeling and Generation Using Transformers},\n  booktitle = {Proc. ISMIR},\n  year = {2023}\n}",
+                "@inproceedings{Madjiheurem2016,\n  author = {Madjiheurem, S. and Qu, L. and Walder, C.},\n  title = {Chord2Vec: Learning Musical Chord Embeddings},\n  booktitle = {NIPS 2016 Workshop},\n  year = {2016}\n}",
+                "@article{Lazzari2023,\n  author = {Lazzari, N. and Poltronieri, A. and Presutti, V.},\n  title = {Pitchclass2vec: Symbolic Music Structure Segmentation with Chord Embeddings},\n  journal = {CEUR Workshop Proc.},\n  volume = {3278},\n  pages = {14--30},\n  year = {2023}\n}",
+                "@article{Yust2022,\n  author = {Yust, J. and Lee, J. and Pinsky, E.},\n  title = {A Clustering-Based Approach to Automatic Harmonic Analysis},\n  journal = {TISMIR},\n  volume = {5},\n  number = {1},\n  pages = {113--128},\n  year = {2022}\n}",
+                "@article{McInnes2018,\n  author = {McInnes, L. and Healy, J. and Melville, J.},\n  title = {UMAP: Uniform Manifold Approximation and Projection for Dimension Reduction},\n  journal = {arXiv:1802.03426},\n  year = {2018}\n}",
+                "@inproceedings{Yang2006,\n  author = {Yang, T. and Liu, J. and McMillan, L. and Wang, W.},\n  title = {A Fast Approximation to Multidimensional Scaling},\n  booktitle = {Proc. CIMCV Workshop},\n  year = {2006}\n}",
+                "@article{Delicado2024,\n  author = {Delicado, P. and Pachón-García, C.},\n  title = {Multidimensional scaling for big data},\n  journal = {Advances in Data Analysis and Classification},\n  year = {2024}\n}",
+                "@article{VanDerMaaten2008,\n  author = {van der Maaten, L. and Hinton, G.},\n  title = {Visualizing Data using t-SNE},\n  journal = {JMLR},\n  volume = {9},\n  pages = {2579--2605},\n  year = {2008}\n}"
+            ],
+            "notas_asesor": [
+                "Dicotomía Teoría/Práctica: La definición del espacio Φ es agnóstica al rango, pero la evaluación de rugosidad impone límites físicos (ancho de banda crítico) que obligan a un subrango experimental para validez psicoacústica (Cubarsí 2019).",
+                "Rango recomendado C3–C6 (MIDI 48–84): Eerola 2022 demuestra caída de consonancia bajo 130 Hz por rugosidad y sobre 1046 Hz por sharpness. Usar este rango tiene justificación empírica sólida.",
+                "La no-invarianza es una feature: Al usar frecuencias absolutas, ChordSpace captura que un Do Mayor en octava 2 suena 'rugoso' vs 'limpio' en octava 4. Los modelos algebraicos (TIS, PC-Sets) pierden esto. Enfatizar como ventaja.",
+                "Explosión combinatoria: Citar Buongiorno Nardelli (10^26 combinaciones para 88 teclas) como argumento primario para no explorar el espacio completo.",
+                "MDS clásico es O(N³): Si la población crece combinatoriamente, MDS es inviable (Yang 2006). UMAP escala como O(N^1.14) pero degrada para N<500 (McInnes 2018, p.49).",
+                "Cardinalidad alta: Tymoczko 2023 argumenta que acordes con >6 notas funcionan más como escalas que como objetos armónicos, justificando restricción de cardinalidad.",
+                "Parámetros de Sethares: Las ecuaciones (1) y (3) de Sethares 1993 demuestran formalmente que D(x)≠D(x+k), i.e., la curva de disonancia se escala con la frecuencia."
+            ],
+            "preguntas_seguimiento": [
+                "¿Debemos segmentar el análisis en 'franjas' de registro (octavas bajas vs medias) en lugar de un solo subrango?",
+                "¿Deberíamos incluir un análisis de sensibilidad mostrando cómo varía D si expandimos el rango de octavas?",
+                "¿Podemos formalizar la restricción de dominio como un subespacio restringido dentro de la topología general de Tymoczko?"
+            ],
+            "para_redactor": {
+                "donde_insertar": "§3.1.1, después de Definición 3.1 (N) y antes/durante la discusión del uso experimental de subrangos.",
+                "tipo_contenido": "justificacion",
+                "palabras_clave": [
+                    "MIDI",
+                    "dominio",
+                    "registro",
+                    "subrango",
+                    "explosión combinatoria",
+                    "reproducibilidad",
+                    "ancho de banda crítico",
+                    "rugosidad"
+                ]
+            }
+        },
+        {
+            "id": "Q-006",
+            "tipo": "A",
+            "pregunta_original": "¿La restricción de ordenamiento implica que dos voicings con las mismas notas en distinto orden son el mismo acorde?",
+            "tema_primario": "armonia",
+            "notebooks_consultados": [
+                "armonia",
+                "math",
+                "psicoacustica",
+                "computacion",
+                "dimred"
+            ],
+            "quality_gates_passed": true,
+            "fecha_consulta": "2026-02-16T16:08:00-05:00",
+            "respuesta_para_insertar": "La definición de identidad en ChordSpace se basa estricta y únicamente en el conjunto de alturas absolutas. La tupla ordenada es una forma canónica para el dominio fundamental del espacio cociente R^m/S_m. Invariancia de permutación (Sethares) vs. No-invariancia de inversión (Harrison & Pearce).",
+            "evidencia_por_notebook": {
+                "armonia": {
+                    "fuente": "Harrison & Pearce 2020",
+                    "afirmacion": "Pitch chord vs PC-set; voicing identity."
+                },
+                "math": {
+                    "fuente": "Tymoczko 2011",
+                    "afirmacion": "Fundamental domain for orbifold T^n/S_n requires sorted coordinates."
+                },
+                "psicoacustica": {
+                    "fuente": "Sethares 1993",
+                    "afirmacion": "Roughness calculation is a symmetric function (sum of pairs), invariant to permutation."
+                }
+            },
+            "para_redactor": {
+                "donde_insertar": "INMEDIATAMENTE debajo del ítem de la pregunta Q-006 (intercalado).",
+                "tipo_contenido": "definicion_identidad",
+                "estatus_insercion": "completado"
+            }
+        },
+        {
+            "id": "Q-007",
+            "tipo": "A",
+            "pregunta_original": "¿Cómo responder a un evaluador que objete la falta de invariancia por transposición?",
+            "tema_primario": "armonia",
+            "notebooks_consultados": [
+                "armonia",
+                "math",
+                "psicoacustica",
+                "computacion",
+                "dimred"
+            ],
+            "quality_gates_passed": true,
+            "fecha_consulta": "2026-02-16T18:15:00-05:00",
+            "respuesta_para_insertar": "No-invariancia por transposición justificada: (i) ERB dependiente de registro (Eerola 2022, Rogala 2017); (ii) OPTIC modular permite P sin T (Callender+ 2008); (iii) pitch chord > pitch-class para modelos perceptuales (Harrison & Pearce 2020, Milne+ 2023).",
+            "evidencia_por_notebook": {
+                "armonia": {
+                    "fuente": "Eerola & Lahdelma 2022; Milne et al. 2023; Harrison & Pearce 2020",
+                    "afirmacion": "Consonancia varía cúbicamente con registro; Tn-types oscurecen patrones perceptivos; pitch chord preserva información psicoacústica."
+                },
+                "math": {
+                    "fuente": "Callender, Quinn & Tymoczko 2008",
+                    "afirmacion": "OPTIC modulares: P sin T produce espacio T^n/S_n legítimo para instancias de acordes."
+                },
+                "psicoacustica": {
+                    "fuente": "Eerola & Lahdelma 2022; Rogala et al. 2017",
+                    "afirmacion": "ERB en octava 2 = 646 cents (tritono); en octava 6 = 216 cents (tono). Rugosidad no es invariante por transposición."
+                }
+            },
+            "para_redactor": {
+                "donde_insertar": "INMEDIATAMENTE debajo del ítem de la pregunta Q-007 (intercalado).",
+                "tipo_contenido": "justificacion_no_invariancia",
+                "estatus_insercion": "completado"
+            }
+        },
+        {
+            "id": "Q-008",
+            "tipo": "A",
+            "pregunta_original": "No basta con decir 'no usamos PC-sets'; hay que explicar positivamente qué noción de identidad SÍ se usa y por qué es apropiada.",
+            "tema_primario": "armonia",
+            "notebooks_consultados": [
+                "armonia",
+                "math",
+                "psicoacustica",
+                "computacion"
+            ],
+            "quality_gates_passed": true,
+            "fecha_consulta": "2026-02-16T18:35:00-05:00",
+            "respuesta_para_insertar": "Pitch chord (Harrison & Pearce 2020) en dominio fundamental de R^n/S_n (Callender+ 2008). No es espacio OP (que asume O-equivalencia). Input de Sethares requiere frecuencias absolutas.",
+            "evidencia_por_notebook": {
+                "armonia": {
+                    "fuente": "Harrison & Pearce 2020",
+                    "afirmacion": "Pitch chord = conjunto MIDI preservando registro, nivel más granular."
+                },
+                "math": {
+                    "fuente": "Callender+ 2008, Tymoczko 2011",
+                    "afirmacion": "Dominio fundamental definido por x1<...<xn en R^n (no en el toro)."
+                },
+                "psicoacustica": {
+                    "fuente": "Eerola & Lahdelma 2022",
+                    "afirmacion": "Consonancia varía con registro → necesita frecuencias absolutas."
+                }
+            },
+            "para_redactor": {
+                "donde_insertar": "INMEDIATAMENTE debajo del ítem de la debilidad Q-008 en §3.1.3 (intercalado).",
+                "tipo_contenido": "nocion_positiva_identidad",
+                "estatus_insercion": "completado"
+            }
+        },
+        {
+            "id": "Q-010",
+            "tipo": "A",
+            "pregunta_original": "¿Por qué 12 bins y no 6 (como en Forte) o 13 (incluyendo unísono separado de octava)?",
+            "tema_primario": "armonia",
+            "notebooks_consultados": [
+                "armonia",
+                "math",
+                "psicoacustica",
+                "computacion"
+            ],
+            "quality_gates_passed": true,
+            "fecha_consulta": "2026-02-16T18:35:00-05:00",
+            "respuesta_para_insertar": "12 bins por asimetría acústica: rugosidad de k ≠ rugosidad de 12-k (Sethares 1993, Huron 1994). IC de Forte (6 bins) impone I-equivalencia OPTIC. 13 bins innecesario: octava/unísono ya capturados por sensibilidad al registro.",
+            "evidencia_por_notebook": {
+                "armonia": {
+                    "fuente": "Sethares 1993; Cambouropoulos 2016",
+                    "afirmacion": "Curvas de rugosidad asimétricas; DIC preserva direccionalidad."
+                },
+                "psicoacustica": {
+                    "fuente": "Huron 1994; Sethares 1993",
+                    "afirmacion": "Consonancia 3ra menor (0.1109) ≠ 6ta mayor (0.0477) Hutchinson-Knopoff."
+                },
+                "math": {
+                    "fuente": "Forte 1973; Callender+ 2008",
+                    "afirmacion": "IC 6 bins = I-equivalencia OPTIC; no colapsar = rechazar I."
+                },
+                "computacion": {
+                    "fuente": "Bernardes 2016",
+                    "afirmacion": "TIS parte de croma 12; reconoce limitación al colapsar a 6."
+                }
+            },
+            "para_redactor": {
+                "donde_insertar": "INMEDIATAMENTE debajo del ítem de la pregunta Q-010 en §3.1.4 (intercalado).",
+                "tipo_contenido": "justificacion_12_bins",
+                "estatus_insercion": "completado"
+            }
+        },
+        {
+            "id": "Q-011",
+            "tipo": "A",
+            "pregunta_original": "¿Cuál es la implicación algebraica de NO colapsar complementarios?",
+            "tema_primario": "armonia",
+            "notebooks_consultados": [
+                "armonia",
+                "math"
+            ],
+            "quality_gates_passed": true,
+            "fecha_consulta": "2026-02-16T22:15:00-05:00",
+            "respuesta_para_insertar": "No colapsar k↔12-k = rechazar I-equivalencia OPTIC. Espacio OPT (Chord Types) vs OPTI (Set Classes). Mayor/menor son distintos. DIC de Cambouropoulos.",
+            "evidencia_por_notebook": {
+                "armonia": {
+                    "fuente": "Callender+ 2008; Cambouropoulos 2016; Tymoczko 2009",
+                    "afirmacion": "IC = I-equivalencia; DIC preserva direccionalidad; Forte 'drástica' para tonalidad."
+                },
+                "math": {
+                    "fuente": "Forte 1973; Callender+ 2008; Jedrzejewski 2013",
+                    "afirmacion": "Z_{12}/~I produce 6 IC; conjuntos Z-relacionados comparten IC; OPT distingue quiralidad."
+                }
+            },
+            "para_redactor": {
+                "donde_insertar": "INMEDIATAMENTE debajo del ítem de la pregunta Q-011 en §3.1.4 (intercalado).",
+                "tipo_contenido": "implicacion_algebraica_no_colapso",
+                "estatus_insercion": "completado"
+            }
+        },
+        {
+            "id": "Q-012",
+            "tipo": "A",
+            "pregunta_original": "Explicar qué es la banda crítica auditiva, qué es disonancia sensorial y qué tiene que ver con la rugosidad.",
+            "tema_primario": "psicoacustica",
+            "notebooks_consultados": [
+                "psicoacustica",
+                "armonia"
+            ],
+            "quality_gates_passed": true,
+            "fecha_consulta": "2026-02-16T22:15:00-05:00",
+            "respuesta_para_insertar": "Banda crítica = ancho resolución coclear. Batimientos rápidos (20-300 Hz) → rugosidad. Disonancia sensorial = suma de rugosidades (Sethares). Distinción: rugosidad es fenómeno, disonancia sensorial es métrica agregada.",
+            "evidencia_por_notebook": {
+                "psicoacustica": {
+                    "fuente": "Sethares 1993; Vassilakis 2001; Masina 2023",
+                    "afirmacion": "Cadena causal: banda crítica → batimientos → rugosidad → disonancia sensorial."
+                },
+                "armonia": {
+                    "fuente": "Harrison & Pearce 2020; Milne 2023",
+                    "afirmacion": "Rugosidad es componente fisiológico; disonancia incluye armonicidad y cultura."
+                }
+            },
+            "para_redactor": {
+                "donde_insertar": "INMEDIATAMENTE debajo de la nota de santimath sobre banda crítica en §3.2.1 (intercalado).",
+                "tipo_contenido": "definicion_cadena_causal_rugosidad",
+                "estatus_insercion": "completado"
+            }
+        },
+        {
+            "id": "Q-013",
+            "tipo": "A",
+            "pregunta_original": "¿Hasta qué punto la parametrización de Sethares es 'el' modelo o 'un' modelo posible?",
+            "tema_primario": "psicoacustica",
+            "notebooks_consultados": [
+                "armonia",
+                "psicoacustica",
+                "computacion"
+            ],
+            "quality_gates_passed": true,
+            "fecha_consulta": "2026-02-16T22:15:00-05:00",
+            "respuesta_para_insertar": "Es 'un' modelo, el más extendido. Alternativas: Hutchinson-Knopoff, Vassilakis, Parncutt, modelos combinados (Masina 2024). Justificación: función suave/diferenciable, relación timbre-escala, referencia base.",
+            "evidencia_por_notebook": {
+                "armonia": {
+                    "fuente": "Sethares 1993; Masina 2024; Milne 2023",
+                    "afirmacion": "'Más extendido'; función d(x)=e^(-ax)-e^(-bx); insuficiente sola para tríadas."
+                },
+                "psicoacustica": {
+                    "fuente": "Hutchinson 1978; Vassilakis 2001; Parncutt 1989; Masina 2024",
+                    "afirmacion": "Comparación: HK (r=.352), Parncutt (r=.675), Stolzenburg (r>.80). Combinados mejor."
+                },
+                "computacion": {
+                    "fuente": "Harrison & Pearce 2020 (hrep); Gaulhiac 2021",
+                    "afirmacion": "hrep implementa Sethares+HK+Vassilakis; Sethares para consonancia local."
+                }
+            },
+            "para_redactor": {
+                "donde_insertar": "INMEDIATAMENTE debajo de las preguntas Q-013/Q-014 en §3.2.1 (intercalado).",
+                "tipo_contenido": "paisaje_modelos_rugosidad",
+                "estatus_insercion": "completado"
+            }
+        },
+        {
+            "id": "Q-014",
+            "tipo": "A",
+            "pregunta_original": "¿Cómo se justifica la elección de Sethares sobre otras parametrizaciones?",
+            "tema_primario": "psicoacustica",
+            "notebooks_consultados": [
+                "armonia",
+                "psicoacustica",
+                "math",
+                "computacion",
+                "dimred"
+            ],
+            "quality_gates_passed": true,
+            "fecha_consulta": "2026-02-16T22:26:00-05:00",
+            "respuesta_para_insertar": "Parsimonia computacional vs Parncutt, sensibilidad al registro vs HK, relación timbre-escala, AF-degree irrelevante para inputs MIDI. hrep usa Sethares como backend.",
+            "evidencia_por_notebook": {
+                "armonia": {
+                    "fuente": "Cook2006; Sethares1993; Masina2024",
+                    "afirmacion": "Parsimonia; batimientos secundarios; combinación roughness+compactness."
+                },
+                "psicoacustica": {
+                    "fuente": "Vassilakis2001; Sethares1993; Cubarsi2019",
+                    "afirmacion": "AF-degree innecesario para espectros idealizados; consonancia local."
+                },
+                "computacion": {
+                    "fuente": "Harrison2020; Gaulhiac2021",
+                    "afirmacion": "hrep implementa Sethares; mapas armónicos usan misma formulación."
+                }
+            },
+            "para_redactor": {
+                "donde_insertar": "INMEDIATAMENTE debajo de Q-013 en §3.2.1 (intercalado).",
+                "tipo_contenido": "justificacion_sethares_chordspace",
+                "estatus_insercion": "completado"
+            }
+        },
+        {
+            "id": "Q-015",
+            "tipo": "A",
+            "pregunta_original": "¿De dónde vienen estos valores numéricos? (D*=0.24, S1, S2, A1, A2)",
+            "tema_primario": "psicoacustica",
+            "notebooks_consultados": [
+                "armonia",
+                "psicoacustica",
+                "math",
+                "computacion",
+                "dimred"
+            ],
+            "quality_gates_passed": true,
+            "fecha_consulta": "2026-02-16T22:26:00-05:00",
+            "respuesta_para_insertar": "Ajuste de curvas (gradient minimization squared error) a datos Plomp-Levelt. D*=0.24 derivado analíticamente (25% banda crítica). S1,S2 por mínimos cuadrados lineales. No son constantes físicas.",
+            "evidencia_por_notebook": {
+                "armonia": {
+                    "fuente": "Sethares1993; Masina2024; Cook2006",
+                    "afirmacion": "Estándar b1=3.5, b2=5.75; variaciones menores en literatura."
+                },
+                "psicoacustica": {
+                    "fuente": "Sethares1993; Vassilakis2001; Mukherjee2023",
+                    "afirmacion": "Gradient minimization; D* analítico; S1,S2 least-squares."
+                },
+                "math": {
+                    "fuente": "Mukherjee2023; Sethares1993",
+                    "afirmacion": "d(x)=e^(-ax)-e^(-bx) diferencia de exponenciales; D*=0.22035 en Mukherjee."
+                },
+                "computacion": {
+                    "fuente": "Gaulhiac2021; Harrison2020",
+                    "afirmacion": "Parámetros hardcodeados en implementaciones; hrep usa valores estándar."
+                }
+            },
+            "para_redactor": {
+                "donde_insertar": "INMEDIATAMENTE debajo de la pregunta Q-015 en §3.2.2 (intercalado).",
+                "tipo_contenido": "origen_parametros_sethares",
+                "estatus_insercion": "completado"
+            }
+        },
+        {
+            "id": "Q-016",
+            "tipo": "A",
+            "pregunta_original": "¿Cuál es la sensibilidad del modelo a variaciones en estos parámetros?",
+            "tema_primario": "psicoacustica",
+            "notebooks_consultados": [
+                "armonia",
+                "psicoacustica",
+                "math",
+                "computacion",
+                "dimred"
+            ],
+            "quality_gates_passed": true,
+            "fecha_consulta": "2026-02-16T22:26:00-05:00",
+            "respuesta_para_insertar": "Estadísticamente robusto (chi² estable ante variaciones de peso); topológicamente sensible a amplitudes (Mukherjee singularidades). Consonancias principales robustas. hrep permite backends intercambiables.",
+            "evidencia_por_notebook": {
+                "armonia": {
+                    "fuente": "Vassilakis2001; Masina2024; Cook2006",
+                    "afirmacion": "Vassilakis r=0.98 vs HK r=0.87; anomalía tríada aumentada compartida."
+                },
+                "psicoacustica": {
+                    "fuente": "Mukherjee2023; Sethares1993; Masina2022",
+                    "afirmacion": "Singularidades incidentales; χ² invariante ante peso; S1,S2 no se varían."
+                },
+                "computacion": {
+                    "fuente": "Harrison2020",
+                    "afirmacion": "hrep: Sethares+HK+Vassilakis intercambiables."
+                }
+            },
+            "para_redactor": {
+                "donde_insertar": "INMEDIATAMENTE debajo de la pregunta Q-016 en §3.2.2 (intercalado).",
+                "tipo_contenido": "sensibilidad_parametros_rugosidad",
+                "estatus_insercion": "completado"
+            }
+        },
+        {
+            "id": "Q-017",
+            "tipo": "A",
+            "pregunta_original": "¿Es el supuesto de espectro armónico con decaimiento exponencial razonable?",
+            "tema_primario": "psicoacustica",
+            "notebooks_consultados": [
+                "armonia",
+                "psicoacustica",
+                "math",
+                "computacion",
+                "dimred"
+            ],
+            "quality_gates_passed": true,
+            "fecha_consulta": "2026-02-16T22:26:00-05:00",
+            "respuesta_para_insertar": "Razonable para timbres occidentales (cuerdas/vientos). δ=0.88 validado por Cook2006. Inválido para inarmónicos. Sethares: consonancia local para espectros arbitrarios. Milne: r=0.85 entre idealizado y real para roughness.",
+            "evidencia_por_notebook": {
+                "armonia": {
+                    "fuente": "Harrison2020; Milne2023; Eerola2022; Cook2006",
+                    "afirmacion": "hrep usa 11 parciales 1/n; Milne 36 parciales; Cook valida δ=0.88 con 6."
+                },
+                "psicoacustica": {
+                    "fuente": "Sethares1993; Masina2024; Vassilakis2001",
+                    "afirmacion": "Consonancia local para inarmónicos; robustez ante variaciones de peso."
+                },
+                "math": {
+                    "fuente": "Mukherjee2023; Sethares1993",
+                    "afirmacion": "Perturbaciones de envolvente alteran mínimos locales de forma estructurada."
+                }
+            },
+            "para_redactor": {
+                "donde_insertar": "INMEDIATAMENTE debajo de la pregunta Q-017 en §3.2.3 (intercalado).",
+                "tipo_contenido": "validez_espectro_armonico",
+                "estatus_insercion": "completado"
+            }
+        },
+        {
+            "id": "Q-018",
+            "tipo": "A",
+            "pregunta_original": "¿Cómo afecta H=6 a la resolución del modelo? ¿Sería diferente con H=10?",
+            "tema_primario": "psicoacustica",
+            "notebooks_consultados": [
+                "armonia",
+                "psicoacustica",
+                "math",
+                "computacion",
+                "dimred"
+            ],
+            "quality_gates_passed": true,
+            "fecha_consulta": "2026-02-16T22:26:00-05:00",
+            "respuesta_para_insertar": "H=6 suficiente: Helmholtz (H≥7 despreciable), Masina (saturación en H=8), Cook (valida H=6). Costo: C(m,2)·H². Triada: 108 vs 300 evaluaciones. Proponer análisis de sensibilidad H∈{4,6,8,10}.",
+            "evidencia_por_notebook": {
+                "armonia": {
+                    "fuente": "Cook2006; Masina2024; Gaulhiac2021",
+                    "afirmacion": "H=6 estándar Sethares/Cook; saturación en H=8; estructuras emergen con 5 parciales."
+                },
+                "psicoacustica": {
+                    "fuente": "Masina2024; Cubarsi2019; Hutchinson1978",
+                    "afirmacion": "n_max=8 sin cambio significativo; tolerancia 1-3% en H<5; HK usa H=10."
+                },
+                "math": {
+                    "fuente": "Mukherjee2023; Cubarsi2019",
+                    "afirmacion": "Costo O(m²H²); δ⁹≈0.31 contribución cruzada <0.10."
+                }
+            },
+            "para_redactor": {
+                "donde_insertar": "INMEDIATAMENTE debajo de la pregunta Q-018 en §3.2.3 (intercalado).",
+                "tipo_contenido": "justificacion_H6_armonicos",
+                "estatus_insercion": "completado"
+            }
+        },
+        {
+            "id": "Q-019",
+            "tipo": "B",
+            "pregunta_original": "¿La percepción de un intervalo interno difiere de los intervalos extremos en un acorde? ¿La posición relativa cambia su peso perceptual?",
+            "tema_primario": "psicoacustica",
+            "notebooks_consultados": [
+                "psicoacustica",
+                "armonia",
+                "math",
+                "computacion",
+                "dimred"
+            ],
+            "quality_gates_passed": true,
+            "fecha_consulta": "2026-02-17T03:00:00-05:00",
+            "respuesta_para_insertar": "La percepción no es suma lineal. Sethares trata todos los pares igual (salvo amplitud). Cook demuestra tensión triádica irreducible a díadas. Modelos de compacidad revelan que posición de nota media altera bajo fundamental virtual. Φ_raw captura contenido total pero no configuración interna: limitación documentada.",
+            "evidencia_por_notebook": {
+                "psicoacustica": {
+                    "fuente": "Sethares1993; Cook2009; Masina2024",
+                    "afirmacion": "Rugosidad simétrica por pares; anomalía tríada aumentada; equidistancia genera inestabilidad."
+                },
+                "armonia": {
+                    "fuente": "Cambouropoulos2016; Parncutt1988; Cook2009",
+                    "afirmacion": "GCT prioriza intervalo con bajo; Lerdahl jerarquía cognitiva; asimetría 4-3 vs 3-4 define modalidad."
+                },
+                "math": {
+                    "fuente": "Sethares1993; Mukherjee2023",
+                    "afirmacion": "C(m,2)·H² pares, todos ponderados igual; sin pesos por posición en fórmula."
+                },
+                "computacion": {
+                    "fuente": "Harrison2020; Cook2006",
+                    "afirmacion": "hrep no implementa pesos diferenciales; todos pares simétricos."
+                },
+                "dimred": {
+                    "fuente": "—",
+                    "afirmacion": "Histograma por clase pierde posición del intervalo en el acorde."
+                }
+            },
+            "para_redactor": {
+                "donde_insertar": "§3.2.4, debajo de la nota sobre intervalos internos vs externos.",
+                "tipo_contenido": "peso_perceptual_intervalo_posicion",
+                "estatus_insercion": "completado"
+            }
+        },
+        {
+            "id": "Q-020",
+            "tipo": "A",
+            "pregunta_original": "¿Cómo afectan los componentes cero en Φ_raw a las métricas de distancia? ¿Qué estrategias existen?",
+            "tema_primario": "math",
+            "notebooks_consultados": [
+                "psicoacustica",
+                "armonia",
+                "math",
+                "computacion",
+                "dimred"
+            ],
+            "quality_gates_passed": true,
+            "fecha_consulta": "2026-02-17T03:00:00-05:00",
+            "respuesta_para_insertar": "JSD requiere ε-padding (0·log0=0 por convención en scipy). Hellinger robusta naturalmente (raíces cuadradas). Coseno tolera ceros pero exagera ortogonalidad. Euclidiana sin problemas pero domina magnitud. Estrategias: suavizado gaussiano previo + ε-padding.",
+            "evidencia_por_notebook": {
+                "psicoacustica": {
+                    "fuente": "Harrison2020; Milne2023",
+                    "afirmacion": "Espectros suavizados eliminan sparsity; DFT mitiga ceros."
+                },
+                "math": {
+                    "fuente": "Burgoyne2013; Kim2018",
+                    "afirmacion": "CoDA: ilr requiere >0; Hellinger robusta; priors bayesianos."
+                },
+                "armonia": {
+                    "fuente": "Wolkowicz2013",
+                    "afirmacion": "Coseno sobre chroma; ortogonalidad como no-similitud."
+                },
+                "computacion": {
+                    "fuente": "scipy docs",
+                    "afirmacion": "jensenshannon maneja ceros internamente."
+                },
+                "dimred": {
+                    "fuente": "Burgoyne2005",
+                    "afirmacion": "MDS sobre distancias suavizadas más estable."
+                }
+            },
+            "para_redactor": {
+                "donde_insertar": "§3.2.4, debajo de debilidad sobre componentes cero.",
+                "tipo_contenido": "manejo_ceros_metricas",
+                "estatus_insercion": "completado"
+            }
+        },
+        {
+            "id": "Q-021",
+            "tipo": "A",
+            "pregunta_original": "¿Existe ground truth perceptual para tríadas/cuatríadas? ¿En qué unidades se mide la rugosidad?",
+            "tema_primario": "psicoacustica",
+            "notebooks_consultados": [
+                "psicoacustica",
+                "armonia",
+                "math",
+                "computacion",
+                "dimred"
+            ],
+            "quality_gates_passed": true,
+            "fecha_consulta": "2026-02-17T03:00:00-05:00",
+            "respuesta_para_insertar": "Sí: Bowling2018 (66 tríadas, 220 cuatríadas cromáticas), Johnson-Laird2012 (55 tríadas), Roberts1986 (jerarquía mayor>menor>dim>aug). Unidad formal: asper. Modelos computacionales: valores arbitrarios/normalizados. Validar con díadas insuficiente para N≥3.",
+            "evidencia_por_notebook": {
+                "psicoacustica": {
+                    "fuente": "Bowling2018; Vencovsky2014; Vassilakis2001",
+                    "afirmacion": "66 tríadas cromáticas evaluadas; asper definido SAM 1kHz; modelos usan unidades arbitrarias."
+                },
+                "armonia": {
+                    "fuente": "Cook2009; Johnson-Laird2012; Roberts1986",
+                    "afirmacion": "Jerarquía mayor>menor>dim>aug; tríada aumentada anomalía aditiva."
+                },
+                "math": {
+                    "fuente": "Masina2024",
+                    "afirmacion": "χ² requiere combinación rugosidad+compacidad para ajuste satisfactorio."
+                },
+                "computacion": {
+                    "fuente": "Harrison2020",
+                    "afirmacion": "hrep permite comparar modelos contra datos empíricos."
+                },
+                "dimred": {
+                    "fuente": "—",
+                    "afirmacion": "No directamente relevante."
+                }
+            },
+            "para_redactor": {
+                "donde_insertar": "§3.2.5, debajo de preguntas sobre ground truth.",
+                "tipo_contenido": "ground_truth_triadas_unidades",
+                "estatus_insercion": "completado"
+            }
+        },
+        {
+            "id": "Q-022",
+            "tipo": "A",
+            "pregunta_original": "¿La normalización destruye información relevante? ¿Cuál?",
+            "tema_primario": "math",
+            "notebooks_consultados": [
+                "psicoacustica",
+                "armonia",
+                "math",
+                "computacion",
+                "dimred"
+            ],
+            "quality_gates_passed": true,
+            "fecha_consulta": "2026-02-17T03:00:00-05:00",
+            "respuesta_para_insertar": "L1 normalización elimina magnitud global de disonancia (perceptualmente informativa: Milne2023 asociación universal). Depende de la pregunta: similitud→normalizado; ordenamiento consonancia→no normalizado. CoDA: ilr preserva geometría composicional. DFT separa magnitud/fase.",
+            "evidencia_por_notebook": {
+                "psicoacustica": {
+                    "fuente": "Sethares1993; Milne2023",
+                    "afirmacion": "Magnitud total predice estabilidad; asociación universal independiente de cultura."
+                },
+                "math": {
+                    "fuente": "Burgoyne2013; Aitchison1986",
+                    "afirmacion": "Simplex introduce correlaciones espurias; ilr preserva geometría; DFT separa magnitud/fase."
+                },
+                "armonia": {
+                    "fuente": "Harrison2020; Masina2022",
+                    "afirmacion": "Magnitud distingue tenso vs relajado; perfil distingue timbre."
+                },
+                "computacion": {
+                    "fuente": "Bernardes2016",
+                    "afirmacion": "TIS usa DFT: magnitud=consonancia, ángulo=afinidad tonal."
+                },
+                "dimred": {
+                    "fuente": "Amiot2016",
+                    "afirmacion": "DFT: magnitud invariante a transposición; fase contiene información de registro."
+                }
+            },
+            "para_redactor": {
+                "donde_insertar": "§3.3.1, debajo de preguntas sobre normalización.",
+                "tipo_contenido": "normalizacion_destruye_magnitud",
+                "estatus_insercion": "completado"
+            }
+        },
+        {
+            "id": "Q-023",
+            "tipo": "B",
+            "pregunta_original": "¿El suavizado gaussiano tiene justificación perceptual o es heurística?",
+            "tema_primario": "psicoacustica",
+            "notebooks_consultados": [
+                "psicoacustica",
+                "armonia",
+                "math",
+                "computacion",
+                "dimred"
+            ],
+            "quality_gates_passed": true,
+            "fecha_consulta": "2026-02-17T03:00:00-05:00",
+            "respuesta_para_insertar": "Justificación perceptual sólida: JND, DL, computación blanda del cerebro (Himpel2022). Harrison usa σ≈10 cents. σ=0.75 st en ChordSpace = tolerancia categórica > JND típica. Precedente: chroma suavizados estándar en MIR. Parámetro configurable, sensibilidad pendiente.",
+            "evidencia_por_notebook": {
+                "psicoacustica": {
+                    "fuente": "Himpel2022; Harrison2020; Masina2023",
+                    "afirmacion": "Percepción imprecisa=distribución; espectros suavizados σ≈10 cents; DL calibrado."
+                },
+                "armonia": {
+                    "fuente": "Bernardes2016; Harrison2020",
+                    "afirmacion": "Chroma suavizados estándar; TIS usa DFT como alternativa; Harrison convolución gaussiana."
+                },
+                "math": {
+                    "fuente": "Kim2018",
+                    "afirmacion": "Suavizado como regularización; elimina ceros; estabiliza métricas."
+                },
+                "computacion": {
+                    "fuente": "—",
+                    "afirmacion": "Implementación scipy.ndimage.gaussian_filter1d."
+                },
+                "dimred": {
+                    "fuente": "—",
+                    "afirmacion": "Suavizado mejora estabilidad de embeddings."
+                }
+            },
+            "para_redactor": {
+                "donde_insertar": "§3.3.2, debajo de pregunta sobre suavizado gaussiano.",
+                "tipo_contenido": "justificacion_suavizado_perceptual",
+                "estatus_insercion": "completado"
+            }
+        },
+        {
+            "id": "Q-024",
+            "tipo": "B",
+            "pregunta_original": "¿Por qué no usar PCA/selección de features en lugar de normalizaciones manuales?",
+            "tema_primario": "computacion",
+            "notebooks_consultados": [
+                "psicoacustica",
+                "armonia",
+                "math",
+                "computacion",
+                "dimred"
+            ],
+            "quality_gates_passed": true,
+            "fecha_consulta": "2026-02-17T03:00:00-05:00",
+            "respuesta_para_insertar": "Literatura respalda interpretabilidad: Harrison rechaza representaciones opacas; Tymoczko/Chew usan geometría explícita; Lazzari pitchclass2vec supera Word2Vec; De Berardinis rechaza DL por falta de interpretabilidad. Con d=12, PCA redundante. Normalizaciones = filtros con semántica musical.",
+            "evidencia_por_notebook": {
+                "psicoacustica": {
+                    "fuente": "Himpel2022; Harrison2020",
+                    "afirmacion": "Prefieren modelos geométricos a ML; explicabilidad sobre potencia."
+                },
+                "armonia": {
+                    "fuente": "Tymoczko2006; Chew2014; DeBerardinis2023; Micchi2020; Lazzari2023",
+                    "afirmacion": "Orbifolds/Spiral Array interpreables; pitchclass2vec>Word2Vec; TPS 'explicable por diseño'."
+                },
+                "math": {
+                    "fuente": "Burgoyne2005",
+                    "afirmacion": "PCA para visualización post-hoc, no como representación base."
+                },
+                "computacion": {
+                    "fuente": "Huang2016",
+                    "afirmacion": "Chord2Vec usa PCA post-hoc para visualizar latentes, no para generar features."
+                },
+                "dimred": {
+                    "fuente": "Cambouropoulos2016",
+                    "afirmacion": "GCT: representación simbólica transparente adaptable a múltiples idiomas."
+                }
+            },
+            "para_redactor": {
+                "donde_insertar": "§3.3.2, debajo de debilidad sobre PCA vs heurísticas.",
+                "tipo_contenido": "interpretabilidad_vs_PCA",
+                "estatus_insercion": "completado"
+            }
+        },
+        {
+            "id": "Q-025",
+            "tipo": "A",
+            "pregunta_original": "¿Tiene sentido la euclidiana sobre rugosidad cruda? ¿Qué métrica es apropiada para cada caso?",
+            "tema_primario": "math",
+            "notebooks_consultados": [
+                "psicoacustica",
+                "armonia",
+                "math",
+                "computacion",
+                "dimred"
+            ],
+            "quality_gates_passed": true,
+            "fecha_consulta": "2026-02-17T03:00:00-05:00",
+            "respuesta_para_insertar": "Euclidiana cruda inapropiada (2da menor=5ta justa en distancia). Coseno respaldado por Harrison para espectros suavizados. TIS: euclidiana=consonancia, angular=afinidad tonal. √JSD métrica válida en simplex. Sin consenso universal → diseño comparativo experimental.",
+            "evidencia_por_notebook": {
+                "psicoacustica": {
+                    "fuente": "Harrison2020",
+                    "afirmacion": "Coseno para smooth pitch spectra; similitud perceptual."
+                },
+                "armonia": {
+                    "fuente": "Bernardes2016; NavarroCaceres2020",
+                    "afirmacion": "TIS: euclidiana=disonancia, ángulo=alineación tonal; distinción funcional."
+                },
+                "math": {
+                    "fuente": "Endres2003",
+                    "afirmacion": "√JSD métrica válida; Hellinger acotada [0,1]; coseno semimétrica."
+                },
+                "computacion": {
+                    "fuente": "Tymoczko2006",
+                    "afirmacion": "Voice-leading: L∞ en orbifold; diferente paradigma."
+                },
+                "dimred": {
+                    "fuente": "Chew2014",
+                    "afirmacion": "Spiral Array: euclidiana calibrada en hélice; no vectores planos."
+                }
+            },
+            "para_redactor": {
+                "donde_insertar": "§3.4.1, debajo de pregunta sobre euclidiana en identity.",
+                "tipo_contenido": "seleccion_metrica_distancia",
+                "estatus_insercion": "completado"
+            }
+        },
+        {
+            "id": "Q-026",
+            "tipo": "A",
+            "pregunta_original": "¿La elección de ρ induce topología diferente? ¿Es D semidefinida positiva?",
+            "tema_primario": "math",
+            "notebooks_consultados": [
+                "psicoacustica",
+                "armonia",
+                "math",
+                "computacion",
+                "dimred"
+            ],
+            "quality_gates_passed": true,
+            "fecha_consulta": "2026-02-17T03:00:00-05:00",
+            "respuesta_para_insertar": "Sí, topologías diferentes: MDS toroidal vs MVU planos separados. Rugosidad vs compacidad: vecindarios discrepantes. Lerdahl viola desigualdad triangular. SMACOF no requiere PSD. √JSD y Hellinger satisfacen Schoenberg. arccos(1-d_cos) es métrica.",
+            "evidencia_por_notebook": {
+                "psicoacustica": {
+                    "fuente": "Sethares1993; Mukherjee2023",
+                    "afirmacion": "Paisaje consonancia dependiente de timbre; topología mínimos locales cambia."
+                },
+                "armonia": {
+                    "fuente": "Masina2024; Cook2009",
+                    "afirmacion": "Rugosidad predice mal tríada dim vs aug; compacidad corrige; combinación lineal necesaria."
+                },
+                "math": {
+                    "fuente": "Burgoyne2005; Himpel2022",
+                    "afirmacion": "MDS vs MVU topologías distintas; Lerdahl no-métrica; Riemanniana para voice-leading."
+                },
+                "computacion": {
+                    "fuente": "sklearn docs",
+                    "afirmacion": "SMACOF iterativo sin requerimiento PSD; convergencia garantizada."
+                },
+                "dimred": {
+                    "fuente": "Bernardes2016",
+                    "afirmacion": "DFT induce topología que agrupa configuraciones armónicas; euclidiana directa no."
+                }
+            },
+            "para_redactor": {
+                "donde_insertar": "§3.4.3, debajo de preguntas sobre topología y PSD.",
+                "tipo_contenido": "topologia_metricas_PSD",
+                "estatus_insercion": "completado"
+            }
+        },
+        {
+            "id": "Q-027",
+            "tipo": "A",
+            "pregunta_original": "¿Por qué MDS métrico? ¿MDS no-métrico? ¿Es el stress suficiente?",
+            "tema_primario": "dimred",
+            "notebooks_consultados": [
+                "psicoacustica",
+                "armonia",
+                "math",
+                "computacion",
+                "dimred"
+            ],
+            "quality_gates_passed": true,
+            "fecha_consulta": "2026-02-17T03:00:00-05:00",
+            "respuesta_para_insertar": "Krumhansl: no-métrico para juicios subjetivos (solo rangos). ChordSpace: ρ computacional → métrico justificado (magnitudes significativas, Milne2023). Stress <0.05 excelente. Complementar con trustworthiness, continuity, diagrama de Shepard.",
+            "evidencia_por_notebook": {
+                "psicoacustica": {
+                    "fuente": "Krumhansl1990; Milne2023",
+                    "afirmacion": "No-métrico para percepción; magnitud rugosidad predictiva de estabilidad."
+                },
+                "armonia": {
+                    "fuente": "Bernardes2016; Bidelman2014",
+                    "afirmacion": "Bernardes usa smacof no-métrico para TIS; jerarquía consonancia no binaria."
+                },
+                "math": {
+                    "fuente": "Kruskal1964",
+                    "afirmacion": "Stress Fórmula 1 estándar; <0.05 excelente, <0.1 bueno."
+                },
+                "computacion": {
+                    "fuente": "sklearn docs",
+                    "afirmacion": "metric=True/False; trustworthiness() implementado."
+                },
+                "dimred": {
+                    "fuente": "Venna2005; Lee2009",
+                    "afirmacion": "Trustworthiness+Continuity métricas basadas en rangos; matriz co-ranking unificadora."
+                }
+            },
+            "para_redactor": {
+                "donde_insertar": "§3.5.1, debajo de preguntas sobre MDS métrico.",
+                "tipo_contenido": "MDS_metrico_vs_no_metrico",
+                "estatus_insercion": "completado"
+            }
+        },
+        {
+            "id": "Q-028",
+            "tipo": "B",
+            "pregunta_original": "¿Los embeddings de diferentes métodos son comparables? ¿Cómo interpretar UMAP donde distancias globales no son significativas?",
+            "tema_primario": "dimred",
+            "notebooks_consultados": [
+                "psicoacustica",
+                "armonia",
+                "math",
+                "computacion",
+                "dimred"
+            ],
+            "quality_gates_passed": true,
+            "fecha_consulta": "2026-02-17T03:00:00-05:00",
+            "respuesta_para_insertar": "No directamente comparables: funciones de costo diferentes (stress vs KL vs cross-entropy). Métricas: trustworthiness+continuity (Venna&Kaski), Procrustes para alineación, co-ranking matrix. Krumhansl: 2D puede engañar. Saturn coeficiente para local+global. MDS principal; UMAP/t-SNE complementarios.",
+            "evidencia_por_notebook": {
+                "psicoacustica": {
+                    "fuente": "Krumhansl1990",
+                    "afirmacion": "Proyecciones 2D engañosas; solución 4D necesaria para distancias correctas."
+                },
+                "armonia": {
+                    "fuente": "Burgoyne2005",
+                    "afirmacion": "MDS vs MVU vs ISOMAP: topologías distintas del mismo espacio."
+                },
+                "math": {
+                    "fuente": "Lee2009; Wang2021",
+                    "afirmacion": "Co-ranking matrix marco unificador; Procrustes para alinear; Random Triplet Accuracy."
+                },
+                "computacion": {
+                    "fuente": "McInnes2018; Venna2005",
+                    "afirmacion": "UMAP: cross-entropy difusa; penaliza falsos positivos. sklearn.manifold.trustworthiness()."
+                },
+                "dimred": {
+                    "fuente": "Chicco2026; Wang2021",
+                    "afirmacion": "Saturn coeficiente local+global; inicialización espectral captura estructura global; DREAMS combina local+global."
+                }
+            },
+            "para_redactor": {
+                "donde_insertar": "§3.5.2, debajo de preguntas sobre comparabilidad de embeddings.",
+                "tipo_contenido": "comparabilidad_embeddings",
+                "estatus_insercion": "completado"
+            }
+        }
+    ]
+}
