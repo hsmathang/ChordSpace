@@ -1,0 +1,51 @@
+{
+  "version": 1,
+  "presets": {
+    "cromatic-triadMaj": {
+      "description": "todas las triadas mayyores sobre la cromatica en el rango octavas 3-4",
+      "locked": false,
+      "combinatorial": {
+        "alphabet": [
+          0,
+          1,
+          2,
+          3,
+          4,
+          5,
+          6,
+          7,
+          8,
+          9,
+          10,
+          11
+        ],
+        "octave_min": 3,
+        "octave_max": 4,
+        "cardinalities": [
+          3
+        ],
+        "structural_mode": false
+      },
+      "filters": {
+        "enabled": true,
+        "cardinalities": [
+          3
+        ],
+        "span_min": 7,
+        "span_max": 7,
+        "max_internal_interval": 4,
+        "include_pitch_classes": [],
+        "exclude_pitch_classes": [],
+        "pc_mode": "contains_all",
+        "interval_mode": "exact",
+        "interval_patterns": [
+          [
+            4,
+            3
+          ]
+        ],
+        "scale_expand": false
+      }
+    }
+  }
+}
