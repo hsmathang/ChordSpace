@@ -363,6 +363,7 @@ class ExperimentLauncher(tk.Tk):
             "metadata": tk.BooleanVar(value=True),
         }
         self.audio_enabled_var = tk.BooleanVar(value=False)
+        self.instructional_enabled_var = tk.BooleanVar(value=False)
 
     # --- UI Building (similar to original but using extracted widgets where possible) ---
 
@@ -678,6 +679,8 @@ class ExperimentLauncher(tk.Tk):
         ttk.Separator(frame, orient="horizontal").grid(row=row, column=0, sticky="ew", pady=8)
         row += 1
         ttk.Checkbutton(frame, text="Incluir reproducción de audio (experimental)", variable=self.audio_enabled_var).grid(row=row, column=0, sticky="w", pady=2)
+        row += 1
+        ttk.Checkbutton(frame, text="Mostrar instructivo para músicos y usuarios no expertos", variable=self.instructional_enabled_var).grid(row=row, column=0, sticky="w", pady=2)
 
     def _build_compare_frame(self, frame: ttk.Frame) -> None:
         params = ttk.Frame(frame)
@@ -790,7 +793,8 @@ class ExperimentLauncher(tk.Tk):
         )
         vis_config = VisualizationConfig(
             sections=self._sections_arg().split(",") if self._sections_arg() != "all" else ["all"],
-            audio=AudioConfig(enabled=self.audio_enabled_var.get())
+            audio=AudioConfig(enabled=self.audio_enabled_var.get()),
+            instructional_mode=self.instructional_enabled_var.get()
         )
         experiment_config = ExperimentConfig(
             population=pop_config, roughness=rough_config, reduction=red_config, execution=exec_config, name="gui_experiment"

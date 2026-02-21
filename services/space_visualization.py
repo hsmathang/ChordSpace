@@ -333,7 +333,8 @@ class VisualizationService:
                 highlight_threshold=config.highlight_threshold,
                 sections_enabled=sections_enabled,
                 heatmap_data=heatmap_data,  # Pass the extra payload
-                audio_data=audio_data       # Pass the audio payload
+                audio_data=audio_data,      # Pass the audio payload
+                instructional_mode=config.instructional_mode
             )
         except MemoryError:
             if logger:

@@ -103,6 +103,7 @@ def render_report_html(
     sections_enabled: Optional[Dict[str, bool]] = None,
     heatmap_data: Optional[Dict[str, Any]] = None,
     audio_data: Optional[Dict[str, Any]] = None,
+    instructional_mode: bool = False,
 ) -> None:
     metric_catalog = metric_info or METRIC_INFO_FALLBACK
 
@@ -694,9 +695,36 @@ def render_report_html(
 
     final_js = js_prefix + REPORT_JS
 
+    instructional_html = ""
+    if instructional_mode:
+        instructional_html = """
+        <div class="instructional-mode" style="background: #f0f7ff; padding: 15px; border-left: 5px solid #0056b3; margin-bottom: 20px; font-family: sans-serif; border-radius: 4px;">
+          <h3 style="margin-top: 0; color: #0056b3;">&#128161; Guía rápida de uso interactivo</h3>
+          <p>Este reporte te permite explorar el espacio de acordes de forma interactiva. Aquí te explicamos cómo utilizar las herramientas disponibles:</p>
+          <ul>
+            <li><strong>Coloreado de acordes (Controles debajo de los gráficos):</strong> Cambia cómo se colorean los puntos. 
+              <ul>
+                <li><em>Rugosidad bruta:</em> Colorea según qué tan disonante ("rugoso") es el acorde de forma absoluta.</li>
+                <li><em>Normalización:</em> Ajusta el color relativo a otros acordes similares (el deslizador de "Exponente" afina el contraste).</li>
+              </ul>
+            </li>
+            <li><strong>Exploración del mapa (Interactividad general):</strong> Haz clic y arrastra sobre el gráfico para moverte (Pan). Usa la rueda del ratón o haz un rectángulo para acercarte (Zoom). Haz doble clic para restaurar la vista original.</li>
+            <li><strong>Selección múltiple (Herramientas Lasso y Box Select):</strong> En el menú superior derecho de cada gráfico, usa las herramientas de selección en forma de caja o lazo para seleccionar grupos de acordes. Estos se usarán en el reproductor de audio.</li>
+            <li><strong>Reproducción de Audio:</strong> Si activaste la opción de audio en la interfaz, puedes reproducir los acordes. 
+              <ul>
+                <li>Usa la herramienta de selección múltiple (caja o lazo) en el gráfico para escoger una "Ruta" de acordes y presiona Play para escucharlos en el orden seleccionado.</li>
+              </ul>
+            </li>
+            <li><strong>Detalle del Acorde (Haz clic en un punto):</strong> Al hacer un solo clic sobre un punto, se abrirá un panel detallado en la parte inferior de la pantalla con toda la información musical y psicoacústica de ese acorde específico: notas que lo componen, nombre o etiqueta, grado de rugosidad y distancias relativas.</li>
+            <li><strong>Familias e Inversiones:</strong> Usa las casillas debajo de "Color por" para que, al hacer clic en un acorde, se iluminen en amarillo sus posibles inversiones o sustituciones armónicas dentro del mapa.</li>
+          </ul>
+        </div>
+        """
+
     if REPORT_TEMPLATE:
         html_content = (
             REPORT_TEMPLATE.replace("__CSS__", REPORT_CSS)
+            .replace("__INSTRUCTIONAL_HTML__", instructional_html)
             .replace("__TABLE_HTML__", combined_tables)
             .replace("__METADATA_HTML__", metadata_html)
             .replace("__TABS_HTML__", tabs_html)
@@ -710,6 +738,7 @@ def render_report_html(
             "<!DOCTYPE html><html lang='es'><head><meta charset='utf-8'/>"
             "<title>Exploración del espacio de acordes</title></head><body>"
             "<h1>Exploración del espacio de acordes</h1>"
+            f"{instructional_html}"
             "<h3>Resumen global</h3>"
             f"{table_html}{metadata_html}{tabs_html}"
             f"<script>{final_js}</script>"

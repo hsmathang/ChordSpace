@@ -71,6 +71,7 @@ class VisualizationConfig:
     color_mode: str = "log_per_pair"
     highlight_threshold: int = 2000
     audio: AudioConfig = field(default_factory=AudioConfig)
+    instructional_mode: bool = False
 
 @dataclass
 class ExperimentResult:
