@@ -45,16 +45,46 @@ def test_metric_distance_matches_scipy():
     js_res = metric_distance("js", vectors, simplex)
     hellinger_res = metric_distance("hellinger", vectors, simplex)
     cosine_res = metric_distance("cosine", vectors, simplex)
+    blend_res = metric_distance("euclid_cos_blend", vectors, simplex)
+    structural_res = metric_distance("structural_roughness", vectors, simplex)
+    structural_alias_res = metric_distance("srm", vectors, simplex)
 
     from scipy.spatial.distance import pdist, jensenshannon
 
     expected_js = pdist(simplex, lambda u, v: float(jensenshannon(u, v, base=2)))
     expected_hell = pdist(np.sqrt(simplex), metric="euclidean") / np.sqrt(2.0)
     expected_cos = pdist(vectors, metric="cosine")
+    expected_euc = pdist(vectors, metric="euclidean")
+    expected_euc = expected_euc / (expected_euc.mean() + 1e-12)
+    expected_cos_norm = expected_cos / (expected_cos.mean() + 1e-12)
+    expected_blend = 0.7 * expected_euc + 0.3 * expected_cos_norm
+    presence = simplex > 1e-12
+    expected_structure = pdist(presence.astype(np.uint8), metric="jaccard")
+    expected_profile = expected_hell
+    expected_per_dimension = 0.5 * pdist(simplex, metric="cityblock")
+    totals = vectors.sum(axis=1)
+    active_bins = np.maximum(presence.sum(axis=1), 1)
+    log_density = np.log1p(totals / active_bins)
+
+    def _rel_total(u, v):
+        a = float(u[0])
+        b = float(v[0])
+        return abs(a - b) / (abs(a) + abs(b) + 1e-12)
+
+    expected_total = pdist(log_density[:, None], metric=_rel_total)
+    expected_structural = (
+        0.325 * expected_structure
+        + 0.299 * expected_profile
+        + 0.214 * expected_per_dimension
+        + 0.162 * expected_total
+    )
 
     np.testing.assert_allclose(js_res, expected_js)
     np.testing.assert_allclose(hellinger_res, expected_hell)
     np.testing.assert_allclose(cosine_res, expected_cos)
+    np.testing.assert_allclose(blend_res, expected_blend)
+    np.testing.assert_allclose(structural_res, expected_structural)
+    np.testing.assert_allclose(structural_alias_res, expected_structural)
 
     with pytest.raises(ValueError):
         metric_distance("unknown_metric", vectors, simplex)

@@ -163,5 +163,17 @@ class ExperimentController:
         return dict(sorted(registry.items()))
 
     def get_default_output_dir(self) -> Path:
+        return self.build_run_output_dir(self.get_default_output_root())
+
+    def get_default_output_root(self) -> Path:
+        return Path("outputs") / "gui_runs"
+
+    def build_run_output_dir(self, base_dir: Path | str | None = None) -> Path:
+        root = Path(base_dir) if base_dir is not None else self.get_default_output_root()
         timestamp = dt.datetime.now().strftime("%Y%m%d_%H%M%S")
-        return Path("outputs") / "gui_runs" / timestamp
+        candidate = root / timestamp
+        suffix = 2
+        while candidate.exists():
+            candidate = root / f"{timestamp}_{suffix:02d}"
+            suffix += 1
+        return candidate

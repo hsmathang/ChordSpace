@@ -98,6 +98,11 @@ METRIC_INFO: Mapping[str, Mapping[str, str]] = _freeze_nested(
             "casual": "Mide el ángulo entre perfiles; importa la forma relativa más que la magnitud.",
             "technical": r"\(d(u,v) = 1 - \frac{u\cdot v}{\|u\|\,\|v\|}\). Adecuado para distribuciones en el simplex.",
         },
+        "euclid_cos_blend": {
+            "title": "Euclid+Cos (λ=0.30)",
+            "casual": "Combina magnitud de rugosidad y forma intervalar en una métrica continua.",
+            "technical": r"\(d(u,v) = (1-\lambda)\,d_E^*(u,v) + \lambda\,d_C^*(u,v)\), con \(\lambda=0.30\), donde \(d_E^*, d_C^*\) se normalizan por su media global.",
+        },
         "js": {
             "title": "Jensen–Shannon",
             "casual": "Compara distribuciones como diferencias de información simétrica.",
@@ -107,6 +112,16 @@ METRIC_INFO: Mapping[str, Mapping[str, str]] = _freeze_nested(
             "title": "Hellinger",
             "casual": "Distancia probabilística equilibrada, robusta a valores pequeños.",
             "technical": r"\(d_H(p,q) = \tfrac{1}{\sqrt{2}}\|\sqrt{p}-\sqrt{q}\|_2\). Equivalente a la euclidiana en raíces.",
+        },
+        "structural_roughness": {
+            "title": "Estructural + Rugosidad",
+            "casual": "Combina estructura intervalar, perfil de rugosidad por clase y rugosidad total normalizada.",
+            "technical": r"\(d = 0.325\,d_{\mathrm{Jaccard}}(s_u,s_v) + 0.299\,d_H(p_u,p_v) + 0.214\,\tfrac{1}{2}\|p_u-p_v\|_1 + 0.162\,\Delta_{\mathrm{tot}}\), donde \(\Delta_{\mathrm{tot}} = \frac{|\log(1+\rho_u)-\log(1+\rho_v)|}{|\log(1+\rho_u)|+|\log(1+\rho_v)|+\epsilon}\) y \(\rho = \sum_k H_k / \max(|\{k:H_k>0\}|,1)\).",
+        },
+        "voiceleading_quintas": {
+            "title": "Voice-leading + Quintas",
+            "casual": "Prioriza movimiento mínimo entre voces y cercanía tonal en el círculo de quintas, preservando perfil rugoso.",
+            "technical": r"\(d = 0.55\,d_{\mathrm{VL}} + 0.25\,d_{Q5} + 0.20\,d_{JS}\), con \(d_{\mathrm{VL}}\) por asignación óptima entre voces (penalización por cardinalidad), \(d_{Q5}\) Hellinger sobre perfiles de pitch-class suavizados en el anillo de quintas y \(d_{JS}\) sobre histogramas normalizados.",
         },
         "euclidean": {
             "title": "Euclidiana",

@@ -1,0 +1,7 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(python -c \"import os; print\\(os.path.getsize\\(''.agent/workflows/proceso_redaccion_metodologia.md''\\)\\)\")"
+    ]
+  }
+}

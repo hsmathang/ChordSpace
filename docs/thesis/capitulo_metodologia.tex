@@ -1,0 +1,512 @@
+\chapter{Metodología}
+\label{chap:metodologia}
+
+En este capítulo se formaliza el marco matemático y computacional desarrollado para el análisis y visualización del espacio de acordes. La propuesta central de esta investigación es que la **similitud sonora** —frecuentemente descrita de manera cualitativa en la teoría musical— puede cuantificarse objetivamente mediante propiedades psicoacústicas fundamentales. En particular, argumentamos que la **rugosidad sensorial**, asociada a la interferencia de parciales dentro de bandas críticas, constituye un correlato más fundamental de la similitud textural que las reglas armónicas dependientes del estilo. Esta elección no es un mero detalle técnico: es la afirmación teórica que hace operativa nuestra hipótesis de sustitución.
+
+Para validar esta propuesta, estructuramos la metodología en torno a tres hipótesis rectoras. En primer lugar, la **Hipótesis de Sustitución (H1)** sostiene que existe una noción cuantificable de similitud sonora, basada en la rugosidad, capaz de producir candidatos de sustitución con coherencia perceptual auditible. En segundo lugar, la **Hipótesis de Variedad (H2)** postula que el espacio psicoacústico efectivo de los acordes no es uniforme, sino que exhibe una estructura intrínseca de baja dimensión (Variedad o \textit{Manifold}). Finalmente, la **Hipótesis de Validez Ecológica (H3)** afirma que la música real (corpus) no se distribuye aleatoriamente en este espacio, sino que habita regiones específicas con perfiles de rugosidad característicos, validando el modelo como un mapa de la práctica musical humana.
+
+El enfoque metodológico desciende desde esta conceptualización hacia la formalización algebraica, el modelado psicoacústico, la construcción del espacio métrico y, finalmente, la validación experimental mediante el contraste entre poblaciones sintéticas y reales.
+
+\section{Conceptualización del Problema y Supuestos Fundamentales}
+\label{sec:conceptualizacion}
+
+La visualización de relaciones armónicas enfrenta un desafío intrínseco: la alta dimensionalidad de los datos musicales frente a la naturaleza bidimensional o tridimensional de la cognición espacial humana. Esta sección establece los cimientos teóricos y las decisiones de diseño que delimitan el alcance del modelo.
+
+\subsection{Justificación de la Reducción Dimensional}
+\label{subsec:justificacion_reduccion}
+
+El espacio de acordes, en su representación más cruda, es un objeto de alta dimensión (e.g., $\mathbb{R}^{12}$). Sin embargo, postulamos la **Hipótesis de la Variedad (Manifold Hypothesis)**: los acordes musicalmente significativos no se distribuyen uniformemente en este espacio, sino que residen en una estructura de menor dimensión gobernada por restricciones acústicas y teóricas. \citeauthor{tymoczkoGeometryMusicalChords2006} \citep{tymoczkoGeometryMusicalChords2006} ha demostrado que la armonía eficiente navega por ``orbifolds'' geométricos compactos.
+
+En nuestro enfoque, la reducción dimensional no obedece solo a una limitación de visualización, sino a la búsqueda de esta estructura latente. Además, enfrentamos la **Maldición de la Dimensionalidad**: en espacios de alta dimensión, las métricas de distancia euclidiana pierden capacidad discriminatoria. Proyectar los datos a $\mathbb{R}^2$ o $\mathbb{R}^3$ busca recuperar la topología intrínseca y alinear la representación computacional con los mapas cognitivos humanos propuestos por \cite{lerdahlTonalPitchSpace1988} y \cite{krumhanslCognitiveFoundationsMusical1990}.
+
+\subsection{Supuestos del Modelo Psicoacústico}
+\label{subsec:supuestos_psicoacusticos}
+
+Para hacer tratable el problema, se establecen simplificaciones operativas fundamentales, entendidas como condiciones de contorno para la validez del modelo. En primer lugar, se adopta el **Sistema de Afinación 12-TET** (Temperamento Igual de 12 Tonos). Aunque el modelo de rugosidad es continuo, esta discretización es necesaria para garantizar la interoperabilidad con datos simbólicos MIDI y la simetría transposicional del espacio. En segundo lugar, se asume un **Timbre Genérico** con espectro armónico idealizado y decaimiento exponencial de amplitud ($A_n = 1/n$). Esto permite generalizar a una amplia gama de instrumentos occidentales, reconociendo que instrumentos inarmónicos generarían curvas de rugosidad divergentes (ver Apéndices). Finalmente, se emplea la **Rugosidad como Proxy de Disonancia**, asumiendo que este fenómeno psicofísico prevalece sobre construcciones culturales de consonancia para propósitos de sustitución textural.
+
+\subsection{Decisiones Críticas de Diseño}
+\label{subsec:decisiones_diseno}
+
+Dos decisiones de diseño resultan críticas para la interpretación de los resultados. La primera es la \textbf{Normalización}. La elección de proyectar los vectores de características (e.g., al simplex) o mantener sus magnitudes absolutas es una variable determinantes: las disimilitudes basadas en forma (Simplex+JSD/Coseno) capturarán mejor la identidad e inversión del acorde, mientras que las basadas en magnitud (Identity+Euclidean) clasificarán mejor la tensión global.
+
+La segunda decisión concierne al \textbf{Determinismo y Reproducibilidad}. Dado que los algoritmos de reducción dimensional (como MDS o UMAP) son estocásticos, se establece un protocolo de semillas fijas para garantizar que las estructuras visuales observadas sean propiedades del sistema y no artefactos de la inicialización aleatoria \cite{Wang2021}.
+
+\section{Formalización del Objeto Acorde}
+\label{sec:marco_conceptual}
+
+A diferencia de los enfoques tradicionales basados en teoría de conjuntos de clases de altura (\textit{PC-sets}) \cite{AllenForteSTRUCTURE}, que abstraen el acorde a un "tipo" invariante bajo transposición e inversión, este trabajo postula como **axioma fundacional** que la similitud sonora relevante para la sustitución armónica es inherentemente sensible al registro absoluto. Por tanto, el objeto fundamental de nuestro estudio no será un conjunto abstracto de clases, sino una instancia de notas con frecuencias definidas, la cual denominamos \textbf{Pitch-Chord}.
+
+Esta decisión axiomática, anclada en el modelo psicoacústico de rugosidad, determina las definiciones subsecuentes. Compositivamente, esto implica que un Do mayor en registro grave ($C_2-E_2-G_2$) y un Do mayor en registro medio ($C_4-E_4-G_4$) no son el mismo objeto en el espacio $\mathcal{A}$, pues sus propiedades de rugosidad y tensión difieren sustancialmente debido al comportamiento no lineal de las bandas críticas del oído.
+
+\subsection{Espacio de Notas y Sistema de Referencia}
+
+El átomo fundamental del modelo es la nota musical, entendida como un evento sonoro discreto. Adoptamos el estándar MIDI sobre una afinación 12-TET como sistema de coordenadas, no por limitación teórica, sino por la necesidad de simetría transposicional.
+
+\begin{definition}[Conjunto de Notas y Frecuencia]
+Se define el conjunto de notas $\mathcal{N} = \{n \in \mathbb{N}_0 : 0 \leq n \leq 127\}$. A cada nota $n$ se le asigna una frecuencia fundamental $f(n) = 440 \cdot 2^{(n-69)/12}$.
+\end{definition}
+
+Aunque utilizamos el grupo cíclico $\mathbb{Z}_{12}$ para operaciones auxiliares, el modelo de rugosidad opera exclusivamente sobre $f(\mathcal{N})$.
+
+\subsection{Formalización del Acorde (Pitch-Chord)}
+
+La estructura del acorde se define para capturar la disposición vertical exacta (*voicing*).
+
+\begin{definition}[Acorde]
+Un acorde de cardinalidad $m$ es una tupla ordenada $\mathbf{n} = (n_1, n_2, \dots, n_m) \in \mathcal{N}^m$ que satisface la condición de orden estricto:
+\begin{equation}
+n_1 < n_2 < \dots < n_m
+\end{equation}
+\end{definition}
+
+La imposición estricta de orden ($<$) conlleva dos consecuencias fundamentales. Primero, la **exclusión de unísonos** ($n_i = n_{i+1}$), justificada psicoacústicamente dado que un unísono perfecto posee rugosidad nula y no contribuye a la textura disonante. Segundo, el establecimiento de una **forma canónica única**, eliminando la ambigüedad por permutación y tratando al acorde como un objeto físico único y no como una clase de equivalencia.
+
+\subsection{Descriptores de Estructura}
+
+Para caracterizar la estructura interna, definimos descriptores que capturan tanto la geometría local como el contenido cromático global.
+
+\begin{definition}[Vector de Estructura Interválica]
+El vector $\mathbf{ic}(\mathbf{n}) \in \mathbb{N}_0^{12}$ cuenta la cantidad de pares de notas separadas por $k$ semitonos. Es crucial notar que utilizamos un vector de **12 dimensiones** (a diferencia del vector de 6 clases de intervalos de Forte).
+\end{definition}
+
+**Consecuencia Musical:** Mantener 12 dimensiones permite distinguir entre un intervalo $k$ y su inversión $12-k$ (e.g., tercera menor vs. sexta mayor). Compositivamente, esto es vital porque una tercera menor cerrada y una sexta mayor abierta, aunque cromáticamente equivalentes, poseen colores tensionales y estabilidades acústicas distintas. El modelo captura así la direccionalidad de la tensión.
+
+\subsection{El Espacio Total de Acordes}
+
+Definimos el dominio de búsqueda $\mathcal{A}$ como la unión de todos los acordes de cardinalidades relevantes (típicamente tríadas y cuatríadas) dentro de los rangos de registro estudiados. En los experimentos, exploraremos subconjuntos restringidos de $\mathcal{A}$ para validar el comportamiento del modelo ante diferentes restricciones estilísticas (ver Sección \ref{sec:diseno_experimental}).
+
+\section{Modelo Psicoacústico de Rugosidad}
+\label{sec:modelo_psicoacustico}
+
+El interés no radica en el acorde meramente como símbolo combinatorio, sino como un evento sonoro con textura y color tímbrico. Para ello, se integra un modelo de \textit{disonancia sensorial} o \textbf{rugosidad}, basándose en la premisa de que la similitud perceptual entre dos acordes está estrechamente ligada a la similitud de sus perfiles de rugosidad.
+
+\subsection{Fundamentos Fisiológicos y el Modelo Plomp-Levelt}
+
+La base fisiológica del modelo reside en la mecánica de la cóclea y el concepto de \textit{banda crítica} (Critical Bandwidth). Cuando dos tonos puros (sinusoides) inciden en el oído interno, la membrana basilar actúa como un banco de filtros frecuenciales. Si las frecuencias de los tonos están suficientemente separadas, estimulan regiones distintas y son percibidos claramente como dos eventos distintos. Sin embargo, si las frecuencias son próximas, sus regiones de excitación se solapan, generando interferencias en la señal neuronal.
+
+\citeA{Plomp1965} demostraron experimentalmente que esta interferencia produce una sensación de "aspereza" auditiva conocida como rugosidad. El fenómeno depende de la diferencia de frecuencia $\Delta f = |f_1 - f_2|$ relativa al ancho de banda crítico ($CB$) en esa región espectral. Es fundamental distinguir esta \textbf{disonancia sensorial} ---fenómeno puramente psicofísico derivado de la anatomía del oído--- de la \textit{disonancia musical}, que es una construcción cultural.
+
+\subsection{Formalización de la Disonancia (Modelo Sethares)}
+
+Para trasladar este fenómeno biológico a un cálculo computacional, se adopta la parametrización propuesta por \cite{setharesLocalConsonanceRelationship1993}. Este modelo ajusta curvas analíticas a los datos empíricos de Plomp y Levelt, permitiendo calcular la disonancia $d$ entre dos sinusoides de frecuencias $f_a, f_b$ y amplitudes $A_a, A_b$.
+
+\begin{equation}
+\label{eq:sethares_pair}
+d(f_a, f_b, A_a, A_b) = A_a A_b \left( C_1 e^{-A_1 S \Delta f} + C_2 e^{-A_2 S \Delta f} \right)
+\end{equation}
+
+Donde $\Delta f = |f_a - f_b|$ y el factor de escala $S$ normaliza la a diferencia de frecuencia respecto al ancho de banda crítico local. Los parámetros $A_1, A_2, C_1, C_2$ determinan las pendientes de ascenso y descenso de la curva de rugosidad, mientras que $S_1$ y $S_2$ modelan cómo la banda crítica se ensancha en frecuencias bajas y se estrecha en altas.
+
+\subsection{Extensión a Tonos Complejos}
+
+Las notas musicales reales no son sinusoides puras, sino tonos complejos formados por una frecuencia fundamental y una serie de parciales (armónicos o inarmónicos). La rugosidad de un intervalo musical no es solo la interacción de sus fundamentales, sino la suma agregada de las interacciones entre \textit{todos} los parciales presentes.
+
+En este trabajo, se asume un modelo de **espectro armónico idealizado** con decaimiento exponencial de amplitud, característico de instrumentos de cuerda frotada o vientos clásicos. Para una nota con fundamental $f_0$, se modela su espectro como un conjunto de $H$ parciales $\{(p \cdot f_0, \delta^{p-1})\}_{p=1}^H$.
+
+\begin{definition}[Rugosidad de Intervalo Complejo]
+La rugosidad $R$ entre dos notas con fundamentales $f_i, f_j$ se define como la suma de las disonancias de par de todos sus parciales:
+\begin{equation}
+\label{eq:complex_roughness}
+R(f_i, f_j) = \sum_{p=1}^{H} \sum_{q=1}^{H} d(p f_i, q f_j, \delta^{p-1}, \delta^{q-1})
+\end{equation}
+\end{definition}
+
+Se utilizan por defecto $H=6$ armónicos y una tasa de decaimiento $\delta=0.88$. Esta elección es un compromiso entre precisión y eficiencia computacional: los primeros 6 armónicos contienen la mayor parte de la energía y son los principales responsables de la percepción de intervalos básicos.
+
+\subsection{Vectorización: La Firma de Rugosidad}
+
+Finalmente, para describir un acorde completo $\mathbf{n} = (n_1, \dots, n_m)$, no se limita a un único valor escalar de rugosidad total, ya que esto ocultaría la estructura interna de las tensiones. En su lugar, se construye un vector de características que distribuye la rugosidad acumulada en función de la clase de intervalo que la genera.
+
+\begin{definition}[Vector de Características de Rugosidad $\Phi_{\text{raw}}$]
+Se define el mapa $\Phi_{\text{raw}}: \mathcal{A} \to \mathbb{R}_{\geq 0}^{12}$ tal que su componente $k$-ésima acumula la rugosidad de todos los pares de notas del acorde separados por $k$ semitonos (módulo 12):
+\begin{equation}
+\Phi_{\text{raw}, k}(\mathbf{n}) = \sum_{\substack{1 \leq i < j \leq m \\ (n_j - n_i) \equiv k \pmod{12}}} R(f(n_i), f(n_j))
+\end{equation}
+\end{definition}
+
+Este vector $\Phi_{\text{raw}}$ constituye la "firma psicoacústica" del acorde. A diferencia del vector de intervalos $\mathbf{ic}$ (que cuenta ocurrencias discretas), $\Phi_{\text{raw}}$ pesa cada intervalo por su contribución real a la disonancia sensorial. Esto significa que una tercera mayor en el registro grave (muy rugosa) aportará mucho más al bin $k=4$ que una tercera mayor en el registro agudo (más suave), capturando así la sensibilidad del modelo al registro absoluto y al timbre.
+
+\subsection{Validación Interna del Modelo}
+
+Para verificar la corrección de la implementación del modelo de Sethares, se realiza una comparación numérica con los curvas teóricas de referencia. Se reproduce la curva de disonancia canónica para dos tonos sinusoidales, variando la frecuencia del segundo tono $f_2$ mientras se mantiene $f_1$ fija.
+
+Los resultados confirman que el modelo reproduce fielmente las características psicoacústicas esperadas. En primer lugar, se observa un máximo de disonancia cuando la diferencia de frecuencia $\Delta f$ es aproximadamente un cuarto del ancho de banda crítico ($0.25 CB$). En segundo lugar, al evaluar díadas complejas con $H=6$, el modelo predice correctamente la jerarquía de consonancia occidental: la octava presenta una rugosidad cercana a cero, seguida por la quinta justa, la tercera mayor y la segunda mayor, culminando con la segunda menor como el intervalo de máxima disonancia. Finalmente, se verifica la sensibilidad al registro, donde un mismo intervalo de tercera mayor presenta mayor rugosidad en octavas graves que en agudas.
+
+\section{Espacio Métrico y Transformaciones}
+\label{sec:transformaciones}
+
+El vector $\Phi_{\text{raw}}$ calculado en la sección anterior encapsula la información psicoacústica fundamental. Sin embargo, su magnitud tiende a crecer cuadráticamente con la cardinalidad del acorde, introduciendo un sesgo en la comparación. En esta sección, se formalizan las transformaciones de normalización diseñadas para mitigar este sesgo, así como las métricas de disimilitud para comparar vectores.
+
+\subsection{Transformaciones de Normalización}
+
+Sea $\mathcal{A}$ el espacio de acordes. La función de rugosidad total $R_{\text{total}}(\mathbf{n}) = \|\Phi_{\text{raw}}(\mathbf{n})\|_1$ exhibe una fuerte correlación con la cardinalidad $m$. Esto implica que, bajo una métrica euclidiana estándar, un acorde de 4 notas y uno de 3 notas podrían resultar distantes simplemente por la diferencia en "masa" disonante.
+
+La decisión de normalizar conlleva un compromiso teórico. Como señalan \citeA{milneEvidenceUniversalAssociation2023}, la magnitud absoluta de rugosidad tiene una asociación universal con la percepción de estabilidad musical. La normalización $L_1$ (proyección al simplex) preserva el \textit{perfil relativo} de rugosidad pero elimina esta magnitud global. Por tanto, la estrategia depende de la pregunta de investigación: para evaluar similitud tímbrica o distributiva, la normalización es necesaria; para clasificar tensión o consonancia, la magnitud absoluta es esencial \cite{masinaDyadsConsonanceDissonance2022}. En este trabajo, se evalúan ambas aproximaciones.
+
+Se define una familia de funciones de transformación $T: \mathbb{R}_{\geq 0}^{12} \to \mathbb{R}_{\geq 0}^{12}$ que mapean el vector crudo a una nueva representación $\Phi = T(\Phi_{\text{raw}})$.
+
+\begin{definition}[Normalización al Simplex]
+La transformación \texttt{simplex} proyecta el vector de rugosidad al simplex unitario estándar $\Delta^{11}$:
+\begin{equation}
+\Phi_{\text{simplex}}(\mathbf{n}) = \frac{\Phi_{\text{raw}}(\mathbf{n})}{\|\Phi_{\text{raw}}(\mathbf{n})\|_1}
+\end{equation}
+\textbf{Interpretación Musical:} Esta transformación permite comparar el "color" de la disonancia ignorando su intensidad total. Es análoga a comparar el timbre de dos instrumentos igualando su volumen. Nos permite buscar acordes con distribución de tensión similar (forma) aunque tengan densidades diferentes.
+\end{definition}
+
+\begin{definition}[Identidad]
+La transformación \texttt{identity} preserva el vector original ($\Phi_{\text{identity}}(\mathbf{n}) = \Phi_{\text{raw}}(\mathbf{n})$).
+\textbf{Interpretación Musical:} Preserva la magnitud absoluta de la disonancia. Útil para distinguir entre acordes tensos y reposados. Bajo esta métrica, dos acordes de igual estructura interválica pero en registros extremos (muy grave vs muy agudo) serán distantes, reflejando la realidad de que no son sustituibles en un contexto de bajo continuo, por ejemplo.
+\end{definition}
+
+Adicionalmente, se implementan variantes que pre-procesan el vector antes de la normalización. Destaca el \textbf{suavizado gaussiano} (\texttt{simplex\_smooth}), que aplica una convolución con un kernel gaussiano ($\sigma \approx 75$ cents) sobre el espectro. Esta técnica, utilizada por \citeA{harrisonRepresentingHarmonyComputational2020}, modela la incertidumbre perceptual o "computación blanda" del sistema auditivo.
+
+Cabe justificar por qué se optó por transformaciones explícitas en lugar de técnicas de aprendizaje de representación como PCA o Autoencoders. En el contexto de teoría musical computacional, la interpretabilidad es prioritaria. Transformaciones como PCA generan componentes principales ortogonales que maximizan varianza pero carecen de semántica musical clara. Por el contrario, las normalizaciones propuestas actúan como filtros con significado directo.
+
+\begin{table}[h]
+\centering
+\small
+\begin{tabular}{|l|p{5cm}|p{6cm}|}
+\hline
+\textbf{ID Propuesta} & \textbf{Definición Operativa} & \textbf{Interpretación y Justificación} \\ \hline
+\texttt{identity} & $\mathbf{x} = \mathbf{h}$ & Baseline. Preserva la magnitud de disonancia sensorial absoluta. \\ \hline
+\texttt{simplex} & $\mathbf{x} = \mathbf{h} / \|\mathbf{h}\|_1$ & Distribución de probabilidad. Elimina el sesgo de cardinalidad. \\ \hline
+\texttt{simplex\_sqrt} & $\mathbf{x} = \sqrt{\mathbf{h}} / \|\sqrt{\mathbf{h}}\|_1$ & Compresión de rango dinámico. Atenúa la dominancia de intervalos muy rugosos. \\ \hline
+\texttt{simplex\_smooth} & $\mathbf{x} = \text{Gauss}_\sigma(\sqrt{\mathbf{h}}) / \|\cdot\|_1$ & Modela la difusión perceptual entre bins adyacentes ($\sigma=0.75$). \\ \hline
+\end{tabular}
+\caption{Catálogo de estrategias de normalización evaluadas.}
+\label{tab:normalizaciones}
+\end{table}
+
+\subsection{Métricas de Disimilitud}
+\label{sec:metricas_disimilitud}
+
+La elección de la normalización restringe y sugiere las métricas de distancia matemáticamente coherentes. Se define la disimilitud entre dos acordes $\mathbf{n}_i, \mathbf{n}_j$ como la distancia entre sus vectores transformados.
+
+\subsubsection{Métricas Geométricas}
+
+Para vectores en $\mathbb{R}^{12}$ general (normalización \texttt{identity}), las métricas $L_p$ son estándares naturales.
+
+\begin{definition}[Distancia Euclidiana]
+\begin{equation}
+d_{\text{euc}}(\mathbf{x}, \mathbf{y}) = \|\mathbf{x} - \mathbf{y}\|_2
+\end{equation}
+Sensible tanto a diferencias en la forma del perfil como a diferencias en magnitud total.
+\end{definition}
+
+\begin{definition}[Distancia Coseno]
+\begin{equation}
+d_{\cos}(\mathbf{x}, \mathbf{y}) = 1 - \frac{\mathbf{x} \cdot \mathbf{y}}{\|\mathbf{x}\|_2 \|\mathbf{y}\|_2}
+\end{equation}
+Mide exclusivamente la similitud angular.
+\end{definition}
+
+No existe una métrica universalmente superior; la elección depende de la geometría del espacio de representación. Para vectores normalizados al simplex, las distancias geométricas como la euclidiana pueden ser subóptimas, pues asumen que el espacio es plano e isotrópico. En cambio, las divergencias de información respetan la geometría estadística del simplex \cite{Amari2016}.
+
+\subsubsection{Divergencias Teórico-Informacionales}
+
+Cuando los vectores han sido normalizados al simplex (\texttt{simplex}, \texttt{smooth}), representan distribuciones de probabilidad discretas.
+
+\begin{definition}[Divergencia de Jensen-Shannon]
+Una versión simetrizada y suavizada de la divergencia de Kullback-Leibler (KL). Para dos distribuciones $P, Q \in \Delta^{11}$:
+\begin{equation}
+\text{JSD}(P \| Q) = \frac{1}{2} D_{\text{KL}}(P \| M) + \frac{1}{2} D_{\text{KL}}(q \| M)
+\end{equation}
+donde $M = \frac{1}{2}(P+Q)$.
+\end{definition}
+
+\begin{proposition}[JSD como Métrica]
+La raíz cuadrada de la divergencia de Jensen-Shannon, $\sqrt{\text{JSD}}$, satisface los axiomas de métrica: no negatividad, identidad de indiscernibles, simetría y desigualdad triangular \cite{Endres2003}.
+\end{proposition}
+
+\begin{definition}[Distancia de Hellinger]
+\begin{equation}
+d_H(P, Q) = \frac{1}{\sqrt{2}} \|\sqrt{P} - \sqrt{Q}\|_2
+\end{equation}
+Métrica robusta definida sobre el simplex.
+\end{definition}
+
+\subsection{Matriz de Distancias}
+
+El producto final es la matriz $\mathbf{D} \in \mathbb{R}^{N \times N}$ donde $D_{ij} = d(\Phi(\mathbf{n}_i), \Phi(\mathbf{n}_j))$.
+
+Es crucial notar que diferentes métricas inducen topologías distintas. \cite{burgoyneVISUALIZATIONLOWDIMENSIONAL} demostraron que métricas euclidianas sobre representaciones de clase de altura tienden a generar estructuras toroidales, mientras que medidas más sofisticadas pueden revelar geometrías singulares.
+
+Una propiedad fundamental de $\mathbf{D}$ es su \textit{embeddability}. Una matriz de distancias es representable perfectamente en el espacio euclidiano si y solo si su matriz de Gram centrada es semidefinida positiva (PSD). Las métricas perceptuales frecuentemente violan esta condición \cite{tymoczkoGeometryMusicHarmony2011}. Por esta razón, se utiliza el algoritmo SMACOF para MDS, el cual, a diferencia del MDS clásico (\textit{Strain}), no requiere que $\mathbf{D}$ sea euclidiana; minimiza el error de ajuste (\textit{Stress}) de manera iterativa incluso en presencia de distancias no euclidianas o violaciones de desigualdad triangular \cite{Borg2005}.
+
+\section{Reducción de Dimensionalidad: Test de la Hipótesis de Variedad}
+\label{sec:reduccion_dimensionalidad}
+
+Esta etapa no constituye meramente una herramienta de visualización, sino el instrumento experimental central para evaluar la **Hipótesis de Variedad** (H2). Postulamos que la complejidad aparente del espacio armónico es, en parte, un efecto de su alta dimensionalidad de representación, y que existe una estructura latente de baja dimensión donde residen las relaciones armónicas significativas.
+
+Bajo este enfoque, los algoritmos de reducción dimensional (MDS, UMAP) actúan como "sondas" topológicas. El éxito de la reducción —medido a través de la minimización del \textit{Stress} y la preservación de vecindarios— se interpreta como evidencia a favor de la existencia de esta variedad musical subyacente. Si el espacio fuera puramente aleatorio o hiperdimensional sin estructura, ninguna proyección en $\mathbb{R}^2$ lograría métricas de calidad aceptables.
+
+\begin{figure}[h]
+\centering
+\fbox{\parbox{0.8\textwidth}{\centering \textbf{[FIGURA 3.X: Pipeline de Reducción Dimensional]} \\
+Esquema lógico: Input $\mathbb{R}^{12}$ $\to$ Matriz $D$ $\to$ Optimizador (SMACOF/UMAP) $\to$ Output $\mathbb{R}^2$. \\
+\textit{Debe mostrar explícitamente la pérdida de información vs preservación de estructura.}}}
+\caption{Flujo de reducción dimensional concebido como test de la hipótesis de variedad.}
+\label{fig:pipeline_dimred}
+\end{figure}
+
+\subsection{Multidimensional Scaling (MDS)}
+
+Se adopta el Escalamiento Multidimensional Métrico como el método principal de referencia.
+
+\begin{definition}[Stress de Kruskal]
+Dado un conjunto de disimilitudes objetivo $D_{ij}$ y una configuración de puntos $Y = \{y_1, \dots, y_N\} \subset \mathbb{R}^2$, la optimización busca minimizar la función de costo conocida como \emph{Stress}:
+\begin{equation}
+\sigma(Y) = \sqrt{\frac{\sum_{i<j} (D_{ij} - \|y_i - y_j\|)^2}{\sum_{i<j} D_{ij}^2}}
+\end{equation}
+\end{definition}
+
+Se implementa la minimización del Stress utilizando el algoritmo iterativo SMACOF (\textit{Scaling by MAjorizing a COmplicated Function}) \cite{Borg2005}.
+
+La elección de **MDS métrico** (*Metric MDS*) frente al no-métrico se justifica porque la disimilitud $\rho$ deriva de un modelo computacional (rugosidad psicoacústica) que produce una **escala de razón** con magnitudes significativas, no meramente rangos ordinales subjetivos \cite{setharesLocalConsonanceRelationship1993}. Tratar estos valores como ordinales (MDS no-métrico) descartaría información crítica sobre *cuánto* más disonante es un acorde respecto a otro. Además, el MDS métrico preserva mejor la **estructura global** y la geometría lineal del espacio, esencial para interpretar trayectorias de modulación \cite{Cox2001}.
+
+El *Stress* de Kruskal cuantifica exclusivamente la fidelidad global de las distancias (error cuadrático), pero es **insuficiente** para diagnosticar fallas topológicas locales, como el colapso de vecindarios o la creación de falsos vecinos (*tearing/crushing*) \cite{Venna2006}. Por ello, se complementa el stress con métricas basadas en rangos (ver Sección \ref{sec:evaluacion}).
+
+\subsection{Métodos de Aprendizaje de Variedades}
+
+Para complementar la visión global del MDS, se integran algoritmos de \textit{Manifold Learning}.
+
+\subsubsection{UMAP (Uniform Manifold Approximation and Projection)}
+Basado en topología algebraica, UMAP busca equilibrar la estructura local con la global \cite{McInnes2018}. La interpretación de UMAP requiere cautela: la **proximidad local** en el gráfico implica una alta probabilidad de que los acordes sean vecinos en el espacio original, pero las **distancias globales** entre clusters distantes no son métricamente fiables ni linealmente interpretables. A diferencia de MDS, UMAP distorsiona el espacio vacío para separar variedades y normaliza la densidad local.
+
+\subsubsection{t-SNE (t-Distributed Stochastic Neighbor Embedding)}
+Se especializa en la preservación de vecindarios locales mediante el modelado de distribuciones de probabilidad. Los embeddings generados por MDS, UMAP y t-SNE **no son directamente comparables** en términos de sus coordenadas cartesianas, dado que optimizan funciones de costo distintas. La comparación rigurosa se establece mediante **métricas de calidad estructural** agnósticas a la geometría absoluta.
+
+\section{Diseño Experimental y Validación}
+\label{sec:diseno_experimental}
+
+La validación del modelo se articula en un contraste fundamental: ¿la geografía psicoacústica resultante es un artefacto combinatorio o refleja estructuras de la práctica musical humana real? Para responder, nuestro diseño experimental compara el **espacio total de posibilidades** (población sintética) con la **subvariedad ocupada por un corpus** estilísticamente coherente (música de J.S. Bach).
+
+Nuestra hipótesis de confirmación es que la música real no se distribuye aleatoriamente en el mapa, sino que habita regiones específicas y estructuradas, lo cual validaría ecológicamente el modelo (H3) y sugeriría que revela regularidades perceptuales explotadas históricamente por la composición.
+
+\subsection{Preguntas de Investigación}
+
+Cada pregunta se vincula directamente a las hipótesis rectoras. La pregunta **P1 (Topología)** investiga qué combinación de métrica y normalización recupera mejor las estructuras teóricas conocidas (como el Círculo de Quintas) sin supervisión, sirviendo como test de la Hipótesis de Variedad (H2). La pregunta **P2 (Discriminación)** evalúa si el embedding es capaz de separar visualmente tipos de acordes basándose únicamente en su perfil de rugosidad, probando la Hipótesis de Sustitución (H1). La pregunta **P3 (Ecología)** indaga si el corpus de Bach ocupa una región acotada y distinta del "ruido" combinatorio en el espacio proyectado, validando la Hipótesis de Validez Ecológica (H3). Finalmente, la pregunta **P4 (Robustez)** examina la estabilidad de la estructura observada ante perturbaciones microtonales y cambios de inicialización.
+
+\subsection{Factores del Experimento}
+
+Se evalúa la interacción sistemática entre los componentes del pipeline.
+
+\begin{table}[h]
+\centering
+\begin{tabular}{|l|p{8cm}|c|}
+\hline
+\textbf{Factor} & \textbf{Niveles Evaluados} & \textbf{Cant.} \\ \hline
+Normalización & identity, simplex, simplex\_sqrt, simplex\_smooth, etc. & 10 \\ \hline
+Métrica & cosine, euclidean, manhattan, jsd, hellinger & 5 \\ \hline
+Reductor & MDS, UMAP, t-SNE, ISOMAP & 4 \\ \hline
+Semilla & 17 (producción), Lista aleatoria (validación) & Var. \\ \hline
+\end{tabular}
+\caption{Espacio de búsqueda del diseño experimental ($N \approx 200$ configuraciones).}
+\label{tab:factores_experimentales}
+\end{table}
+
+Existen \textbf{combinaciones matemáticamente inválidas} que deben ser excluidas. Específicamente, las métricas basadas en teoría de la información (JSD, Hellinger) están definidas axiomáticamente sobre distribuciones de probabilidad (norma $L_1=1$). Aplicarlas a vectores con normalización \texttt{identity} viola esta definición y produce resultados numéricos espurios. Por tanto, el experimento implementa una regla de \textbf{coerción estricta}: si se selecciona una métrica probabilística, los datos deben estar en el simplex.
+
+Respecto a la **corrección por comparaciones múltiples** (dado el alto número de escenarios), la práctica estándar en selección de modelos (*model selection*) y MIR difiere de la inferencia causal estricta. No se busca refutar una hipótesis nula aislada, sino establecer un ranking de desempeño estable. Por ello, se reportan la media y desviación estándar sobre múltiples semillas en lugar de aplicar correcciones tipo Bonferroni, que serían excesivamente conservadoras para un análisis exploratorio \cite{Micchi2020}.
+
+\subsection{Generación Combinatoria y Poblaciones de Prueba}
+\label{subsec:generacion_combinatoria}
+
+Dada la hipótesis de que la armonía funcional reside en una sub-variedad del espacio total $\mathcal{A}$, el diseño experimental requiere una estrategia rigurosa para generar tanto "señal" (acordes musicalmente válidos) como "ruido" (acordes combinatoriamente posibles pero estilísticamente improbables). Para ello, se formaliza un mecanismo de generación combinatorial exhaustiva.
+
+\subsubsection{Formalización del Universo Combinatorio}
+
+Se define el universo combinatorio restringido $U$ como el conjunto de todos los acordes posibles que satisfacen restricciones explícitas de alfabeto, registro y cardinalidad.
+
+\begin{definition}[Universo Combinatorio Restringido]
+Sean $A \subseteq \{0,\dots,11\}$ un alfabeto de clases de altura permitidas, $K \subset \mathbb{N}$ un conjunto de cardinalidades objetivo, y $[o_{min}, o_{max}]$ un rango de octavas. El universo $U$ se define como:
+\begin{equation}
+U(A, o_{min}, o_{max}, K) = \bigcup_{k \in K} \left\{ \mathbf{n} \in \mathcal{N}^k : \pi(n_i) \in A, \ o_{min} \leq \text{oct}(n_i) \leq o_{max} \right\}
+\end{equation}
+donde la condición de orden estricto $n_1 < \dots < n_k$ es inherente a la definición de $\mathcal{N}^k$ en este trabajo.
+\end{definition}
+
+Esta formulación permite barrer sistemáticamente el espacio de búsqueda. Por ejemplo, para validar modelos perceptuales que operan "dentro de una octava", se fija $o_{min}=o_{max}=4$. Para estudiar el estilo de Bach, se fija el rango a la tesitura SATB ($o_{min}=3, o_{max}=5$).
+
+\subsubsection{Estrategia de Muestreo}
+
+La cardinalidad del espacio crece exponencialmente. Para mantener la tratabilidad computacional sin sacrificar rigor topológico, se emplean dos regímenes de muestreo. Para espacios acotados (e.g., todas las tríadas en una octava), se utiliza una **Enumeración Exhaustiva ($N_{small}$)**, generando todas las combinaciones posibles para eliminar el error de muestreo y permitir afirmaciones topológicas definitivas. Para el "Catálogo Extendido" ($N \sim 10^4$), se realiza un **Muestreo Estratificado ($N_{large}$)** uniforme sobre $U$, asegurando que cada cardinalidad $k \in K$ esté representada proporcionalmente, evitando así que las combinaciones combinatoriamente más numerosas dominen la proyección.
+
+\subsubsection{Definición de Poblaciones Experimentales}
+
+\subsubsection{Definición y Construcción de Poblaciones Experimentales}
+
+Para operacionalizar las preguntas de investigación, se definen cinco poblaciones específicas (Tabla \ref{tab:poblaciones_params}). Cada una representa subconjuntos del universo $\mathcal{A}$ diseñados para aislar variables topológicas, perceptuales o estilísticas.
+
+\begin{table}[h]
+\centering
+\small
+\renewcommand{\arraystretch}{1.2}
+\begin{tabular}{|l|c|c|c|l|}
+\hline
+\textbf{ID Población} & \textbf{Alfabeto ($A$)} & \textbf{Rango ($O$)} & \textbf{Card. ($K$)} & \textbf{Filtros y Estrategia} \\ \hline
+$P_{CANON}$ & $\{0..11\}$ & $[4, 4]$ & $\{3, 4\}$ & \textit{Tetrachords} y Tríadas en posición cerrada \\ \hline
+$P_{BOWLING}$ & $\{0..11\}$ & $[4, 4]$ & $\{2, 3, 4\}$ & $U_{full}$ (Enumeración completa intra-octava) \\ \hline
+$P_{FUNC}$ & Diatónico & $[4, 4]$ & $\{3\}$ & 7 tríadas diatónicas + inversiones, etiquetadas $\{T, S, D\}$ \\ \hline
+$P_{BACH}^{REAL}$ & $\{0..11\}$ & $[3, 6]^\dagger$ & $\{3, 4\}$ & Verticalidades extraídas de \texttt{JSB Chorales} \\ \hline
+$P_{BACH}^{SYN}$ & $\{0..11\}$ & $[3, 5]$ & $\{3, 4\}$ & Span $\in [12, 28]$ st, $\max(\Delta) \le 12$ st \\ \hline
+$P_{NOISE}$ & $\{0..11\}$ & $[3, 5]$ & $\{3, 4\}$ & Muestreo Uniforme sin restricciones de voicing \\ \hline
+$P_{EXT}$ & $\{0..11\}$ & $[3, 5]$ & $\{4, 5, 6\}$ & Clusters cromáticos: span $\le 12$, $\max(\Delta) \le 2$ \\ \hline
+\end{tabular}
+\caption{Parámetros de generación para las poblaciones de validación. $\dagger$El rango de $P_{BACH}^{REAL}$ es empírico, derivado del corpus. $P_{FUNC}$: población funcional (ver §\ref{subsec:validacion_funcional}). $P_{EXT}$: acordes de complejidad extrema (ver texto).}
+\label{tab:poblaciones_params}
+\end{table}
+
+\paragraph{Validación Topológica ($P_{CANON}$).}
+Este conjunto de control basal ($N \approx 100$) está formado por las clases de acordes universalmente reconocidas en la teoría occidental (tríadas mayores, menores, aumentadas, disminuidas y sus inversiones). El objetivo es verificar que la métrica de rugosidad y la reducción dimensional recuperan la estructura del "Círculo de Quintas" y la "Red de Tonnetz" sin haber sido programadas explícitamente para ello, validando así que la topología emergente es consistente con la teoría musical establecida.
+
+\paragraph{Validación Perceptual ($P_{BOWLING}$).}
+Esta población implementa el "puente" metodológico con los estudios de \citeA{Bowling2018}. El protocolo de construcción traduce la descripción del estudio original ("todas las posibles díadas, tríadas y tétradas cromáticas dentro de una octava") a una generación exhaustiva del universo $U(\{0..11\}, 4, 4, \{2, 3, 4\})$, fijando el registro en la octava central (MIDI 60-71). Se asume una equivalencia representacional: aunque el modelo utiliza síntesis espectral simplificada, la estructura interválica es idéntica a los estímulos humanos. Bajo esta premisa, se espera una correlación de Spearman significativa ($\rho > 0.5$) entre la rugosidad calculada y los juicios de disonancia reportados.
+
+\paragraph{Validación Estilística ($P_{BACH}$ vs $P_{NOISE}$ vs $P_{EXT}$).}
+Este experimento se diseña para contrastar la estructura de la música tonal frente al desorden entrópico y la complejidad extrema. El grupo experimental, $P_{BACH}^{REAL}$, se construye extrayendo cada sonoridad vertical del dataset \texttt{JSB Chorales} \cite{huang2016counterpoint}, eliminando repeticiones consecutivas y filtrando unísonos. Como contraste, se genera el grupo $P_{BACH}^{SYN}$ imponiendo restricciones heurísticas de ``buen voicing'' (rango de soprano a bajo limitado a $\sim$2 octavas, sin saltos internos mayores a una octava) sobre el universo combinatorio. El control entrópico $P_{NOISE}$ se genera mediante muestreo uniforme sobre el mismo soporte de octavas ($3..5$) y cardinalidades ($3,4$) pero sin filtros de conducción. Como polo opuesto de complejidad, $P_{EXT}$ contiene clusters cromáticos densos ($\max(\Delta) \le 2$ semitonos entre notas consecutivas), deliberadamente diseñados para representar el extremo de máxima rugosidad. La comparación entre estas nubes permite evaluar si las reglas de conducción de voces emergen como regiones de baja rugosidad, si el modelo captura la especificidad del estilo armónico, y si la métrica separa eficazmente las tres categorías estilísticas mediante el Silhouette Score sobre la partición $\{\text{Bach}, \text{Ruido}, \text{Extremo}\}$ y la divergencia KL entre sus distribuciones de rugosidad.
+
+\subsubsection{Control de Variables}
+Para aislar el efecto de la rugosidad de otras variables como la extensión del registro, se aplican filtros estrictos sobre las poblaciones sintéticas. Se controla el **Span (Extensión)**, limitando la distancia entre la nota más grave y la más aguda para coincidir con las poblaciones reales, y los **Intervalos Internos**, restringiendo los "saltos" máximos permitidos entre voces adyacentes para evitar acordes anatómicamente imposibles, excepto en la población de control $P_{Noise}$ donde se permiten deliberadamente.
+
+\subsection{Métricas de Calidad del Embedding}
+\label{sec:evaluacion}
+
+Para medir la fidelidad del embedding se emplean métricas que diagnostican la preservación de estructuras locales y globales.
+
+\begin{definition}[Trustworthiness]
+Mide la fiabilidad de la visualización penalizando las \textbf{intrusiones} (falsos vecinos).
+\begin{equation}
+T(k) = 1 - \frac{2}{Nk(2N - 3k - 1)} \sum_{i=1}^{N} \sum_{j \in U_k(i)} (r(i,j) - k)
+\end{equation}
+\cite{Venna2006}.
+\end{definition}
+
+\begin{definition}[Continuity]
+Mide la completitud del mapa penalizando las \textbf{extrusiones} (vecinos perdidos). Un valor alto de $C(k)$ asegura que los acordes similares en el espacio original se mantengan agrupados en la visualización.
+\begin{equation}
+C(k) = 1 - \frac{2}{Nk(2N - 3k - 1)} \sum_{i=1}^{N} \sum_{j \in V_k(i)} (\hat{r}(i,j) - k)
+\end{equation}
+\end{definition}
+
+Se evalúan estas métricas para un vecindario pequeño $k=3$. Esta elección se justifica tanto teórica como empíricamente. Desde la teoría neo-Riemanniana, cada tríada posee exactamente tres vecinos parsimoniosos (P, L, R) \cite{tymoczkoGeometryMusicHarmony2011}, siendo este el vecindario natural para evaluar relaciones armónicas inmediatas.
+
+Trustworthiness ($T$) y Continuity ($C$) son métricas complementarias \cite{Venna2006}. MDS tiende a maximizar $C$ a costa de $T$, mientras que UMAP prioriza $T$. Se reportan ambas para diagnosticar el tipo de distorsión presente.
+
+\begin{definition}[Correlación de Spearman]
+Mide la dependencia monótona entre las distancias originales $D_{ij}$ y las proyectadas $\hat{D}_{ij}$. Un valor $\rho \approx 1$ indica una preservación excelente del ordenamiento global relativo.
+\end{definition}
+
+% PLACEHOLDER: Figura Shepard
+\begin{figure}[h]
+\centering
+\fbox{\parbox{0.6\textwidth}{\centering \textbf{[FIGURA 3.Y: Diagrama de Shepard (Conceptual)]} \\
+Scatterplot $D_{ij}$ vs $\hat{D}_{ij}$. \\
+\textit{Muestra ajuste lineal ideal vs dispersión real.}}}
+\caption{Diagrama de Shepard representativo de un embedding.}
+\label{fig:shepard_conceptual}
+\end{figure}
+
+\begin{definition}[Silhouette Score]
+Dada una partición del conjunto de acordes en $G$ grupos etiquetados $\{C_1, \dots, C_G\}$, el Silhouette Score de un acorde $i \in C_g$ se define como:
+\begin{equation}
+s(i) = \frac{b(i) - a(i)}{\max\{a(i), b(i)\}}
+\end{equation}
+donde $a(i)$ es la distancia media intra-grupo y $b(i)$ la distancia media al grupo más cercano. Valores cercanos a $+1$ indican cohesión interna del grupo; valores negativos, asignación errónea. En este trabajo, se evalúa el Silhouette sobre tres particiones distintas: \textbf{(i)} por cardinalidad del acorde, \textbf{(ii)} por cualidad armónica (Mayor/Menor/Disminuido), y \textbf{(iii)} por función armónica ($\{T, S, D\}$), lo cual permite cuantificar qué dimensiones de la estructura musical captura la métrica de rugosidad.
+\end{definition}
+
+\section{Protocolos de Validación Específicos}
+\label{sec:protocolos_validacion}
+
+Más allá de las métricas globales, se establece una batería de experimentos diseñados para evaluar la robustez del modelo desde perspectivas topológicas, psicoacústicas y estilísticas. La Tabla~\ref{tab:experimentos} sintetiza los siete experimentos que componen esta batería, cada uno vinculado a una hipótesis, una población y un conjunto de métricas específicas.
+
+\begin{table}[h]
+\centering
+\small
+\renewcommand{\arraystretch}{1.3}
+\begin{tabular}{|c|p{2.2cm}|p{4.5cm}|c|p{3.2cm}|}
+\hline
+\textbf{ID} & \textbf{Nombre} & \textbf{Hipótesis} & \textbf{Pobl.} & \textbf{Métricas} \\ \hline
+E1 & Línea base de cualidad & Las tríadas mayores, menores y disminuidas se separan sin etiquetas & $P_{CANON}$ & Silhouette (cualidad) \\ \hline
+E2 & Segregación de extremos & Clusters cromáticos ocupan región distinta a tríadas convencionales & $P_{CANON} \cup P_{EXT}$ & Silhouette (tipo) \\ \hline
+E3 & Sensibilidad al registro & Misma estructura en distintos registros: cercanos pero no idénticos & Tríadas multi-oct. & Mann--Whitney, $d_{intra} \ll d_{inter}$ \\ \hline
+E4 & Estabilidad ante ruido & La topología es robusta ante perturbaciones microtonales & $P_{CANON}$ + jitter & $\Delta T(k)/T(k)$ \\ \hline
+E5 & Validación perceptual & La rugosidad correlaciona con juicios de consonancia humana & $P_{BOWLING}$ & Spearman $\rho$, corr.\ parcial \\ \hline
+E6 & Validación funcional & Acordes de la misma función armónica son vecinos cercanos & $P_{FUNC}$ & Silhouette ($\{T, S, D\}$) \\ \hline
+E7 & Consistencia estilística & Bach, ruido y extremos forman manifolds separables & $P_{BACH} \cup P_{NOISE} \cup P_{EXT}$ & KL, Silhouette (estilo) \\ \hline
+\end{tabular}
+\caption{Batería experimental. Cada experimento vincula una hipótesis con una población, un conjunto de métricas y un resultado esperado. Las hipótesis H1 (sustitución), H2 (variedad) y H3 (validez ecológica) se evalúan a través de los experimentos E5--E6, E1--E4, y E7, respectivamente.}
+\label{tab:experimentos}
+\end{table}
+
+\subsection{Validación Topológica y Estabilidad}
+Para descartar que la estructura visual sea un artefacto del algoritmo de reducción, se contrasta la hipótesis nula de que el mapa no preserva estructura significativa más allá del azar.
+
+\paragraph{Modelos Nulos.}
+Se generan $B = 100$ proyecciones nulas mediante permutación aleatoria de las coordenadas del embedding, calculando las métricas $T(k)$ y $C(k)$ para cada permutación. El modelo se considera validado únicamente si sus métricas superan el percentil 95 de la distribución nula, es decir, si se rechaza la hipótesis $H_0$ de que el mapa es indistinguible de una proyección aleatoria con $p < 0.05$.
+
+\paragraph{Resistencia al Ruido (Jitter).}
+Se aplica una perturbación aditiva $\epsilon \sim \mathcal{N}(0, \sigma)$ a las frecuencias fundamentales de cada nota, simulando desviaciones microtonales propias de la ejecución instrumental real. Se evalúan tres niveles de perturbación: $\sigma \in \{5, 10, 25\}$ cents, cubriendo desde la precisión de un afinador electrónico hasta la variabilidad típica de un intérprete vocal. La estabilidad topológica se confirma si la variación relativa $\Delta T(k) / T(k) < 0.10$ para los tres niveles, demostrando que la estructura del mapa no depende de la afinación precisa.
+
+\paragraph{Sensibilidad al Registro.}
+Dado que el modelo de rugosidad opera sobre frecuencias absolutas y las bandas críticas se ensanchan en registros graves \cite{Eerola2022}, se espera que las versiones transpuestas de un mismo acorde no sean idénticas en el espacio, pero sí significativamente más cercanas entre sí que acordes de distinta estructura interválica. Para verificar esto, se generan las siete tríadas diatónicas en tres registros (octavas 3, 4 y 5) y se compara la distribución de distancias intra-estructura (misma tríada, distinto registro) con la distribución de distancias inter-estructura (tríadas distintas), mediante un test de rangos de Mann--Whitney. La hipótesis se confirma si $d_{\text{intra}} \ll d_{\text{inter}}$ con $p < 0.05$.
+
+\subsection{Validación Psicoacústica}
+La alineación entre la geometría del espacio latente y la percepción humana se evalúa utilizando los datasets externos estandarizados de \citeA{Bowling2018} (similitud de intervalos vocales) y \citeA{Harrison2020} (consonancia simultánea).
+
+\paragraph{Protocolo.}
+El procedimiento opera en tres pasos. Primero, se importan los estímulos exactos de cada estudio (cuando están disponibles como materiales suplementarios) o se genera la población equivalente $P_{BOWLING}$ con parámetros combinatoriales idénticos: alfabeto cromático completo, una octava, cardinalidades $\{2, 3, 4\}$. Segundo, para cada acorde se calcula la rugosidad total $R_{\text{total}}(\mathbf{n}) = \|\Phi_{\text{raw}}(\mathbf{n})\|_1$ mediante el pipeline descrito en §\ref{sec:modelo_psicoacustico}. Tercero, se construyen los vectores pareados $\mathbf{r}_{\text{modelo}}$ (rugosidad calculada) y $\mathbf{r}_{\text{humano}}$ (rating perceptual reportado) y se calcula la correlación de rangos de Spearman:
+\begin{equation}
+\rho_S = \text{Spearman}(\mathbf{r}_{\text{modelo}},\ \mathbf{r}_{\text{humano}})
+\end{equation}
+Se espera $\rho > 0.5$ como indicador de correlación moderada-fuerte. Adicionalmente, se calcula la \textbf{correlación parcial} controlando por cardinalidad del acorde, lo que permite aislar el efecto de la rugosidad acústica de posibles confusores como la ``masa'' disonante total asociada al número de notas.
+
+\subsection{Validación Funcional: Funciones Armónicas en el Espacio de Rugosidad}
+\label{subsec:validacion_funcional}
+
+La teoría armónica de la práctica común, formalizada por Rameau y sistematizada por Riemann y Piston, organiza los acordes diatónicos en tres categorías funcionales: \textbf{Tónica} (grados I, iii, vi), \textbf{Subdominante} (grados ii, IV) y \textbf{Dominante} (grados V, vii$^\circ$). Estas categorías no son clasificaciones arbitrarias, sino que reflejan relaciones de tensión y resolución arraigadas en la conducción de voces y la estructura interválica de los acordes \cite{tymoczkoGeometryMusicalChords2006, lerdahlTonalPitchSpace1988}. Existe evidencia de que los acordes con la misma función comparten propiedades acústicas estructurales---lo cual motiva la siguiente pregunta: ¿refleja la métrica de rugosidad sensorial esta organización funcional sin acceso a información contextual ni sintáctica?
+
+\paragraph{Protocolo.}
+Se fija una tonalidad de referencia (Do Mayor) y se generan las siete tríadas diatónicas en posición fundamental e inversiones dentro de un registro medio (octava 4), constituyendo la población $P_{FUNC}$ ($N \approx 21$--$42$ acordes). Cada acorde se etiqueta según su grado funcional: $T = \{\text{I, iii, vi}\}$, $S = \{\text{ii, IV}\}$, $D = \{\text{V, vii}^\circ\}$. Se calcula la firma de rugosidad, se construye la matriz de distancias y se proyecta a $\mathbb{R}^2$ mediante MDS.
+
+\paragraph{Hipótesis.}
+Los acordes pertenecientes a la misma categoría funcional exhiben mayor proximidad en el espacio métrico de rugosidad que los de categorías distintas, cuantificada por el \textbf{Silhouette Score} sobre la partición $\{T, S, D\}$.
+
+\paragraph{Resultado esperado.}
+Un Silhouette medio positivo ($\bar{s} > 0$) indicaría que las funciones armónicas poseen un correlato sensorial detectable por el modelo, sugiriendo que la sintaxis tonal se apoya---al menos parcialmente---en propiedades psicoacústicas de bajo nivel. Un resultado negativo o cercano a cero indicaría que la función armónica es un fenómeno puramente sintáctico, ortogonal a la rugosidad sensorial.
+
+\paragraph{Extensiones.}
+El experimento puede repetirse para las doce tonalidades mayores ($k \in \{0, \dots, 11\}$) para evaluar la consistencia de los resultados bajo las simetrías del sistema 12-TET. Adicionalmente, puede ampliarse a tétradas (séptimas diatónicas) para verificar si la separación funcional se mantiene en cardinalidades superiores.
+
+\section{Reproducibilidad y Consideraciones Finales}
+\label{sec:reproducibilidad}
+
+\subsection{Estrategia de Reproducibilidad}
+Para garantizar la verificabilidad de los resultados, este estudio se adhiere a directrices de ciencia abierta. Todo el código fuente para la generación de acordes, cálculo de métricas y reducción de dimensionalidad se encuentra disponible en el repositorio del proyecto, y los datasets generados se archivan con identificadores persistentes. Dado el carácter estocástico de algoritmos como UMAP y t-SNE, se fijan explícitamente las semillas aleatorias (\texttt{random\_state}) en todos los pasos del pipeline para asegurar el determinismo bit a bit de las figuras y tablas. Finalmente, los experimentos masivos ($N \sim 10^4$) se reportan junto con las especificaciones de hardware del entorno controlado, contextualizando el costo computacional de las matrices de distancia $\mathcal{O}(N^2)$.
+
+\subsection{Amenazas a la Validez}
+Es necesario reconocer las limitaciones inherentes al diseño. Respecto a la **Validez de Constructo**, el uso de la rugosidad de Sethares como proxy de la disonancia asume timbres con espectros armónicos fijos, lo que podría no representar fielmente instrumentos inarmónicos. En cuanto a la **Validez Interna**, las reducciones dimensionales introducen distorsiones inevitables; aunque mitigadas por la inicialización PCA y métricas de control, las distancias globales en UMAP deben interpretarse con cautela. Finalmente, la **Validez Externa** está acotada al sistema de afinación 12-TET. La generalización a sistemas microtonales requeriría una recalibración sustancial de los modelos psicoacústicos base.
+
+\subsection{Consideraciones Éticas}
+Este estudio se basa exclusivamente en modelos teóricos, simulaciones computacionales y análisis de datos públicos preexistentes. No involucra la participación de sujetos humanos, experimentación animal, ni el procesamiento de datos personales sensibles, por lo que no requiere aprobación de un comité de ética institucional.
+
+\appendix
+
+\section{Detalles y Justificaciones Adicionales}
+
+\subsection{Apéndice A: Decisión sobre Invariancias y Registro Absoluto}
+\label{app:invariancia}
+
+La decisión de trabajar con \textbf{Pitch-Chords} (notas con registro específico) en lugar de \textbf{Pitch-Class Sets} (clases de altura) es fundamental para la coherencia psicoacústica del modelo. En la teoría de conjuntos estándar \cite{AllenForteSTRUCTURE}, los acordes $\{60, 64, 67\}$ (Do mayor central) y $\{48, 52, 55\}$ (Do mayor grave) son considerados equivalentes (clase $[0,4,7]$). Sin embargo, el modelo de rugosidad de Plomp-Levelt y Sethares es inherentemente sensible al registro: el ancho de banda crítico no escala linealmente con la frecuencia.
+
+En el registro grave, las bandas críticas son proporcionalmente más anchas en términos de semitonos, lo que provoca que intervalos como la tercera mayor ($4$ semitonos) generen mucha más rugosidad ("barrosidad") que en el registro agudo. Si adoptáramos la invariancia de octava (PC-sets), estaríamos promediando o ignorando esta realidad física, colapsando acordes con tensiones perceptuales muy distintas en un mismo punto matemático. Para una tesis que busca explorar la **sustitución armónica basada en la sonoridad**, esta pérdida de información sería inaceptable. Por tanto, asumimos el costo computacional de un espacio más grande ($\mathcal{N}^m$) a cambio de fidelidad perceptual.
+
+\subsection{Apéndice B: Comparación de Modelos de Disonancia}
+\label{app:rugosidad_detalle}
+
+Se evaluaron alternativas al modelo de rugosidad de Sethares. Las teorías clásicas de conducción de voces (Voice Leading Smoothness) proponen la distancia en el "semigroup" de movimientos de voces como métrica de similitud \cite{tymoczkoGeometryMusicHarmony2011}. Sin embargo, el Voice Leading es una medida de "eficiencia mecánica" o cercanía en el teclado, no necesariamente de similitud sonora. Dos acordes pueden estar muy cerca en términos de conducción de voces (e.g., Do Mayor y Do menor) pero sonar distintos.
+
+Por otro lado, los modelos tonales funcionales (e.g., Lerdahl) dependen de la aculturación y de establecer un centro tonal previo. Nuestro objetivo es una métrica universal y "bottom-up" (desde la señal hacia la percepción), lo cual favorece los modelos psicoacústicos. Entre estos, elegimos Sethares por su parametrización continua y su capacidad de manejar espectros tímbricos arbitrarios, superando a modelos puramente interválicos como el de Hutchinson & Knopoff que asumen timbres estandarizados.
+
+\bibliographystyle{apacite}
+\bibliography{referencias_metodologia_vf}

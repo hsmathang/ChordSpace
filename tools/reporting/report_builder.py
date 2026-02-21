@@ -43,6 +43,11 @@ METRIC_INFO_FALLBACK: Dict[str, Dict[str, str]] = {
         "casual": "Mide el angulo entre perfiles; destaca la forma relativa.",
         "technical": "(d(u,v) = 1 - u.v / (||u|| ||v||)).",
     },
+    "euclid_cos_blend": {
+        "title": "Euclid+Cos (λ=0.30)",
+        "casual": "Combina magnitud y forma en una distancia continua.",
+        "technical": "(1-λ)*d_E^* + λ*d_C^*, λ=0.30.",
+    },
     "js": {
         "title": "Jensen-Shannon",
         "casual": "Comparacion simetrica basada en entropia.",
@@ -52,6 +57,16 @@ METRIC_INFO_FALLBACK: Dict[str, Dict[str, str]] = {
         "title": "Hellinger",
         "casual": "Distancia probabilistica equilibrada.",
         "technical": "d_H(p,q) = ||sqrt(p) - sqrt(q)||_2 / sqrt(2).",
+    },
+    "structural_roughness": {
+        "title": "Estructural + Rugosidad",
+        "casual": "Combina estructura intervalar, perfil y rugosidad total.",
+        "technical": "0.325*Jaccard + 0.299*Hellinger + 0.214*TV + 0.162*Delta_total.",
+    },
+    "voiceleading_quintas": {
+        "title": "Voice-leading + Quintas",
+        "casual": "Prioriza conducción de voces corta y cercanía tonal en el círculo de quintas.",
+        "technical": "w_VL*d_VL + w_Q5*d_Q5 + w_JS*d_JS (default: 0.55, 0.25, 0.20).",
     },
     "euclidean": {
         "title": "Euclidiana",
@@ -213,7 +228,18 @@ def render_report_html(
                 continue
         figure_groups[scenario_name][suffix] = fig
 
-    preferred_order = ["euclidean", "cosine", "js", "hellinger", "l1", "cityblock", "manhattan"]
+    preferred_order = [
+        "euclidean",
+        "cosine",
+        "euclid_cos_blend",
+        "js",
+        "hellinger",
+        "structural_roughness",
+        "voiceleading_quintas",
+        "l1",
+        "cityblock",
+        "manhattan",
+    ]
 
     def _metric_key(metric: str) -> Tuple[int, str]:
         idx = preferred_order.index(metric) if metric in preferred_order else len(preferred_order)
@@ -572,9 +598,13 @@ def render_report_html(
                 oct_min = combo.get("octave_min")
                 oct_max = combo.get("octave_max")
                 structural = combo.get("structural_mode")
+                preset_name = combo.get("preset_name")
+                preset_description = combo.get("preset_description")
                 parts = [
                     "Combinatoria",
                     f"{rows} acordes" if rows is not None else "",
+                    f"preset={preset_name}" if preset_name else "",
+                    f"preset_desc={preset_description}" if preset_description else "",
                     "alfabeto=" + ", ".join(str(v) for v in alphabet) if alphabet else "",
                     f"octavas={oct_min}-{oct_max}" if oct_min is not None and oct_max is not None else "",
                     "n=" + ", ".join(str(v) for v in cards) if cards else "",

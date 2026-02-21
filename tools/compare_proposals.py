@@ -241,6 +241,11 @@ METRIC_INFO = {
         "casual": "Mide el ángulo entre perfiles; importa la forma relativa más que la magnitud.",
         "technical": "(d(u,v) = 1 - frac{ucdot v}{|u|,|v|}). Adecuado para distribuciones en el simplex.",
     },
+    "euclid_cos_blend": {
+        "title": "Euclid+Cos (λ=0.30)",
+        "casual": "Combina magnitud rugosa y forma intervalar en una sola distancia continua.",
+        "technical": "(1-λ)·d_E^* + λ·d_C^*, con λ=0.30 y normalización por media de cada distancia.",
+    },
     "js": {
         "title": "Jensen–Shannon",
         "casual": "Compara distribuciones como diferencias de información simétrica.",
@@ -250,6 +255,16 @@ METRIC_INFO = {
         "title": "Hellinger",
         "casual": "Distancia probabilística equilibrada, robusta a valores pequeños.",
         "technical": "(d_H(p,q) = tfrac{1}{sqrt{2}}|sqrt{p}-sqrt{q}|_2). Equivalente a la euclidiana en raíces.",
+    },
+    "structural_roughness": {
+        "title": "Estructural + Rugosidad",
+        "casual": "Combina estructura intervalar, perfil por clases y rugosidad total normalizada.",
+        "technical": "(d = 0.325 d_Jaccard + 0.299 d_H + 0.214 TV + 0.162 Delta_total), robusta ante cardinalidades distintas.",
+    },
+    "voiceleading_quintas": {
+        "title": "Voice-leading + Quintas",
+        "casual": "Prioriza movimiento mínimo entre voces y cercanía tonal en el círculo de quintas, conservando perfil rugoso.",
+        "technical": "(d = w_VL d_VL + w_Q5 d_{Q5} + w_JS d_{JS}), con pesos configurables (default: 0.55, 0.25, 0.20). d_VL usa matching mínimo con penalización por cardinalidad; d_{Q5} es Hellinger sobre PCs suavizados en el anillo de quintas.",
     },
     "euclidean": {
         "title": "Euclidiana",
@@ -479,26 +494,73 @@ PREPROCESSORS: Dict[str, Tuple[str, Callable[..., Tuple[np.ndarray, np.ndarray]]
 }
 
 
+STRUCTURAL_ROUGHNESS_METRIC = "structural_roughness"
+STRUCTURAL_ROUGHNESS_ALIASES = {
+    STRUCTURAL_ROUGHNESS_METRIC,
+    "structure_roughness",
+    "srm",
+}
+# Pesos calibrados sobre población estructural diatónica (2-3 notas, max intervalo interno <= 12)
+# para mejorar trustworthiness/continuity sin sacrificar stress.
+STRUCTURAL_ROUGHNESS_WEIGHTS = (0.325, 0.299, 0.214, 0.162)
+EPSILON = 1e-12
+EUCLID_COS_BLEND_LAMBDA = 0.30
+
+
+def _normalize_simplex_rows(values: np.ndarray) -> np.ndarray:
+    clipped = np.clip(np.asarray(values, dtype=float), 0.0, None)
+    sums = np.sum(clipped, axis=1, keepdims=True)
+    return np.divide(clipped, sums, out=np.zeros_like(clipped), where=sums > EPSILON)
+
+
+def _structural_roughness_distance(X: np.ndarray, dist_simplex: np.ndarray) -> np.ndarray:
+    probs = _normalize_simplex_rows(dist_simplex)
+    presence = np.clip(np.asarray(dist_simplex, dtype=float), 0.0, None) > EPSILON
+    totals = np.sum(np.clip(np.asarray(X, dtype=float), 0.0, None), axis=1)
+    active_bins = np.maximum(np.sum(presence, axis=1).astype(float), 1.0)
+    roughness_density = totals / active_bins
+    log_roughness_density = np.log1p(roughness_density)
+
+    d_structure = pdist(presence.astype(np.uint8), metric="jaccard")
+    d_profile = pdist(np.sqrt(probs), metric="euclidean") / np.sqrt(2.0)
+    d_per_dimension = 0.5 * pdist(probs, metric="cityblock")
+
+    def _relative_total_delta(u: np.ndarray, v: np.ndarray) -> float:
+        a = float(u[0])
+        b = float(v[0])
+        return abs(a - b) / (abs(a) + abs(b) + EPSILON)
+
+    d_total = pdist(log_roughness_density[:, None], metric=_relative_total_delta)
+    w_structure, w_profile, w_per_dimension, w_total = STRUCTURAL_ROUGHNESS_WEIGHTS
+    return (
+        w_structure * d_structure
+        + w_profile * d_profile
+        + w_per_dimension * d_per_dimension
+        + w_total * d_total
+    )
+
+
 def metric_distance(metric: str, X: np.ndarray, dist_simplex: np.ndarray) -> np.ndarray:
     metric = metric.lower()
+    simplex_probs = _normalize_simplex_rows(dist_simplex)
     if metric == "cosine":
         return pdist(X, metric="cosine")
+    if metric in {"euclid_cos_blend", "hybrid_ec30"}:
+        d_e = pdist(X, metric="euclidean")
+        d_c = pdist(X, metric="cosine")
+        d_e = d_e / (float(np.mean(d_e)) + EPSILON)
+        d_c = d_c / (float(np.mean(d_c)) + EPSILON)
+        lam = EUCLID_COS_BLEND_LAMBDA
+        return (1.0 - lam) * d_e + lam * d_c
     if metric == "js":
-        # Asegurar distribuciones válidas (normalizar por fila en el par)
         def _js(u, v):
-            su = float(np.sum(u))
-            sv = float(np.sum(v))
-            uu = (u / su) if su > 0 else u
-            vv = (v / sv) if sv > 0 else v
-            return jensenshannon(uu, vv, base=2.0)
-        return pdist(dist_simplex, _js)
+            return float(jensenshannon(u, v, base=2.0))
+        return pdist(simplex_probs, _js)
     if metric == "hellinger":
-        # Normalizar por fila al vuelo
-        def _norm(u):
-            s = float(np.sum(u))
-            return (u / s) if s > 0 else u
-        root = np.sqrt(np.apply_along_axis(_norm, 1, dist_simplex))
+        root = np.sqrt(simplex_probs)
         return pdist(root, metric="euclidean") / np.sqrt(2.0)
+    if metric in STRUCTURAL_ROUGHNESS_ALIASES:
+        return _structural_roughness_distance(X, dist_simplex)
     if metric in {"euclidean", "l2"}:
         return pdist(X, metric="euclidean")
     if metric in {"l1", "cityblock", "manhattan"}:

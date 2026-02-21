@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from concurrent.futures import ProcessPoolExecutor, as_completed
-from typing import Any, Dict, List, Mapping, Sequence, Tuple
+from typing import Any, Dict, List, Mapping, Optional, Sequence, Tuple
 
 import numpy as np
 
@@ -27,6 +27,7 @@ def run_experiment(
     deterministic: bool,
     jobs: int,
     mds_n_init: int,
+    metric_params: Optional[Mapping[str, Mapping[str, float]]] = None,
     cpu_count: int | None = None,
 ) -> Dict[str, Any]:
     """Ejecuta los escenarios y retorna resultados agregados y payloads de figuras."""
@@ -38,6 +39,13 @@ def run_experiment(
     scenario_tasks: List[Dict[str, Any]] = []
     expected_order: List[str] = []
     warnings: List[str] = []
+    metric_params_map: Dict[str, Mapping[str, float]] = {}
+    if metric_params:
+        metric_params_map = {
+            str(metric_name).strip().lower(): params
+            for metric_name, params in metric_params.items()
+            if isinstance(params, Mapping)
+        }
 
     for scenario in scenarios:
         preproc_id = scenario["preproc_id"]
@@ -51,8 +59,15 @@ def run_experiment(
         if key not in distance_cache:
             X = preproc_cache[preproc_id]
             simplex = dist_simplex_cache[preproc_id]
+            metric_key = str(scenario["metric"]).strip().lower()
             try:
-                dist_condensed = metric_distance(scenario["metric"], X, simplex)
+                dist_condensed = metric_distance(
+                    scenario["metric"],
+                    X,
+                    simplex,
+                    entries=entries,
+                    metric_params=metric_params_map.get(metric_key),
+                )
             except ValueError as exc:
                 warnings.append(f"[skip] {scenario['name']}: {exc}")
                 continue

@@ -1,0 +1,16 @@
+Q-011 | ¿Cuál es la implicación algebraica de NO colapsar complementarios? (El espacio de representación tiene mayor dimensión pero mayor poder discriminativo).
+---
+Q-012 | Nota de santimath: “Explicar qué es la banda crítica auditiva, qué es disonancia sensorial y qué tiene que ver con la rugosidad”.
+---
+Q-013 | ¿Hasta qué punto la parametrización de Sethares es “el” modelo o “un” modelo posible? (Existen alternativas como Vassilakis, Hutchinson-Knopoff).
+---
+Q-014 | ¿Cómo se justifica la elección de Sethares sobre otras parametrizaciones?
+---
+Q-015 | ¿De dónde vienen estos valores numéricos? (Ajuste empírico de Sethares a los datos de Plomp-Levelt).
+---
+Q-016 | ¿Cuál es la sensibilidad del modelo a variaciones en estos parámetros? (Señalar que el repositorio permite sobreescritura; discutir en §3.8 Supuestos).
+---
+Q-017 | ¿Es el supuesto de espectro armónico con decaimiento exponencial razonable? (Razonable para instrumentos de cuerda/viento; no para percusión o espectros inarmónicos).
+---
+Q-018 | ¿Cómo afecta H=6 a la resolución del modelo? ¿Sería diferente con H=10?
+---

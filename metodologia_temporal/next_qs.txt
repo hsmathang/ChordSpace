@@ -1,0 +1,10 @@
+Q-008 | Nota de santimath: “No basta con decir ‘no usamos PC-sets’; hay que explicar positivamente qué noción de identidad SÍ se usa y por qué es apropiada”.
+---
+Q-009 | Nota de santimath: “La curva de Sethares muestra diferencias de rugosidad por intervalos; también hay trabajos que representan acordes con 6 dimensiones (IC de Forte / TIS). ¿Qué evidencia apoya que 12 dimensiones (sin colapsar complementarios) sea mejor a nivel perceptual?”
+---
+Q-010 | ¿Por qué 12 bins y no 6 (como en Forte) o 13 (incluyendo unísono separado de octava)?
+---
+Q-011 | ¿Cuál es la implicación algebraica de NO colapsar complementarios? (El espacio de representación tiene mayor dimensión pero mayor poder discriminativo).
+---
+Q-012 | Nota de santimath: “Explicar qué es la banda crítica auditiva, qué es disonancia sensorial y qué tiene que ver con la rugosidad”.
+---

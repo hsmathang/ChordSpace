@@ -38,6 +38,39 @@ def midi_to_freqs(notes: List[int]) -> List[float]:
     return [440.0 * (2.0 ** ((n - 69) / 12.0)) for n in notes]
 
 
+NOTE_NAMES = ("C", "C#", "D", "Eb", "E", "F", "F#", "G", "Ab", "A", "Bb", "B")
+
+
+def _midi_to_note_name(note: int) -> str:
+    midi = int(note)
+    return f"{NOTE_NAMES[midi % 12]}{(midi // 12) - 1}"
+
+
+def _entry_axis_label(entry: Any, index: int) -> str:
+    acorde = getattr(entry, "acorde", None)
+    base_name = getattr(acorde, "name", None) or getattr(entry, "identity_name", None) or f"Chord {index}"
+    intervals = getattr(acorde, "intervals", []) if acorde is not None else []
+    try:
+        interval_txt = "[" + ",".join(str(int(i)) for i in intervals) + "]" if intervals else ""
+    except Exception:
+        interval_txt = ""
+
+    notes_abs = getattr(acorde, "notes_abs", None) if acorde is not None else None
+    note_names: List[str] = []
+    if isinstance(notes_abs, (list, tuple, np.ndarray)):
+        for note in list(notes_abs):
+            try:
+                note_names.append(_midi_to_note_name(int(round(float(note)))))
+            except Exception:
+                continue
+    notes_txt = f" ({','.join(note_names)})" if note_names else ""
+    return f"{base_name}{(' ' + interval_txt) if interval_txt else ''}{notes_txt}"
+
+
+def _build_heatmap_axis_labels(entries: List[Any]) -> List[str]:
+    return [_entry_axis_label(entry, idx) for idx, entry in enumerate(entries)]
+
+
 def build_audio_descriptors(result: ExperimentResult) -> Dict[str, Any]:
     """Builds a dictionary mapping chord index to audio properties (frequencies, label)."""
     chords: Dict[int, Dict[str, Any]] = {}
@@ -156,21 +189,17 @@ class VisualizationService:
 
         # 4. Prepare Heatmap Data for JS (if eligible)
         heatmap_data: Optional[Dict[str, Any]] = None
-        HEATMAP_LIMIT = 1500  # Hard limit for browser performance
 
         def _slugify(name: str) -> str:
             slug = re.sub(r"[^A-Za-z0-9]+", "_", name).strip("_")
             return slug or "scenario"
 
-        if (
-            sections_enabled.get("heatmap", False)
-            and len(result.entries) <= HEATMAP_LIMIT
-            and result.output_path is not None
-        ):
+        if sections_enabled.get("heatmap", False) and result.output_path is not None:
             if logger:
                 logger(f"[visualizacion] generando payload de heatmaps dinámicos (N={len(result.entries)})...")
 
-            labels = _generate_compact_labels(result.entries)
+            labels = _build_heatmap_axis_labels(result.entries)
+            compact_labels = _generate_compact_labels(result.entries)
             cardinalities = [
                 int(getattr(entry, "n_notes", 0) or 0)
                 for entry in result.entries
@@ -220,7 +249,9 @@ class VisualizationService:
             if heatmap_files:
                 heatmap_data = {
                     "metadata": {
+                        "axis_labels": labels,
                         "labels": labels,
+                        "compact_labels": compact_labels,
                         "cardinalities": cardinalities,
                     },
                     "files": heatmap_files,
@@ -291,17 +322,78 @@ class VisualizationService:
 
         if logger:
             logger("[visualizacion] renderizando reporte HTML…")
-        render_report_html(
-            metrics_df=result.metrics_df,
-            figures=figures,
-            output_path=result.output_path / "report.html",
-            seeds=result.config.execution.seeds,
-            run_metadata=run_metadata,
-            metric_info=METRIC_INFO,
-            highlight_threshold=config.highlight_threshold,
-            sections_enabled=sections_enabled,
-            heatmap_data=heatmap_data,  # Pass the extra payload
-            audio_data=audio_data       # Pass the audio payload
-        )
+        try:
+            render_report_html(
+                metrics_df=result.metrics_df,
+                figures=figures,
+                output_path=result.output_path / "report.html",
+                seeds=result.config.execution.seeds,
+                run_metadata=run_metadata,
+                metric_info=METRIC_INFO,
+                highlight_threshold=config.highlight_threshold,
+                sections_enabled=sections_enabled,
+                heatmap_data=heatmap_data,  # Pass the extra payload
+                audio_data=audio_data       # Pass the audio payload
+            )
+        except MemoryError:
+            if logger:
+                logger(
+                    "[visualizacion] memoria insuficiente para reporte completo; "
+                    "reintentando sin heatmap/shepard."
+                )
+            try:
+                fallback_sections = {
+                    "scatter": bool(sections_enabled.get("scatter", True)),
+                    "heatmap": False,
+                    "shepard": False,
+                    "table": bool(sections_enabled.get("table", True)),
+                    "secondary_metrics": bool(sections_enabled.get("secondary_metrics", False)),
+                    "metadata": bool(sections_enabled.get("metadata", True)),
+                }
+                render_report_html(
+                    metrics_df=result.metrics_df,
+                    figures=figures,
+                    output_path=result.output_path / "report.html",
+                    seeds=result.config.execution.seeds,
+                    run_metadata=run_metadata,
+                    metric_info=METRIC_INFO,
+                    highlight_threshold=config.highlight_threshold,
+                    sections_enabled=fallback_sections,
+                    heatmap_data=None,
+                    audio_data=audio_data,
+                )
+                if logger:
+                    logger(
+                        "[visualizacion] reporte parcial generado "
+                        "(scatter activo, heatmap/shepard desactivados)."
+                    )
+            except MemoryError:
+                if logger:
+                    logger(
+                        "[visualizacion] memoria insuficiente incluso en modo parcial; "
+                        "generando version liviana (sin figuras)."
+                    )
+                fallback_sections = {
+                    "scatter": False,
+                    "heatmap": False,
+                    "shepard": False,
+                    "table": bool(sections_enabled.get("table", True)),
+                    "secondary_metrics": bool(sections_enabled.get("secondary_metrics", False)),
+                    "metadata": bool(sections_enabled.get("metadata", True)),
+                }
+                render_report_html(
+                    metrics_df=result.metrics_df,
+                    figures=[],
+                    output_path=result.output_path / "report.html",
+                    seeds=result.config.execution.seeds,
+                    run_metadata=run_metadata,
+                    metric_info=METRIC_INFO,
+                    highlight_threshold=config.highlight_threshold,
+                    sections_enabled=fallback_sections,
+                    heatmap_data=None,
+                    audio_data=None,
+                )
+                if logger:
+                    logger("[visualizacion] reporte liviano generado correctamente.")
 
         return result.output_path / "report.html"

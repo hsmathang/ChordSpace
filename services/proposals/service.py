@@ -10,7 +10,6 @@ from sklearn.manifold import MDS
 
 from .data import ChordEntry, PopulationLoader, stack_hist
 from .metrics import (
-    BASE_VECTOR_METRICS,
     evaluate_mixture_error,
     evaluate_nn_hits,
     metric_distance,
@@ -96,10 +95,12 @@ class ProposalsComparisonService:
         self._last_simplex = np.asarray(simplex, dtype=float)
         self._last_preprocessor = preprocessor_id
 
-        base_matrix = (
-            self._last_adjusted if metric.lower() in BASE_VECTOR_METRICS else self._last_simplex
+        dist_condensed = metric_distance(
+            metric,
+            self._last_adjusted,
+            self._last_simplex,
+            entries=self._entries,
         )
-        dist_condensed = metric_distance(metric, base_matrix, self._last_simplex)
         dist_matrix = squareform(dist_condensed)
 
         nn_top1, nn_top2 = evaluate_nn_hits(dist_matrix, self._entries, self._last_simplex)
@@ -129,7 +130,10 @@ class ProposalsComparisonService:
 
         if embedding is None:
             dist_condensed = metric_distance(
-                "euclidean", self._last_adjusted, self._last_simplex
+                "euclidean",
+                self._last_adjusted,
+                self._last_simplex,
+                entries=self._entries,
             )
             dist_matrix = squareform(dist_condensed)
             reducer = MDS(

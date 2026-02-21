@@ -6,6 +6,7 @@ from typing import Dict, Iterable, List, Mapping, Optional, Sequence, Tuple
 
 import numpy as np
 from scipy.spatial.distance import pdist, squareform, jensenshannon
+from scipy.optimize import linear_sum_assignment
 
 from lab import kruskal_stress_1
 from metrics import (
@@ -17,27 +18,245 @@ from metrics import (
 
 from .data import ChordEntry
 
-BASE_VECTOR_METRICS = {"cosine", "euclidean", "l1", "l2", "cityblock", "manhattan"}
+BASE_VECTOR_METRICS = {
+    "cosine",
+    "euclidean",
+    "euclid_cos_blend",
+    "hybrid_ec30",
+    "l1",
+    "l2",
+    "cityblock",
+    "manhattan",
+}
+STRUCTURAL_ROUGHNESS_METRIC = "structural_roughness"
+STRUCTURAL_ROUGHNESS_ALIASES = {
+    STRUCTURAL_ROUGHNESS_METRIC,
+    "structure_roughness",
+    "srm",
+}
+VOICELEADING_QUINTAS_METRIC = "voiceleading_quintas"
+VOICELEADING_QUINTAS_ALIASES = {
+    VOICELEADING_QUINTAS_METRIC,
+    "vl_quintas",
+    "voiceleading5",
+}
+# Pesos calibrados sobre población estructural diatónica (2-3 notas, max intervalo interno <= 12)
+# para mejorar trustworthiness/continuity sin sacrificar stress.
+STRUCTURAL_ROUGHNESS_WEIGHTS = (0.325, 0.299, 0.214, 0.162)
+EPSILON = 1e-12
+EUCLID_COS_BLEND_LAMBDA = 0.30
+VOICELEADING_QUINTAS_WEIGHTS = (0.55, 0.25, 0.20)
+VOICELEADING_GAP_PENALTY = 6.5
+CIRCLE_OF_FIFTHS = np.array([0, 7, 2, 9, 4, 11, 6, 1, 8, 3, 10, 5], dtype=int)
+FIFTH_INDEX = {int(pc): idx for idx, pc in enumerate(CIRCLE_OF_FIFTHS)}
 
 
-def metric_distance(metric: str, X: np.ndarray, dist_simplex: np.ndarray) -> np.ndarray:
+def _normalize_simplex_rows(values: np.ndarray) -> np.ndarray:
+    clipped = np.clip(np.asarray(values, dtype=float), 0.0, None)
+    sums = np.sum(clipped, axis=1, keepdims=True)
+    return np.divide(clipped, sums, out=np.zeros_like(clipped), where=sums > EPSILON)
+
+
+def _structural_roughness_distance(X: np.ndarray, dist_simplex: np.ndarray) -> np.ndarray:
+    probs = _normalize_simplex_rows(dist_simplex)
+    presence = np.clip(np.asarray(dist_simplex, dtype=float), 0.0, None) > EPSILON
+
+    totals = np.sum(np.clip(np.asarray(X, dtype=float), 0.0, None), axis=1)
+    active_bins = np.maximum(np.sum(presence, axis=1).astype(float), 1.0)
+    roughness_density = totals / active_bins
+    log_roughness_density = np.log1p(roughness_density)
+
+    d_structure = pdist(presence.astype(np.uint8), metric="jaccard")
+    d_profile = pdist(np.sqrt(probs), metric="euclidean") / np.sqrt(2.0)
+    d_per_dimension = 0.5 * pdist(probs, metric="cityblock")
+
+    def _relative_total_delta(u: np.ndarray, v: np.ndarray) -> float:
+        a = float(u[0])
+        b = float(v[0])
+        return abs(a - b) / (abs(a) + abs(b) + EPSILON)
+
+    d_total = pdist(log_roughness_density[:, None], metric=_relative_total_delta)
+
+    w_structure, w_profile, w_per_dimension, w_total = STRUCTURAL_ROUGHNESS_WEIGHTS
+    return (
+        w_structure * d_structure
+        + w_profile * d_profile
+        + w_per_dimension * d_per_dimension
+        + w_total * d_total
+    )
+
+
+def _entry_notes(entry: ChordEntry) -> np.ndarray:
+    acorde = getattr(entry, "acorde", None)
+    notes_abs = getattr(acorde, "notes_abs", None) if acorde is not None else None
+    notes: List[float] = []
+    if isinstance(notes_abs, (list, tuple, np.ndarray)):
+        for item in list(notes_abs):
+            try:
+                notes.append(float(int(round(float(item)))))
+            except Exception:
+                continue
+    if notes:
+        return np.asarray(sorted(notes), dtype=float)
+    intervals = getattr(acorde, "intervals", []) if acorde is not None else []
+    running = 0
+    fallback: List[float] = [0.0]
+    for step in intervals:
+        try:
+            running += int(step)
+        except Exception:
+            continue
+        fallback.append(float(running))
+    return np.asarray(sorted(fallback), dtype=float)
+
+
+def _quintas_profile(notes: np.ndarray) -> np.ndarray:
+    vec = np.zeros(12, dtype=float)
+    for note in notes:
+        pc = int(round(float(note))) % 12
+        idx = FIFTH_INDEX.get(pc)
+        if idx is not None:
+            vec[idx] += 1.0
+    smooth = 0.5 * vec + 0.25 * np.roll(vec, 1) + 0.25 * np.roll(vec, -1)
+    total = float(np.sum(smooth))
+    if total <= EPSILON:
+        return np.full(12, 1.0 / 12.0, dtype=float)
+    return smooth / total
+
+
+def _param_float(
+    metric_params: Mapping[str, float],
+    keys: Sequence[str],
+    *,
+    default: float,
+) -> float:
+    for key in keys:
+        if key in metric_params:
+            try:
+                return float(metric_params[key])
+            except Exception as exc:
+                raise ValueError(f"Parámetro inválido para {key}: {metric_params[key]}") from exc
+    return float(default)
+
+
+def _resolve_voiceleading_quintas_params(
+    metric_params: Optional[Mapping[str, float]],
+) -> Tuple[float, float, float, float]:
+    params = metric_params or {}
+    w_default_vl, w_default_q5, w_default_js = VOICELEADING_QUINTAS_WEIGHTS
+    w_vl = _param_float(params, ("w_vl", "vl", "voiceleading"), default=w_default_vl)
+    w_q5 = _param_float(params, ("w_q5", "q5", "quintas"), default=w_default_q5)
+    w_js = _param_float(params, ("w_js", "js", "roughness"), default=w_default_js)
+    gap_penalty = _param_float(params, ("gap_penalty", "gap"), default=VOICELEADING_GAP_PENALTY)
+
+    if w_vl < 0 or w_q5 < 0 or w_js < 0:
+        raise ValueError("Los pesos de voiceleading_quintas deben ser no negativos.")
+    weight_sum = w_vl + w_q5 + w_js
+    if weight_sum <= EPSILON:
+        raise ValueError("La suma de pesos de voiceleading_quintas debe ser positiva.")
+    if gap_penalty <= EPSILON:
+        raise ValueError("gap_penalty debe ser mayor que 0 para voiceleading_quintas.")
+
+    return (
+        float(w_vl / weight_sum),
+        float(w_q5 / weight_sum),
+        float(w_js / weight_sum),
+        float(gap_penalty),
+    )
+
+
+def _voice_step_cost(a: float, b: float) -> float:
+    semitone_fold = abs(((a - b + 6.0) % 12.0) - 6.0)
+    register_penalty = min(abs(a - b), 24.0) / 24.0
+    return float(semitone_fold + 0.35 * register_penalty)
+
+
+def _voice_leading_distance(notes_a: np.ndarray, notes_b: np.ndarray, gap_penalty: float) -> float:
+    len_a = int(notes_a.size)
+    len_b = int(notes_b.size)
+    if len_a == 0 and len_b == 0:
+        return 0.0
+    size = max(len_a, len_b)
+    costs = np.full((size, size), gap_penalty, dtype=float)
+    for i in range(len_a):
+        for j in range(len_b):
+            costs[i, j] = _voice_step_cost(float(notes_a[i]), float(notes_b[j]))
+    row_ind, col_ind = linear_sum_assignment(costs)
+    total_cost = float(np.sum(costs[row_ind, col_ind]))
+    normalized = total_cost / (size * gap_penalty)
+    return float(np.clip(normalized, 0.0, 1.0))
+
+
+def _voiceleading_quintas_distance(
+    dist_simplex: np.ndarray,
+    entries: Optional[Sequence[ChordEntry]],
+    metric_params: Optional[Mapping[str, float]] = None,
+) -> np.ndarray:
+    if entries is None:
+        raise ValueError(
+            "La métrica 'voiceleading_quintas' requiere entries para acceder a notas absolutas."
+        )
+    n = dist_simplex.shape[0]
+    if len(entries) != n:
+        raise ValueError(
+            "La métrica 'voiceleading_quintas' recibió un número de entries distinto al tamaño de la población."
+        )
+
+    notes_by_entry = [_entry_notes(entry) for entry in entries]
+    quintas_matrix = np.vstack([_quintas_profile(notes) for notes in notes_by_entry])
+    simplex_probs = _normalize_simplex_rows(dist_simplex)
+
+    d_js = pdist(simplex_probs, metric=lambda u, v: float(jensenshannon(u, v, base=2.0)))
+    d_q5 = pdist(np.sqrt(quintas_matrix), metric="euclidean") / np.sqrt(2.0)
+
+    w_vl, w_q5, w_js, gap_penalty = _resolve_voiceleading_quintas_params(metric_params)
+
+    pair_count = n * (n - 1) // 2
+    d_vl = np.zeros(pair_count, dtype=float)
+    idx = 0
+    for i in range(n - 1):
+        notes_i = notes_by_entry[i]
+        for j in range(i + 1, n):
+            d_vl[idx] = _voice_leading_distance(notes_i, notes_by_entry[j], gap_penalty)
+            idx += 1
+
+    return w_vl * d_vl + w_q5 * d_q5 + w_js * d_js
+
+
+def metric_distance(
+    metric: str,
+    X: np.ndarray,
+    dist_simplex: np.ndarray,
+    *,
+    entries: Optional[Sequence[ChordEntry]] = None,
+    metric_params: Optional[Mapping[str, float]] = None,
+) -> np.ndarray:
     metric = metric.lower()
+    simplex_probs = _normalize_simplex_rows(dist_simplex)
     if metric == "cosine":
         return pdist(X, metric="cosine")
+    if metric in {"euclid_cos_blend", "hybrid_ec30"}:
+        d_e = pdist(X, metric="euclidean")
+        d_c = pdist(X, metric="cosine")
+        d_e = d_e / (float(np.mean(d_e)) + EPSILON)
+        d_c = d_c / (float(np.mean(d_c)) + EPSILON)
+        lam = EUCLID_COS_BLEND_LAMBDA
+        return (1.0 - lam) * d_e + lam * d_c
     if metric == "js":
         def _js(u: np.ndarray, v: np.ndarray) -> float:
-            su = float(np.sum(u))
-            sv = float(np.sum(v))
-            uu = (u / su) if su > 0 else u
-            vv = (v / sv) if sv > 0 else v
-            return jensenshannon(uu, vv, base=2.0)
-        return pdist(dist_simplex, _js)
+            return float(jensenshannon(u, v, base=2.0))
+        return pdist(simplex_probs, _js)
     if metric == "hellinger":
-        def _norm(u: np.ndarray) -> np.ndarray:
-            s = float(np.sum(u))
-            return (u / s) if s > 0 else u
-        root = np.sqrt(np.apply_along_axis(_norm, 1, dist_simplex))
+        root = np.sqrt(simplex_probs)
         return pdist(root, metric="euclidean") / np.sqrt(2.0)
+    if metric in STRUCTURAL_ROUGHNESS_ALIASES:
+        return _structural_roughness_distance(X, dist_simplex)
+    if metric in VOICELEADING_QUINTAS_ALIASES:
+        return _voiceleading_quintas_distance(
+            dist_simplex,
+            entries,
+            metric_params=metric_params,
+        )
     if metric in {"euclidean", "l2"}:
         return pdist(X, metric="euclidean")
     if metric in {"l1", "cityblock", "manhattan"}:
@@ -168,4 +387,5 @@ __all__ = [
     "evaluate_mixture_error",
     "summarise_embedding_metrics",
     "aggregate_seed_results",
+    "STRUCTURAL_ROUGHNESS_METRIC",
 ]

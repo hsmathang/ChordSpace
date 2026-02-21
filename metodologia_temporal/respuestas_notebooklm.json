@@ -1118,6 +1118,197 @@
                 "tipo_contenido": "comparabilidad_embeddings",
                 "estatus_insercion": "completado"
             }
+        },
+        {
+            "id": "Q-029",
+            "tipo": "A",
+            "pregunta_original": "¿Es la matriz D definida positiva / semidefinida? (Relevante para MDS clásico; no necesariamente para SMACOF).",
+            "tema_primario": "math",
+            "notebooks_consultados": [
+                "math",
+                "dimred",
+                "computacion",
+                "armonia",
+                "psicoacustica"
+            ],
+            "quality_gates_passed": true,
+            "fecha_consulta": "2026-02-17T13:58:00-05:00",
+            "respuesta_para_insertar": "Matriz D no suele ser Euclidiana (Gram matrix no PSD tras doble centrado) por asimetrías perceptuales/violaciones métricas. MDS Clásico falla (autovalores negativos). SMACOF preferible: minimiza Stress directamente sin requerir embedding perfecto.",
+            "evidencia_por_notebook": {
+                "math": {
+                    "fuente": "BurgoyneSaul2011; Kim2018",
+                    "afirmacion": "D es Euclidean embeddable ssi Gram matrix (doble centrado) es PSD. Si no, MDS Clásico falla."
+                },
+                "dimred": {
+                    "fuente": "Delicado2020; Kraemer2018; Smelser2026",
+                    "afirmacion": "Autovalores negativos impiden embedding perfecto. SMACOF minimiza stress monotonicamente (mejor para manifolds curvos)."
+                },
+                "computacion": {
+                    "fuente": "Bernardes2016; BurgoyneSaul2005",
+                    "afirmacion": "Lerdahl viola desigualdad triangular -> no Euclidiana. Usan SMACOF para Tonal Interval Space."
+                },
+                "psicoacustica": {
+                    "fuente": "Krumhansl1990; Tymoczko2011",
+                    "afirmacion": "Espacios perceptuales y de conducción de voces violan axiomas métricos (asimétrica/triangular)."
+                }
+            },
+            "para_redactor": {
+                "donde_insertar": "§3.4.3, después de definir D y antes de pasar a reducción dimensional (§3.5).",
+                "tipo_contenido": "definicion",
+                "estatus_insercion": "completado"
+            }
+        },
+        {
+            "id": "Q-036",
+            "tipo": "A",
+            "pregunta_original": "¿Es necesario corregir por comparaciones múltiples al comparar 200 escenarios?",
+            "tema_primario": "dimred",
+            "notebooks_consultados": [
+                "dimred",
+                "math",
+                "computacion",
+                "armonia",
+                "psicoacustica"
+            ],
+            "quality_gates_passed": true,
+            "fecha_consulta": "2026-02-17T14:26:00-05:00",
+            "respuesta_para_insertar": "No se requiere Bonferroni porque el objetivo es 'model selection' (ranking), no inferencia causal. Se reporta estabilidad (mean±std sobre seeds) para mitigar overfitting.",
+            "evidencia_por_notebook": {
+                "dimred": {
+                    "fuente": "Chicco2026; McInnes2018; Mabadeje2025",
+                    "afirmacion": "Usar métricas agregadas (Saturn, Q_local) y análisis de estabilidad (Procrustes) en lugar de p-values."
+                },
+                "computacion": {
+                    "fuente": "DeHaas2011; Micchi2020",
+                    "afirmacion": "Para comparar algoritmos usar Friedman+Tukey; para grid search reportar top-k en validación."
+                },
+                "psicoacustica": {
+                    "fuente": "Masina2023; Eerola2022",
+                    "afirmacion": "Ranking correlation y Evidence Ratios (Bayes) son preferibles a p-values para comparar modelos."
+                }
+            },
+            "para_redactor": {
+                "donde_insertar": "§3.6.2 (después de ‘Preguntas clave’)",
+                "tipo_contenido": "justificacion",
+                "estatus_insercion": "completado"
+            }
+        },
+        {
+            "id": "Q-039",
+            "tipo": "A",
+            "pregunta_original": "¿Por qué k = 3? ¿Es sensible la evaluación a este parámetro?",
+            "tema_primario": "dimred",
+            "notebooks_consultados": [
+                "dimred",
+                "math",
+                "computacion",
+                "armonia",
+                "psicoacustica"
+            ],
+            "quality_gates_passed": true,
+            "fecha_consulta": "2026-02-17T14:45:00-05:00",
+            "respuesta_para_insertar": "k=3 justificado por 3 vecinos neo-Riemannianos (P,L,R) y empir. k=4 de Burgoyne. Reportar curvas T(k).",
+            "evidencia_por_notebook": {
+                "dimred": {
+                    "fuente": "Lee2009; Venna2005",
+                    "afirmacion": "Reportar curvas T(k)/C(k); usar Q_local como escalar."
+                },
+                "armonia": {
+                    "fuente": "Tymoczko2006; Bernardes2016",
+                    "afirmacion": "3 vecinos parsimoniosos (P,L,R) justifican k=3."
+                },
+                "computacion": {
+                    "fuente": "Burgoyne2005; Karystinaios2022",
+                    "afirmacion": "k=4 para MVU; k=3 para SMOTE en acordes."
+                }
+            },
+            "para_redactor": {
+                "donde_insertar": "§3.7.1",
+                "tipo_contenido": "justificacion",
+                "estatus_insercion": "completado"
+            }
+        },
+        {
+            "id": "Q-040",
+            "tipo": "A",
+            "pregunta_original": "¿Trustworthiness y continuity son redundantes o complementarios?",
+            "tema_primario": "dimred",
+            "notebooks_consultados": [
+                "dimred",
+                "math",
+                "computacion"
+            ],
+            "quality_gates_passed": true,
+            "fecha_consulta": "2026-02-17T14:50:00-05:00",
+            "respuesta_para_insertar": "Complementarias: T penaliza intrusiones (falsos vecinos), C penaliza extrusiones (vecinos perdidos). MDS favorece C, UMAP favorece T.",
+            "evidencia_por_notebook": {
+                "dimred": {
+                    "fuente": "Lee2009; Venna2005; Wang2021; Chicco2026",
+                    "afirmacion": "T y C capturan errores asimétricos via co-ranking matrix."
+                }
+            },
+            "para_redactor": {
+                "donde_insertar": "§3.7.1",
+                "tipo_contenido": "definicion",
+                "estatus_insercion": "completado"
+            }
+        },
+        {
+            "id": "Q-041",
+            "tipo": "A",
+            "pregunta_original": "Modo determinista: n_jobs=1, mds_n_init=4, seed fija. ¿Es relevante? ¿Qué dice la literatura?",
+            "tema_primario": "dimred",
+            "notebooks_consultados": [
+                "dimred",
+                "math",
+                "computacion"
+            ],
+            "quality_gates_passed": true,
+            "fecha_consulta": "2026-02-17T14:55:00-05:00",
+            "respuesta_para_insertar": "Sí relevante. Seed+n_jobs=1 es buena práctica. n_init=4 compromiso práctico (no óptimo teórico). Reportar variabilidad.",
+            "evidencia_por_notebook": {
+                "dimred": {
+                    "fuente": "McInnes2018; Wang2021; Kobak2021",
+                    "afirmacion": "Inicialización espectral + seed + n_jobs=1 como estándar."
+                },
+                "math": {
+                    "fuente": "Dzemyda2021",
+                    "afirmacion": "Mínimo global de Stress hallado en 3.9-22.3% de 1000 intentos."
+                }
+            },
+            "para_redactor": {
+                "donde_insertar": "§3.8.4",
+                "tipo_contenido": "justificacion",
+                "estatus_insercion": "completado"
+            }
+        },
+        {
+            "id": "Q-042",
+            "tipo": "A",
+            "pregunta_original": "¿La rugosidad de Sethares realmente captura 'similitud sonora'? Es un proxy, no una medida directa.",
+            "tema_primario": "psicoacustica",
+            "notebooks_consultados": [
+                "psicoacustica",
+                "armonia"
+            ],
+            "quality_gates_passed": true,
+            "fecha_consulta": "2026-02-17T14:55:00-05:00",
+            "respuesta_para_insertar": "Roughness mide interferencia acústica (sensorial), NO similitud completa. Proxy defendible si se delimita explicitamente.",
+            "evidencia_por_notebook": {
+                "psicoacustica": {
+                    "fuente": "Plomp1965; Sethares1993; Masina2024; McDermott2016",
+                    "afirmacion": "Roughness = disonancia sensorial. Falla en tríadas. Necesita harmonicidad."
+                },
+                "armonia": {
+                    "fuente": "Tymoczko2006; Cook2009; Harrison2020",
+                    "afirmacion": "Roughness insuficiente; voice-leading, familiaridad y contexto tonal son necesarios."
+                }
+            },
+            "para_redactor": {
+                "donde_insertar": "§3.8.5",
+                "tipo_contenido": "validacion",
+                "estatus_insercion": "completado"
+            }
         }
     ]
 }

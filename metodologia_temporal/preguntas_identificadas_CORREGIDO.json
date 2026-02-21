@@ -1,0 +1,301 @@
+{
+  "total": 42,
+  "preguntas": [
+    {
+      "id": "Q-001",
+      "ubicacion": "línea 22",
+      "seccion": "3.0 Introducción al capítulo y flujo metodológico",
+      "tipo": "pregunta_nativa",
+      "pregunta": "¿Puede el lector, solo leyendo esta introducción, entender qué va a leer y por qué en ese orden?"
+    },
+    {
+      "id": "Q-002",
+      "ubicacion": "línea 23",
+      "seccion": "3.0 Introducción al capítulo y flujo metodológico",
+      "tipo": "pregunta_nativa",
+      "pregunta": "¿Queda claro que el capítulo NO es un manual de software sino la descripción de un modelo matemático con su realización computacional?"
+    },
+    {
+      "id": "Q-003",
+      "ubicacion": "línea 48",
+      "seccion": "# 3.1.1 Espacio de Notas y Sistema de Referencia",
+      "tipo": "pregunta_nativa",
+      "pregunta": "¿Es necesario definir $\\mathcal{N}$ como todo $\\{0,...,127\\}$ o basta con el subrango usado experimentalmente?"
+    },
+    {
+      "id": "Q-004",
+      "ubicacion": "línea 49",
+      "seccion": "# 3.1.1 Espacio de Notas y Sistema de Referencia",
+      "tipo": "pregunta_nativa",
+      "pregunta": "¿Cómo justificar la elección de 12-TET frente a un lector que podría preguntar por afinaciones alternativas?"
+    },
+    {
+      "id": "Q-005",
+      "ubicacion": "línea 66",
+      "seccion": "# 3.1.2 Formalización del Acorde",
+      "tipo": "pregunta_nativa",
+      "pregunta": "¿Se justifica exigir $n_1 < \\cdots < n_m$ (estrictamente creciente) o podrían admitirse unísonos? (Not de santimath: exclente pregunta esto nos difenrecia de muchos otros enfoques de representacion porque para nosotros no estamos permtiendo unisonos asumimos rugosidad nula hay que njustificarlo)."
+    },
+    {
+      "id": "Q-006",
+      "ubicacion": "línea 67",
+      "seccion": "# 3.1.2 Formalización del Acorde",
+      "tipo": "pregunta_nativa_con_comentario_tipo_a",
+      "pregunta": "¿La restricción de ordenamiento implica que dos voicings con las mismas notas en distinto orden son el mismo acorde?",
+      "comentario_santimath": "estamos usando la palabra voivings en este capitlo? hay que definirlo al lector matemático, y no, dos acordes con misma notas en otrdens disntios son distintos, la idea del orden es que estan ordenados porfrecuencias cmo cuando uno toca en el piano desde el bajo hacia las voces agudas del acorde mover una nota a otra octava hace que sea disitintto el acorde no se si esa justificaion ira aca pero hay que buscar referencias y uivar esta claidad en el lugar adecuado para el lector."
+    },
+    {
+      "id": "Q-007",
+      "ubicacion": "línea 79",
+      "seccion": "# 3.1.3 Decisión de Identidad: Distinción frente a la Teoría de PC-sets",
+      "tipo": "pregunta_nativa",
+      "pregunta": "¿Cómo responder a un evaluador que objete la falta de invariancia por transposición?"
+    },
+    {
+      "id": "Q-008",
+      "ubicacion": "línea 83",
+      "seccion": "# 3.1.3 Decisión de Identidad: Distinción frente a la Teoría de PC-sets",
+      "tipo": "comentario_santimath_tipo_a",
+      "comentario_santimath": "trabajo para el notebooklm"
+    },
+    {
+      "id": "Q-009",
+      "ubicacion": "línea 93",
+      "seccion": "# 3.1.4 Vector de Conteo de Clases de Intervalo (12 bins)",
+      "tipo": "comentario_santimath_tipo_a",
+      "comentario_santimath": "y tambien lo muestra el modelo de seathaeres y su graficasu curva de percicion de rugosidad en los intervalos, tambien hay que decir que hay trabajos que si represnetan con 6 dimencioens a los acordes no estamos tan de aceurdo anivel percepcion habra que ver como podemos probar que destacamos en algo en ese aspecto respecto a los trabajos como el TIS"
+    },
+    {
+      "id": "Q-010",
+      "ubicacion": "línea 96",
+      "seccion": "# 3.1.4 Vector de Conteo de Clases de Intervalo (12 bins)",
+      "tipo": "pregunta_nativa",
+      "pregunta": "¿Por qué 12 bins y no 6 (como en Forte) o 13 (incluyendo unísono separado de octava)? ( Nota de santimath, excelente pregunta. Notebooklm deberia aydaurnos a repsonder con refernecias acertadas.)"
+    },
+    {
+      "id": "Q-011",
+      "ubicacion": "línea 97",
+      "seccion": "# 3.1.4 Vector de Conteo de Clases de Intervalo (12 bins)",
+      "tipo": "pregunta_nativa",
+      "pregunta": "¿Cuál es la implicación algebraica de NO colapsar complementarios? (El espacio de representación tiene mayor dimensión pero mayor poder discriminativo)."
+    },
+    {
+      "id": "Q-012",
+      "ubicacion": "línea 111",
+      "seccion": "# 3.2.1 Fundamentos del Modelo de Plomp-Levelt y Sethares",
+      "tipo": "comentario_santimath_tipo_a",
+      "comentario_santimath": "hay que explicar que es la banda critica auditiva. y que es la disonancia sensorial. y que tiene que ver con la rugosidad?  aunque eso debio habalrse a mas profundidad en otros capituslo prvios no? creeria yo."
+    },
+    {
+      "id": "Q-013",
+      "ubicacion": "línea 116",
+      "seccion": "# 3.2.1 Fundamentos del Modelo de Plomp-Levelt y Sethares",
+      "tipo": "pregunta_nativa",
+      "pregunta": "¿Hasta qué punto la parametrización de Sethares es \"el\" modelo o \"un\" modelo posible? (Es \"un\" modelo; existen alternativas como Vassilakis, Hutchinson-Knopoff)."
+    },
+    {
+      "id": "Q-014",
+      "ubicacion": "línea 117",
+      "seccion": "# 3.2.1 Fundamentos del Modelo de Plomp-Levelt y Sethares",
+      "tipo": "pregunta_nativa",
+      "pregunta": "¿Cómo se justifica la elección de Sethares sobre otras parametrizaciones?"
+    },
+    {
+      "id": "Q-015",
+      "ubicacion": "línea 133",
+      "seccion": "# 3.2.2 La Función de Disonancia entre Parciales",
+      "tipo": "pregunta_nativa_con_comentario_tipo_a",
+      "pregunta": "¿De dónde vienen estos valores numéricos? (Ajuste empírico de Sethares a los datos de Plomp-Levelt).",
+      "comentario_santimath": "y que tan robusto es este modelo?"
+    },
+    {
+      "id": "Q-016",
+      "ubicacion": "línea 134",
+      "seccion": "# 3.2.2 La Función de Disonancia entre Parciales",
+      "tipo": "pregunta_nativa",
+      "pregunta": "¿Cuál es la sensibilidad del modelo a variaciones en estos parámetros? (Señalar que el repositorio permite sobreescritura; discutir en §3.8 Supuestos)."
+    },
+    {
+      "id": "Q-017",
+      "ubicacion": "línea 150",
+      "seccion": "# 3.2.3 Extensión a Tonos Complejos: Modelo de Parciales Armónicos",
+      "tipo": "pregunta_nativa",
+      "pregunta": "¿Es el supuesto de espectro armónico con decaimiento exponencial razonable? (Razonable para instrumentos de cuerda/viento; no para percusión o espectros inarmónicos)."
+    },
+    {
+      "id": "Q-018",
+      "ubicacion": "línea 151",
+      "seccion": "# 3.2.3 Extensión a Tonos Complejos: Modelo de Parciales Armónicos",
+      "tipo": "pregunta_nativa",
+      "pregunta": "¿Cómo afecta $H=6$ a la resolución del modelo? ¿Sería diferente con $H=10$?"
+    },
+    {
+      "id": "Q-019",
+      "ubicacion": "línea 180",
+      "seccion": "# 3.2.5 Validación Interna del Componente de Rugosidad",
+      "tipo": "pregunta_nativa",
+      "pregunta": "¿Es suficiente validar con díadas? ¿Cómo se verifica que la extensión a acordes de mayor cardinalidad es correcta?"
+    },
+    {
+      "id": "Q-020",
+      "ubicacion": "línea 181",
+      "seccion": "# 3.2.5 Validación Interna del Componente de Rugosidad",
+      "tipo": "pregunta_nativa",
+      "pregunta": "¿Existe un \"ground truth\" perceptual contra el cual validar para tríadas o cuatríadas?"
+    },
+    {
+      "id": "Q-021",
+      "ubicacion": "línea 199",
+      "seccion": "# 3.3.1 El Problema de la Comparabilidad",
+      "tipo": "pregunta_nativa",
+      "pregunta": "¿La normalización destruye información relevante? ¿Cuál?"
+    },
+    {
+      "id": "Q-022",
+      "ubicacion": "línea 200",
+      "seccion": "# 3.3.1 El Problema de la Comparabilidad",
+      "tipo": "pregunta_nativa",
+      "pregunta": "¿Es posible que la mejor normalización dependa de la pregunta que se quiere responder?"
+    },
+    {
+      "id": "Q-023",
+      "ubicacion": "línea 229",
+      "seccion": "# 3.3.2 Catálogo de Propuestas Evaluadas",
+      "tipo": "pregunta_nativa",
+      "pregunta": "¿El suavizado gaussiano tiene justificación perceptual o es una heurística?"
+    },
+    {
+      "id": "Q-024",
+      "ubicacion": "línea 230",
+      "seccion": "# 3.3.2 Catálogo de Propuestas Evaluadas",
+      "tipo": "pregunta_nativa",
+      "pregunta": "¿Hay riesgo de sobreajuste al evaluar tantas propuestas? (Discutir en §3.8 corrección por comparaciones múltiples)."
+    },
+    {
+      "id": "Q-025",
+      "ubicacion": "línea 257",
+      "seccion": "# 3.4.1 Métricas Vectoriales",
+      "tipo": "pregunta_nativa",
+      "pregunta": "¿Tiene sentido usar la distancia euclidiana sobre vectores de rugosidad cruda (`identity`)? (Sí, pero dominarán las diferencias de magnitud, no de forma)."
+    },
+    {
+      "id": "Q-026",
+      "ubicacion": "línea 277",
+      "seccion": "# 3.4.2 Métricas de Distribuciones de Probabilidad",
+      "tipo": "pregunta_nativa",
+      "pregunta": "¿Cuándo preferir JSD vs Hellinger? (JSD es más discriminante para distribuciones con soporte diferente; Hellinger es más robusta a zeros numéricos). ( Nota de santimath: hay que ver como safar de eso repaidamente oy decir que basicmaente nos quedamos con cosenos eucliddan y quiza otra y explicar que pasa con las otras pero brevemente no dejar que se vuelva un hoyo de pregnutas eso hayq ue cerrar el asunto de las metricas muy bien dejarlo zanjado para que no hayan muchas preguntas)"
+    },
+    {
+      "id": "Q-027",
+      "ubicacion": "línea 278",
+      "seccion": "# 3.4.2 Métricas de Distribuciones de Probabilidad",
+      "tipo": "pregunta_nativa",
+      "pregunta": "¿El uso de $\\log_2$ vs $\\ln$ en JSD afecta la métrica? (Solo escala; la propiedad métrica de $\\sqrt{\\text{JSD}}$ se mantiene)."
+    },
+    {
+      "id": "Q-028",
+      "ubicacion": "línea 294",
+      "seccion": "# 3.4.3 Construcción de la Matriz de Distancias $D$",
+      "tipo": "pregunta_nativa",
+      "pregunta": "¿La elección de $\\rho$ induce una topología diferente sobre $\\mathcal{A}$? ¿Cómo verificarlo?"
+    },
+    {
+      "id": "Q-029",
+      "ubicacion": "línea 295",
+      "seccion": "# 3.4.3 Construcción de la Matriz de Distancias $D$",
+      "tipo": "pregunta_nativa",
+      "pregunta": "¿Es la matriz $D$ definida positiva / semidefinida? (Relevante para MDS clásico; no necesariamente para SMACOF)."
+    },
+    {
+      "id": "Q-030",
+      "ubicacion": "línea 322",
+      "seccion": "# 3.5.1 Formulación como Problema de Optimización (MDS)",
+      "tipo": "pregunta_nativa",
+      "pregunta": "¿Por qué MDS métrico y no no-métrico? (Métrico preserva magnitudes, no solo rangos; apropiado cuando la escala de $\\rho$ es informativa)."
+    },
+    {
+      "id": "Q-031",
+      "ubicacion": "línea 323",
+      "seccion": "# 3.5.1 Formulación como Problema de Optimización (MDS)",
+      "tipo": "pregunta_nativa",
+      "pregunta": "¿Es el stress una medida suficiente o necesitamos métricas complementarias?"
+    },
+    {
+      "id": "Q-032",
+      "ubicacion": "línea 352",
+      "seccion": "# 3.5.2 Métodos Complementarios: UMAP, t-SNE, ISOMAP",
+      "tipo": "pregunta_nativa",
+      "pregunta": "¿Los embeddings de diferentes métodos son directamente comparables?"
+    },
+    {
+      "id": "Q-033",
+      "ubicacion": "línea 353",
+      "seccion": "# 3.5.2 Métodos Complementarios: UMAP, t-SNE, ISOMAP",
+      "tipo": "pregunta_nativa",
+      "pregunta": "¿Cómo interpretar un embedding UMAP donde las distancias globales no son significativas?"
+    },
+    {
+      "id": "Q-034",
+      "ubicacion": "línea 386",
+      "seccion": "# 3.6.1 Preguntas Experimentales",
+      "tipo": "pregunta_nativa",
+      "pregunta": "¿Las preguntas son falsificables? ¿Qué resultado descartaría la hipótesis?"
+    },
+    {
+      "id": "Q-035",
+      "ubicacion": "línea 410",
+      "seccion": "# 3.6.2 Factores Controlables y sus Niveles",
+      "tipo": "pregunta_nativa",
+      "pregunta": "¿Hay combinaciones inválidas? Sí: métricas de distribución (js, hellinger) con normalización `identity` requieren normalización L1 previa (documentar cómo el pipeline lo maneja)."
+    },
+    {
+      "id": "Q-036",
+      "ubicacion": "línea 411",
+      "seccion": "# 3.6.2 Factores Controlables y sus Niveles",
+      "tipo": "pregunta_nativa",
+      "pregunta": "¿Es necesario corregir por comparaciones múltiples al comparar 200 escenarios?"
+    },
+    {
+      "id": "Q-037",
+      "ubicacion": "línea 434",
+      "seccion": "# 3.6.4 Experimentos de Referencia Implementados",
+      "tipo": "pregunta_nativa",
+      "pregunta": "¿Los experimentos implementados cubren suficientemente los objetivos de la tesis?"
+    },
+    {
+      "id": "Q-038",
+      "ubicacion": "línea 436",
+      "seccion": "# 3.6.4 Experimentos de Referencia Implementados",
+      "tipo": "pregunta_nativa",
+      "pregunta": "¿Hay gaps experimentales? (El Exp1–Exp6 planteado originalmente no está implementado como tal; documentar honestamente)."
+    },
+    {
+      "id": "Q-039",
+      "ubicacion": "línea 461",
+      "seccion": "# 3.7.1 Métricas de Preservación de Vecindarios",
+      "tipo": "pregunta_nativa",
+      "pregunta": "¿Por qué $k = 3$? ¿Es sensible la evaluación a este parámetro? (Discutir en §3.8)."
+    },
+    {
+      "id": "Q-040",
+      "ubicacion": "línea 462",
+      "seccion": "# 3.7.1 Métricas de Preservación de Vecindarios",
+      "tipo": "pregunta_nativa",
+      "pregunta": "¿Trustworthiness y continuity son redundantes o complementarios?"
+    },
+    {
+      "id": "Q-041",
+      "ubicacion": "línea 538",
+      "seccion": "# 3.8.4 Decisiones Críticas de Diseño",
+      "tipo": "comentario_santimath_tipo_a",
+      "comentario_santimath": "la verdad nose mucho sobre esto pero siento que falta detalle y definciones para poder hablar de esto, en realdiad es relevante mencionarlo? que dice la literatura?"
+    },
+    {
+      "id": "Q-042",
+      "ubicacion": "línea 552",
+      "seccion": "# 3.8.5 Amenazas a la Validez",
+      "tipo": "pregunta_nativa",
+      "pregunta": "¿La rugosidad de Sethares realmente captura \"similitud sonora\"? Es un proxy, no una medida directa.( Nota de santimath: hay mcuhas refernecia para jsutificar estas cosas)"
+    }
+  ]
+}

@@ -1,0 +1,1319 @@
+{
+  "metadata": {
+    "documento_fuente": "ESTRUCTURA_MATEMATICA_DETALLADA.md",
+    "total_preguntas_procesadas": 42,
+    "preguntas_tipo_a_contextualizadas": 37,
+    "preguntas_tipo_b_skip": 5
+  },
+  "preguntas_contextualizadas": [
+    {
+      "id": "Q-001",
+      "tipo": "B",
+      "ubicacion_original": "Sección 3.0 Introducción al capítulo y flujo metodológico, línea 22",
+      "pregunta_original": "¿Puede el lector, solo leyendo esta introducción, entender qué va a leer y por qué en ese orden?",
+      "razon_skip": "Autoevaluación de claridad narrativa: depende del texto final del capítulo y de la intención del autor, no de una consulta bibliográfica.",
+      "accion_sugerida": "Reescribir §3.0 como mapa explícito (dominio de acordes → vectorización Φ_raw → normalización/métrica → reducción 2D → evaluación → supuestos). Añadir al final un párrafo que justifique el orden y cómo cada bloque responde a los objetivos."
+    },
+    {
+      "id": "Q-002",
+      "tipo": "B",
+      "ubicacion_original": "Sección 3.0 Introducción al capítulo y flujo metodológico, línea 23",
+      "pregunta_original": "¿Queda claro que el capítulo NO es un manual de software sino la descripción de un modelo matemático con su realización computacional?",
+      "razon_skip": "Decisión de escritura/encuadre: se resuelve con redacción del propio capítulo (tono, estructura, ejemplos mínimos), no buscando definiciones en la literatura.",
+      "accion_sugerida": "Añadir en §3.0 una frase de alcance y un contrato: (i) se define el modelo matemático y sus supuestos; (ii) la implementación se describe solo como operacionalización reproducible (parámetros, pipeline, artefactos), sin entrar en UI/uso paso a paso."
+    },
+    {
+      "id": "Q-003",
+      "tipo": "A",
+      "ubicacion_original": "Sección 3.1.1 Espacio de Notas y Sistema de Referencia, línea 48",
+      "seccion_completa": "3.1.1 Espacio de Notas y Sistema de Referencia",
+      "pregunta_original": "¿Es necesario definir N como todo {0,...,127} o basta con el subrango usado experimentalmente?",
+      "contexto_extraido_del_capitulo": {
+        "modelo_general": "Modelo computacional de exploración de acordes en MIDI: el dominio base de notas se formaliza como N={0,…,127} (MIDI) y se fija una afinación 12-TET para mapear notas a Hz.",
+        "decisiones_previas": [
+          "Representación base en MIDI (enteros 0–127)",
+          "Afinación 12-TET con ancla A4=440 Hz mediante f(n)=440·2^((n-69)/12)",
+          "Uso de proyección a clases de altura mod 12 (Z_12) cuando se requiere (pitch classes)",
+          "En el repositorio/GUI las poblaciones suelen restringirse por alfabeto de pitch classes y rango de octavas por tractabilidad"
+        ],
+        "parametros_definidos": {
+          "N_teorico": "0–127 (MIDI)",
+          "f(n)": "440·2^((n-69)/12)",
+          "A4": "440 Hz",
+          "sistema": "12-TET"
+        },
+        "objetivo_seccion": "Definir formalmente el universo de notas y el sistema de referencia (afinación) sobre el cual se construyen acordes y se calculan frecuencias."
+      },
+      "pregunta_reformulada_para_notebooklm": "CONTEXTO DEL MODELO:\nEn el capítulo formalizamos el universo de notas como números MIDI n∈{0,…,127} y fijamos 12‑TET con A4=440 Hz mediante f(n)=440·2^((n-69)/12). En la práctica, nuestras poblaciones experimentales se construyen/filtran en el repositorio usando subconjuntos (alfabeto de pitch classes y rango de octavas), tanto por razones musicales como computacionales.\n\nDECISIÓN ESPECÍFICA:\nDebemos decidir cómo declarar el dominio en la formalización (N completo vs subrango experimental) y cómo justificar esa restricción cuando el modelo (rugosidad) depende del registro.\n\nPREGUNTA:\nEn modelos computacionales basados en MIDI/12‑TET que dependen de frecuencias absolutas, ¿qué recomiendan las fuentes sobre (i) definir el dominio teórico como el rango MIDI completo y luego restringir experimentalmente, versus (ii) definir directamente un subrango (octavas/registro) como dominio del estudio? ¿Qué implicaciones reconocidas existen sobre validez/interpretación cuando el registro afecta las medidas perceptuales (p.ej., rugosidad) y cuando el tamaño del espacio crece combinatoriamente con N?\n\nQUÉ BUSCAMOS:\nCriterios y formulaciones estándar (con citas) para reportar el dominio de notas y las restricciones de rango/registro en estudios de modelado musical computacional, incluyendo cómo escribir esa decisión como supuesto metodológico reproducible.",
+      "tema_notebook_sugerido": "math",
+      "para_redactor": {
+        "donde_insertar": "§3.1.1, después de Definición 3.1 (N) y antes/durante la discusión del uso experimental de subrangos.",
+        "tipo_contenido": "justificacion",
+        "palabras_clave": [
+          "MIDI",
+          "dominio",
+          "registro",
+          "subrango",
+          "explosión combinatoria",
+          "reproducibilidad"
+        ]
+      }
+    },
+    {
+      "id": "Q-004",
+      "tipo": "A",
+      "ubicacion_original": "Sección 3.1.1 Espacio de Notas y Sistema de Referencia, línea 49",
+      "seccion_completa": "3.1.1 Espacio de Notas y Sistema de Referencia",
+      "pregunta_original": "¿Cómo justificar la elección de 12-TET frente a un lector que podría preguntar por afinaciones alternativas?",
+      "contexto_extraido_del_capitulo": {
+        "modelo_general": "El modelo fija 12‑TET para convertir MIDI→Hz y operar sobre intervalos y rugosidad con frecuencias absolutas.",
+        "decisiones_previas": [
+          "Uso explícito de 12‑TET y ancla A4=440 Hz",
+          "Se declara como supuesto (no verdad universal): excluye microtonalidad y afinación justa"
+        ],
+        "parametros_definidos": {
+          "A4": "440 Hz",
+          "f(n)": "440·2^((n-69)/12)",
+          "sistema": "12-TET"
+        },
+        "objetivo_seccion": "Justificar el sistema de afinación y establecer el mapa MIDI→frecuencia que usa el componente psicoacústico."
+      },
+      "pregunta_reformulada_para_notebooklm": "CONTEXTO DEL MODELO:\nNuestro modelo representa acordes como tuplas de notas MIDI y necesita convertir cada nota a frecuencia absoluta para calcular rugosidad psicoacústica. Para ello fijamos la afinación 12‑TET con A4=440 Hz y la función f(n)=440·2^((n-69)/12).\n\nDECISIÓN ESPECÍFICA:\nDebemos justificar por qué trabajamos en 12‑TET (y por qué no en afinación justa, temperamentos alternativos o microtonalidad) dado que el sistema de afinación cambia las frecuencias y, por tanto, la rugosidad calculada.\n\nPREGUNTA:\n¿Qué argumentos y referencias usa la literatura para justificar 12‑TET como supuesto operativo en modelos computacionales de armonía/percepción (especialmente cuando el modelo depende de Hz y no solo de pitch classes)? ¿Cómo se recomienda enunciar esta decisión como compromiso entre (i) compatibilidad con MIDI y prácticas musicales occidentales, (ii) reproducibilidad y simplicidad computacional, y (iii) limitaciones de validez externa hacia otras afinaciones?\n\nQUÉ BUSCAMOS:\nFuentes citables (libros/papers) que permitan redactar una justificación breve pero rigurosa de 12‑TET como supuesto, y que indiquen qué cambia conceptualmente si se reemplaza por otras afinaciones (sin tener que implementar microtonalidad en esta tesis).",
+      "tema_notebook_sugerido": "math",
+      "para_redactor": {
+        "donde_insertar": "§3.1.1, inmediatamente después de Definición 3.2 (f(n)) y del párrafo que declara 12‑TET como supuesto.",
+        "tipo_contenido": "justificacion",
+        "palabras_clave": [
+          "12-TET",
+          "afinación",
+          "MIDI",
+          "validez externa",
+          "supuestos"
+        ]
+      }
+    },
+    {
+      "id": "Q-005",
+      "tipo": "A",
+      "ubicacion_original": "Sección 3.1.2 Formalización del Acorde, línea 66",
+      "seccion_completa": "3.1.2 Formalización del Acorde",
+      "pregunta_original": "¿Se justifica exigir n1 < ··· < nm (estrictamente creciente) o podrían admitirse unísonos? (Nota de santimath: esta pregunta nos diferencia de muchos enfoques porque no permitimos unísonos; asumimos rugosidad nula; hay que justificarlo).",
+      "contexto_extraido_del_capitulo": {
+        "modelo_general": "Los acordes se formalizan como m‑tuplas estrictamente crecientes de notas MIDI en N, lo que excluye duplicados exactos (unísonos MIDI).",
+        "decisiones_previas": [
+          "Acorde como tupla estrictamente creciente (sin MIDI repetidos)",
+          "Span(n)=n_m−n_1 y vector de intervalos adyacentes Δ_i=n_{i+1}−n_i",
+          "Explosión combinatoria: |A_m|=C(N,m) para N=128",
+          "El cálculo de rugosidad (Sethares) produce d(f,f)=0 para Δf=0, pero doblajes pueden alterar ponderaciones si se modelan como voces separadas"
+        ],
+        "parametros_definidos": {
+          "N": "128 notas MIDI (0–127)",
+          "m": "cardinalidad (m≥2)",
+          "span": "n_m − n_1"
+        },
+        "objetivo_seccion": "Definir el objeto 'acorde' como elemento del dominio matemático sobre el cual se construyen representaciones y métricas."
+      },
+      "pregunta_reformulada_para_notebooklm": "CONTEXTO DEL MODELO:\nDefinimos un acorde como una m‑tupla de notas MIDI estrictamente creciente (n1<…<nm), para representar un voicing como conjunto de alturas absolutas sin duplicar exactamente la misma nota MIDI. Más adelante, el modelo psicoacústico calcula rugosidad sumando contribuciones entre pares de notas/armónicos; en la parametrización usada, dos sinusoides idénticas (Δf=0) tienen disonancia sensorial 0.\n\nDECISIÓN ESPECÍFICA:\nDecidimos excluir unísonos exactos en la definición del acorde. Necesitamos justificarlo (matemática y perceptualmente) y reconocer qué ocurriría si se permitieran (acorde como multiconjunto con multiplicidades).\n\nPREGUNTA:\nEn la literatura de representación computacional de acordes y en modelos de disonancia/rugosidad (Plomp–Levelt, Sethares y variantes), ¿cómo se trata la presencia de unísonos/doblajes exactos? ¿Es estándar excluirlos en el dominio (tuplas estrictas) o modelarlos explícitamente como voces adicionales (lo que cambia las ponderaciones por pares y la energía total)? ¿Qué justificaciones se dan para cada opción, especialmente cuando el objetivo es medir similitud sonora basada en rugosidad?\n\nQUÉ BUSCAMOS:\nReferencias y argumentos para redactar: (i) por qué una definición sin unísonos es razonable en un estudio de exploración de acordes, (ii) qué efecto conceptual tendría permitir multiplicidades, y (iii) cómo declarar esta decisión como supuesto del modelo.",
+      "tema_notebook_sugerido": "armonia",
+      "para_redactor": {
+        "donde_insertar": "§3.1.2, inmediatamente después de Definición 3.4 (Acorde) y antes de introducir Δ y span.",
+        "tipo_contenido": "justificacion",
+        "palabras_clave": [
+          "unísono",
+          "doblaje",
+          "multiconjunto",
+          "voicing",
+          "rugosidad",
+          "dominio"
+        ]
+      }
+    },
+    {
+      "id": "Q-006",
+      "tipo": "A",
+      "ubicacion_original": "Sección 3.1.2 Formalización del Acorde, línea 67",
+      "seccion_completa": "3.1.2 Formalización del Acorde",
+      "pregunta_original": "¿La restricción de ordenamiento implica que dos voicings con las mismas notas en distinto orden son el mismo acorde?",
+      "contexto_extraido_del_capitulo": {
+        "modelo_general": "El acorde se representa como tupla estrictamente creciente; el orden es canónico (por altura) y pretende capturar el registro/voicing mediante las alturas absolutas, no mediante permutaciones arbitrarias.",
+        "decisiones_previas": [
+          "Acorde = (n1<…<nm) en MIDI",
+          "El modelo distingue acordes por registro (no equivalencia con PC-sets)",
+          "Cambiar una nota de octava cambia el acorde (alturas absolutas), pero permutar etiquetas de voces no debería crear un objeto nuevo si el conjunto de alturas es el mismo"
+        ],
+        "parametros_definidos": {
+          "representacion": "tupla ordenada por altura (canónica)",
+          "registro": "alturas absolutas MIDI"
+        },
+        "objetivo_seccion": "Aclarar la noción de identidad del acorde/voicing en el dominio y preparar la distinción posterior frente a PC-sets."
+      },
+      "pregunta_reformulada_para_notebooklm": "CONTEXTO DEL MODELO:\nEn nuestra tesis un acorde/voicing se define por alturas absolutas MIDI (n1<…<nm). El orden se usa como representación canónica (ordenar por altura), no como una permutación musical de “roles de voz”. Además, el modelo distingue acordes por registro/espaciado (no colapsa por transposición ni por PC-set).\n\nDECISIÓN ESPECÍFICA:\nNecesitamos explicar al lector matemático qué significa “voicing” y qué noción de identidad adoptamos: (i) mismo conjunto de alturas absolutas ⇒ mismo objeto, independientemente del orden en que se escriban; (ii) mover una nota de octava ⇒ objeto distinto.\n\nPREGUNTA:\n¿Cómo define y formaliza la literatura (teoría musical, análisis computacional, MIR) el concepto de voicing frente a “acorde” y frente a PC-set? ¿Qué formalizaciones son comunes (conjunto/multiconjunto vs vector ordenado por registro) y qué implicaciones tienen para identidad del objeto y para métricas perceptuales sensibles al registro? ¿Qué referencias se pueden citar para justificar que el orden en la tupla es solo una convención canónica (ordenar por altura) y no una distinción adicional?\n\nQUÉ BUSCAMOS:\nDefiniciones y fuentes citables que nos permitan introducir “voicing/registro/espaciado” con precisión y evitar malentendidos entre: permutaciones de representación vs cambios reales de alturas (p.ej., inversiones u octave shifts).",
+      "tema_notebook_sugerido": "armonia",
+      "para_redactor": {
+        "donde_insertar": "§3.1.2, después de Definición 3.4 y antes de §3.1.3 (identidad vs PC-sets).",
+        "tipo_contenido": "definicion",
+        "palabras_clave": [
+          "voicing",
+          "registro",
+          "espaciado",
+          "identidad",
+          "PC-set"
+        ]
+      }
+    },
+    {
+      "id": "Q-007",
+      "tipo": "A",
+      "ubicacion_original": "Sección 3.1.3 Decisión de Identidad: Distinción frente a la Teoría de PC-sets, línea 79",
+      "seccion_completa": "3.1.3 Decisión de Identidad: Distinción frente a la Teoría de PC-sets",
+      "pregunta_original": "¿Cómo responder a un evaluador que objete la falta de invariancia por transposición?",
+      "contexto_extraido_del_capitulo": {
+        "modelo_general": "El espacio de acordes A no colapsa por transposición: acordes con mismas pitch classes en registros distintos son distintos, porque la rugosidad depende de frecuencias absolutas.",
+        "decisiones_previas": [
+          "No equivalencia con PC-sets (Forte): no se aplican T_n/I",
+          "La representación y la rugosidad dependen del registro (Hz)",
+          "Se menciona que cierta invariancia puede recuperarse opcionalmente via poblaciones ancladas (raíz 0), pero no es el objetivo principal"
+        ],
+        "parametros_definidos": {
+          "dependencia_registro": "rugosidad depende de f(n) en Hz",
+          "opcion_anclaje": "poblaciones ancladas en raíz 0 (atenúan efectos)"
+        },
+        "objetivo_seccion": "Justificar la noción de identidad elegida y anticipar objeciones desde la teoría de PC-sets/invariancias."
+      },
+      "pregunta_reformulada_para_notebooklm": "CONTEXTO DEL MODELO:\nNuestro modelo busca un espacio perceptual de acordes donde la similitud se derive de rugosidad psicoacústica. Como la rugosidad se calcula con frecuencias absolutas, un mismo patrón de intervalos (o un PC-set) transpuesto a otro registro puede cambiar su rugosidad y, por tanto, su posición en el espacio.\n\nDECISIÓN ESPECÍFICA:\nRechazamos la invariancia por transposición típica de PC-sets porque no queremos colapsar diferencias de registro/voicing que sí afectan la percepción; opcionalmente podemos “controlar” registro usando poblaciones ancladas, pero no imponemos equivalencia T_n.\n\nPREGUNTA:\n¿Qué evidencia y argumentos presenta la literatura psicoacústica/musical para sostener que consonancia/dissonancia (y específicamente rugosidad sensorial) depende del registro y no es invariante por transposición? ¿Cómo se recomienda justificar, en un trabajo académico, una representación de acordes sensible al registro frente a un evaluador que espera invariancias tipo PC-set? ¿Qué trade-offs se reportan entre abstracción teórica (invarianza) y fidelidad perceptual (dependencia de frecuencias absolutas)?\n\nQUÉ BUSCAMOS:\nFuentes citables y un marco argumentativo breve para defender la no-invariancia por transposición como decisión metodológica alineada con el objetivo perceptual del modelo (no como “omisión”).",
+      "tema_notebook_sugerido": "psicoacustica",
+      "para_redactor": {
+        "donde_insertar": "§3.1.3, después de la justificación basada en dependencia de registro y antes de pasar a la representación por intervalos (3.1.4).",
+        "tipo_contenido": "justificacion",
+        "palabras_clave": [
+          "transposición",
+          "invariancia",
+          "registro",
+          "psicoacústica",
+          "PC-sets"
+        ]
+      }
+    },
+    {
+      "id": "Q-008",
+      "tipo": "A",
+      "ubicacion_original": "Sección 3.1.3 Decisión de Identidad: Distinción frente a la Teoría de PC-sets, línea 83",
+      "seccion_completa": "3.1.3 Decisión de Identidad: Distinción frente a la Teoría de PC-sets",
+      "pregunta_original": "Nota de santimath: “No basta con decir ‘no usamos PC-sets’; hay que explicar positivamente qué noción de identidad SÍ se usa y por qué es apropiada”.",
+      "contexto_extraido_del_capitulo": {
+        "modelo_general": "Se rechaza la equivalencia de PC-sets y se adopta una identidad de acorde sensible a registro/voicing para poder modelar rugosidad basada en frecuencias absolutas.",
+        "decisiones_previas": [
+          "Acorde como tupla de MIDI (n1<…<nm)",
+          "No colapsar por transposición ni por inversiones T_n/I",
+          "Representación posterior por bins de clases de intervalo (12) sin colapsar complementarios",
+          "Objetivo: similitud sonora/perceptual, no clasificación por clases abstractas"
+        ],
+        "parametros_definidos": {
+          "identidad": "sensibilidad a registro y espaciado",
+          "representacion": "bins 12 sin colapsar complementarios"
+        },
+        "objetivo_seccion": "Enunciar explícitamente la noción de identidad del objeto ‘acorde’ que el modelo preserva y la que deliberadamente no preserva."
+      },
+      "pregunta_reformulada_para_notebooklm": "CONTEXTO DEL MODELO:\nEn la tesis construimos un espacio de acordes orientado a similitud perceptual: los acordes se modelan como alturas absolutas MIDI (voicing/registro) y se miden mediante rugosidad psicoacústica (dependiente de Hz). Por eso no adoptamos equivalencias fuertes tipo PC-set que colapsan transposiciones/inversiones y eliminan información de registro.\n\nDECISIÓN ESPECÍFICA:\nDebemos describir positivamente qué identidad de acorde usamos (qué propiedades son invariantes y cuáles son discriminadas) y cómo esa identidad se alinea con el objetivo “similitud sonora” y con el pipeline experimental (poblaciones, métricas, reducción).\n\nPREGUNTA:\n¿Qué marcos conceptuales y referencias existen para definir “identidad de acorde” en análisis computacional/musical cuando se quiere conservar información de voicing/registro (sensibilidad a alturas absolutas) en lugar de equivalencias por PC-set? ¿Cómo describen estos trabajos las propiedades preservadas (p.ej., intervalos internos, espaciado) y las no preservadas (p.ej., transposición total), y en qué problemas se justifica esta elección (percepción, timbre, roughness, voice-leading)?\n\nQUÉ BUSCAMOS:\nLenguaje y citas para redactar una sección corta tipo: “noción de identidad adoptada” + “invariancias descartadas” + “por qué esta identidad es la correcta para un modelo basado en rugosidad”.",
+      "tema_notebook_sugerido": "armonia",
+      "para_redactor": {
+        "donde_insertar": "§3.1.3, como párrafo final de ‘Debilidades a vigilar’ o como subapartado explícito “Identidad de acorde adoptada”.",
+        "tipo_contenido": "definicion",
+        "palabras_clave": [
+          "identidad de acorde",
+          "voicing",
+          "registro",
+          "equivalencia",
+          "Forte",
+          "PC-set"
+        ]
+      }
+    },
+    {
+      "id": "Q-009",
+      "tipo": "A",
+      "ubicacion_original": "Sección 3.1.4 Vector de Conteo de Clases de Intervalo (12 bins), línea 93",
+      "seccion_completa": "3.1.4 Vector de Conteo de Clases de Intervalo (12 bins)",
+      "pregunta_original": "Nota de santimath: “La curva de Sethares muestra diferencias de rugosidad por intervalos; también hay trabajos que representan acordes con 6 dimensiones (IC de Forte / TIS). ¿Qué evidencia apoya que 12 dimensiones (sin colapsar complementarios) sea mejor a nivel perceptual?”",
+      "contexto_extraido_del_capitulo": {
+        "modelo_general": "Se define un vector de 12 bins que cuenta clases de intervalo sin colapsar complementarios, motivado por diferencias de rugosidad entre intervalos k y 12−k.",
+        "decisiones_previas": [
+          "Vector ic(n)∈N0^12 con convención de binning (intervalo 0→índice 11)",
+          "No colapsar complementarios (k distinto de 12−k)",
+          "Justificación perceptual: rugosidad depende de frecuencias absolutas e interacción armónica"
+        ],
+        "parametros_definidos": {
+          "dim_vector": "12 bins",
+          "convencion_bin": "intervalo 0→índice 11; 1..11→índices 0..10"
+        },
+        "objetivo_seccion": "Definir la representación por clases de intervalo y justificar la decisión de 12 componentes sin colapsar intervalos complementarios."
+      },
+      "pregunta_reformulada_para_notebooklm": "CONTEXTO DEL MODELO:\nRepresentamos acordes mediante un vector de 12 componentes asociado a clases de intervalo (módulo 12) sin colapsar complementarios (k ≠ 12−k). Esta decisión se motiva porque el modelo psicoacústico de rugosidad (Sethares/Plomp–Levelt) distingue perceptualmente separaciones frecuenciales que, en teoría de PC-sets, se suelen colapsar.\n\nDECISIÓN ESPECÍFICA:\nNecesitamos justificar, con apoyo bibliográfico, por qué una representación de 12 bins puede ser preferible a representaciones de 6 bins (IC vector de Forte u otras) cuando el objetivo es capturar diferencias perceptuales ligadas a rugosidad y registro.\n\nPREGUNTA:\n¿Qué trabajos en análisis/representación computacional de acordes comparan (o discuten) representaciones que colapsan intervalos complementarios (6 bins) versus representaciones que los mantienen distintos (12 bins)? En particular, ¿qué argumentos o evidencias perceptuales se citan para sostener que distinguir k y 12−k aporta poder discriminativo relevante (p.ej., en modelos de disonancia/rugosidad o timbre), y cómo se relaciona esto con curvas de rugosidad tipo Sethares?\n\nQUÉ BUSCAMOS:\nReferencias citables y pros/contras reportados (precisión perceptual, interpretabilidad, invariancias perdidas/ganadas) para apoyar nuestra decisión de usar 12 bins en un capítulo de metodología.",
+      "tema_notebook_sugerido": "armonia",
+      "para_redactor": {
+        "donde_insertar": "§3.1.4, después de Propiedad 3.2 (distinción de complementarios).",
+        "tipo_contenido": "comparacion",
+        "palabras_clave": [
+          "intervalos complementarios",
+          "IC vector",
+          "Forte",
+          "TIS",
+          "representación",
+          "rugosidad"
+        ]
+      }
+    },
+    {
+      "id": "Q-010",
+      "tipo": "A",
+      "ubicacion_original": "Sección 3.1.4 Vector de Conteo de Clases de Intervalo (12 bins), línea 96",
+      "seccion_completa": "3.1.4 Vector de Conteo de Clases de Intervalo (12 bins)",
+      "pregunta_original": "¿Por qué 12 bins y no 6 (como en Forte) o 13 (incluyendo unísono separado de octava)?",
+      "contexto_extraido_del_capitulo": {
+        "modelo_general": "La representación ic(n) usa 12 bins para intervalos mod 12 con convención de interfaz para el bin 0 (unísono/octava).",
+        "decisiones_previas": [
+          "No colapsar complementarios (12 bins en lugar de 6)",
+          "El dominio excluye unísonos exactos (MIDI repetido), pero intervalos mod 12 = 0 pueden aparecer como octavas",
+          "Se fija una convención de binning: intervalo 0 se mapea al índice 11"
+        ],
+        "parametros_definidos": {
+          "bins": "12",
+          "bin_0": "intervalo 0→índice 11"
+        },
+        "objetivo_seccion": "Justificar el diseño de la representación por intervalos (dimensionalidad y convención) en relación con objetivos perceptuales."
+      },
+      "pregunta_reformulada_para_notebooklm": "CONTEXTO DEL MODELO:\nUsamos una representación de acordes basada en clases de intervalo mod 12 con 12 componentes, donde no colapsamos intervalos complementarios y donde el intervalo mod 12 = 0 corresponde en la práctica a octavas (porque no permitimos unísonos MIDI exactos). Esta representación alimenta un pipeline de rugosidad y, más adelante, distancias y reducción dimensional.\n\nDECISIÓN ESPECÍFICA:\nDebemos justificar (i) por qué no usamos el IC vector de 6 bins de Forte, y (ii) por qué no separamos explícitamente unísono y octava en bins distintos (13), dado que ambos caen en clase 0 mod 12 pero tienen interpretaciones distintas.\n\nPREGUNTA:\n¿Qué decisiones de binning/dimensionalidad son estándar en la literatura para representar intervalos internos de acordes: 6 bins (colapsando complementarios), 12 bins (sin colapsar), o 13 bins (separando unísono vs octava)? ¿Qué criterios se usan para elegir (objetivo analítico vs perceptual, sensibilidad a registro, interpretabilidad, comparabilidad con Forte)? ¿Cómo tratan los trabajos que excluyen unísonos exactos la clase 0 (octava) en la representación?\n\nQUÉ BUSCAMOS:\nReferencias y argumentos para redactar una justificación técnica de por qué 12 bins es una elección adecuada en un modelo perceptual basado en rugosidad, y cómo explicar claramente el caso especial del intervalo 0.",
+      "tema_notebook_sugerido": "armonia",
+      "para_redactor": {
+        "donde_insertar": "§3.1.4, al introducir Definición 3.7 y antes del ejemplo de binning (si se añade).",
+        "tipo_contenido": "justificacion",
+        "palabras_clave": [
+          "bins",
+          "Forte",
+          "unísono",
+          "octava",
+          "interval class",
+          "representación"
+        ]
+      }
+    },
+    {
+      "id": "Q-011",
+      "tipo": "A",
+      "ubicacion_original": "Sección 3.1.4 Vector de Conteo de Clases de Intervalo (12 bins), línea 97",
+      "seccion_completa": "3.1.4 Vector de Conteo de Clases de Intervalo (12 bins)",
+      "pregunta_original": "¿Cuál es la implicación algebraica de NO colapsar complementarios? (El espacio de representación tiene mayor dimensión pero mayor poder discriminativo).",
+      "contexto_extraido_del_capitulo": {
+        "modelo_general": "La representación ic(n) vive en N0^12 y mantiene separados intervalos k y 12−k, a diferencia del IC vector de Forte (6).",
+        "decisiones_previas": [
+          "Trabajar en Z_12 para clases de altura, pero no imponer equivalencias tipo PC-set",
+          "Mantener complementarios separados para preservar información perceptual",
+          "El vector cuenta pares: suma de componentes = C(m,2)"
+        ],
+        "parametros_definidos": {
+          "dim_12": "12",
+          "dim_6": "6 (Forte)",
+          "grupo_base": "Z_12"
+        },
+        "objetivo_seccion": "Dar una lectura algebraica/geométrica de la representación elegida y de sus simetrías/invariancias."
+      },
+      "pregunta_reformulada_para_notebooklm": "CONTEXTO DEL MODELO:\nEn lugar de usar el IC vector de Forte (6 componentes que colapsa intervalos complementarios k y 12−k), definimos una representación de 12 componentes que mantiene ambas clases separadas. El objetivo es evitar colapsar diferencias relevantes cuando el modelo perceptual (rugosidad) distingue esos casos.\n\nDECISIÓN ESPECÍFICA:\nQueremos explicar qué cambia “matemáticamente” al pasar de 6 a 12 dimensiones: qué simetrías se pierden/ganan y qué noción de equivalencia se está rechazando.\n\nPREGUNTA:\nDesde una perspectiva algebraica y geométrica, ¿cómo se puede caracterizar la diferencia entre (i) una representación que identifica k≈12−k y (ii) otra que no lo hace? ¿Qué simetría o acción de grupo se está factorizando en el caso de 6 bins, y qué consecuencias tiene sobre la estructura del espacio (dimensión efectiva, posibles redundancias, discriminación de objetos)? ¿Existen referencias en teoría de conjuntos de clases de altura, teoría de grupos aplicada a música o geometría de espacios de acordes que expliquen formalmente este “colapso de complementarios” y sus implicaciones?\n\nQUÉ BUSCAMOS:\nUn argumento matemático (con citas) que podamos incluir como justificación conceptual: qué equivalencia introduce el colapso, qué información elimina, y por qué nuestra tarea (similitud perceptual sensible a registro) prefiere no imponerla.",
+      "tema_notebook_sugerido": "math",
+      "para_redactor": {
+        "donde_insertar": "§3.1.4, después de Propiedad 3.2 o como subapartado “Implicaciones algebraicas del no-colapso”.",
+        "tipo_contenido": "justificacion",
+        "palabras_clave": [
+          "simetría",
+          "grupo",
+          "Z12",
+          "complementarios",
+          "dimensión",
+          "equivalencia"
+        ]
+      }
+    },
+    {
+      "id": "Q-012",
+      "tipo": "A",
+      "ubicacion_original": "Sección 3.2.1 Fundamentos del Modelo de Plomp-Levelt y Sethares, línea 111",
+      "seccion_completa": "3.2.1 Fundamentos del Modelo de Plomp-Levelt y Sethares",
+      "pregunta_original": "Nota de santimath: “Explicar qué es la banda crítica auditiva, qué es disonancia sensorial y qué tiene que ver con la rugosidad”.",
+      "contexto_extraido_del_capitulo": {
+        "modelo_general": "Se implementa un modelo de rugosidad/disonancia sensorial: Plomp & Levelt (1965) + parametrización de Sethares (1993) extendida a tonos complejos por suma par-a-par de parciales.",
+        "decisiones_previas": [
+          "Se usa rugosidad como proxy de similitud sonora",
+          "Sethares parametriza una curva de disonancia dependiente de una escala crítica ligada a banda crítica auditiva",
+          "Se usan tonos sintéticos (espectros armónicos) en la implementación"
+        ],
+        "parametros_definidos": {
+          "conceptos": [
+            "banda crítica",
+            "disonancia sensorial",
+            "rugosidad"
+          ]
+        },
+        "objetivo_seccion": "Dar fundamentos psicoacústicos mínimos que conecten disonancia sensorial, banda crítica y el cálculo de rugosidad usado en Φ_raw."
+      },
+      "pregunta_reformulada_para_notebooklm": "CONTEXTO DEL MODELO:\nEn la tesis medimos acordes mediante rugosidad psicoacústica: partimos del resultado experimental de Plomp & Levelt (1965) sobre disonancia sensorial entre tonos puros y usamos la parametrización de Sethares (1993) para extenderlo a tonos complejos sumando contribuciones entre parciales. Este componente alimenta nuestro vector Φ_raw (12 bins) y, finalmente, un espacio de similitud sonora.\n\nDECISIÓN ESPECÍFICA:\nNecesitamos definir con rigor “banda crítica auditiva” y “disonancia sensorial”, y explicar cómo esos conceptos entran en la forma de la curva de disonancia/rugosidad que usa Sethares (por qué aparece una escala crítica y por qué depende de la frecuencia).\n\nPREGUNTA:\nSegún Plomp & Levelt y literatura posterior, ¿qué es exactamente la banda crítica auditiva (definición y medición) y cómo se relaciona con el fenómeno de disonancia sensorial/roughness (batidos, interferencia en la membrana basilar, etc.)? ¿Cómo se traduce esa idea al modelo matemático de Sethares (parámetros/escala crítica) y qué diferencia hay entre “disonancia sensorial” y “disonancia armónica/musical” en términos de constructo?\n\nQUÉ BUSCAMOS:\nDefiniciones citables y una explicación corta (pero precisa) para incluir en metodología: medición/valores típicos, rol en la curva de disonancia, y conexión explícita con la implementación de rugosidad para acordes (más que solo díadas).",
+      "tema_notebook_sugerido": "psicoacustica",
+      "para_redactor": {
+        "donde_insertar": "§3.2.1, en el primer bloque ‘Contenido’, antes de presentar la ecuación de disonancia entre parciales (§3.2.2).",
+        "tipo_contenido": "definicion",
+        "palabras_clave": [
+          "banda crítica",
+          "disonancia sensorial",
+          "roughness",
+          "Plomp-Levelt",
+          "Sethares"
+        ]
+      }
+    },
+    {
+      "id": "Q-013",
+      "tipo": "A",
+      "ubicacion_original": "Sección 3.2.1 Fundamentos del Modelo de Plomp-Levelt y Sethares, línea 112",
+      "seccion_completa": "3.2.1 Fundamentos del Modelo de Plomp-Levelt y Sethares",
+      "pregunta_original": "¿Hasta qué punto la parametrización de Sethares es “el” modelo o “un” modelo posible? (Existen alternativas como Vassilakis, Hutchinson-Knopoff).",
+      "contexto_extraido_del_capitulo": {
+        "modelo_general": "Se adopta la parametrización de Sethares para disonancia entre parciales como núcleo del cálculo de rugosidad.",
+        "decisiones_previas": [
+          "Usar Plomp–Levelt como base experimental y Sethares como parametrización operativa",
+          "Extender a tonos complejos por suma par-a-par de parciales",
+          "Reconocer que existen parametrizaciones/modelos alternativos"
+        ],
+        "parametros_definidos": {
+          "modelo_elegido": "Sethares (1993)",
+          "alternativas_mencionadas": [
+            "Vassilakis",
+            "Hutchinson–Knopoff"
+          ]
+        },
+        "objetivo_seccion": "Situar Sethares dentro del panorama de modelos de disonancia/rugosidad y evitar presentarlo como única opción."
+      },
+      "pregunta_reformulada_para_notebooklm": "CONTEXTO DEL MODELO:\nPara calcular la rugosidad de acordes implementamos una curva de disonancia sensorial basada en Plomp & Levelt (1965) y usamos la parametrización de Sethares (1993), extendida a tonos complejos mediante suma de contribuciones entre parciales.\n\nDECISIÓN ESPECÍFICA:\nDebemos explicar si Sethares es un “estándar” ampliamente adoptado o una elección entre varias, y qué cambia si se eligieran alternativas (forma de la curva, supuestos fisiológicos, sensibilidad a timbre/registro).\n\nPREGUNTA:\n¿Cuál es el estatus de la parametrización de Sethares en la literatura de psicoacústica computacional: se considera un modelo de referencia, una aproximación práctica popular, o una opción más? ¿Qué modelos alternativos de roughness/disonancia (p.ej., Hutchinson–Knopoff, Vassilakis u otros) se usan para tonos complejos y en qué difieren conceptualmente (supuestos, ecuaciones, calibración, rangos de validez)? ¿Qué evidencia comparativa existe sobre desempeño o adecuación perceptual?\n\nQUÉ BUSCAMOS:\nUn panorama citables (review/papers) que permita redactar: “Sethares como elección operativa” + “alternativas y por qué no se usaron” + “limitaciones conocidas”.",
+      "tema_notebook_sugerido": "psicoacustica",
+      "para_redactor": {
+        "donde_insertar": "§3.2.1, en un párrafo de cierre antes de pasar a la ecuación concreta (§3.2.2).",
+        "tipo_contenido": "comparacion",
+        "palabras_clave": [
+          "Sethares",
+          "Hutchinson-Knopoff",
+          "Vassilakis",
+          "modelo de rugosidad",
+          "alternativas"
+        ]
+      }
+    },
+    {
+      "id": "Q-014",
+      "tipo": "A",
+      "ubicacion_original": "Sección 3.2.1 Fundamentos del Modelo de Plomp-Levelt y Sethares, línea 113",
+      "seccion_completa": "3.2.1 Fundamentos del Modelo de Plomp-Levelt y Sethares",
+      "pregunta_original": "¿Cómo se justifica la elección de Sethares sobre otras parametrizaciones?",
+      "contexto_extraido_del_capitulo": {
+        "modelo_general": "Se requiere justificar la elección de un modelo psicoacústico concreto para convertir frecuencias (Hz) en disonancia/rugosidad computable.",
+        "decisiones_previas": [
+          "Se usa Sethares como parametrización principal",
+          "La implementación usa tonos sintéticos con espectro armónico (H y δ fijos)",
+          "El repositorio permite sobreescritura de parámetros/modelos, pero se fija uno para el estudio"
+        ],
+        "parametros_definidos": {
+          "H": "6",
+          "delta": "0.88",
+          "modelo": "Sethares"
+        },
+        "objetivo_seccion": "Justificar la elección del componente psicoacústico como base del vector Φ_raw."
+      },
+      "pregunta_reformulada_para_notebooklm": "CONTEXTO DEL MODELO:\nEl componente central de nuestro pipeline es una medida de rugosidad/disonancia sensorial que, a partir de frecuencias absolutas (Hz), produce una cantidad agregable por pares y usable como feature de acordes. Implementamos Sethares (basado en Plomp–Levelt) y lo aplicamos a tonos sintéticos con espectro armónico (H=6, δ=0.88).\n\nDECISIÓN ESPECÍFICA:\nNecesitamos justificar por qué elegimos Sethares (y no otra parametrización) en una tesis de modelamiento matemático aplicado: criterios de trazabilidad a evidencia experimental, interpretabilidad, adopción previa, y costo computacional.\n\nPREGUNTA:\n¿Qué criterios usa la literatura para elegir entre modelos de roughness/disonancia (Sethares vs alternativas como Hutchinson–Knopoff, Vassilakis u otras) cuando el objetivo es analizar acordes/voicings con tonos complejos? ¿Qué ventajas/desventajas se reportan para Sethares en términos de: (i) fundamentación psicofísica, (ii) generalización a acordes (m>2), (iii) sensibilidad a timbre/registro, y (iv) tractabilidad computacional para exploración masiva?\n\nQUÉ BUSCAMOS:\nArgumentos citables para una justificación metodológica breve (2–5 frases) y una nota de limitaciones: “por qué Sethares aquí” + “qué queda fuera” + “qué pasaría si cambiáramos el modelo”.",
+      "tema_notebook_sugerido": "psicoacustica",
+      "para_redactor": {
+        "donde_insertar": "§3.2.1, en el bloque ‘Preguntas clave’ como respuesta escrita y referenciada, o en §3.8.1 (Supuestos del modelo psicoacústico).",
+        "tipo_contenido": "justificacion",
+        "palabras_clave": [
+          "selección de modelo",
+          "disonancia",
+          "rugosidad",
+          "comparación",
+          "criterios"
+        ]
+      }
+    },
+    {
+      "id": "Q-015",
+      "tipo": "A",
+      "ubicacion_original": "Sección 3.2.2 La Función de Disonancia entre Parciales, línea 133",
+      "seccion_completa": "3.2.2 La Función de Disonancia entre Parciales",
+      "pregunta_original": "¿De dónde vienen estos valores numéricos? (Ajuste empírico de Sethares a los datos de Plomp-Levelt).",
+      "contexto_extraido_del_capitulo": {
+        "modelo_general": "Se usa una función paramétrica d(fa,fb,Aa,Ab) con constantes (D*, S1, S2, C1, C2, A1, A2) para modelar disonancia entre dos sinusoides.",
+        "decisiones_previas": [
+          "Adoptar los parámetros numéricos indicados en la ecuación operativa del repositorio",
+          "Interpretar S como escala crítica ligada a banda crítica"
+        ],
+        "parametros_definidos": {
+          "D*": "0.24",
+          "S1": "0.0207",
+          "S2": "18.96",
+          "C1": "5",
+          "C2": "-5",
+          "A1": "-3.51",
+          "A2": "-5.75"
+        },
+        "objetivo_seccion": "Especificar la función de disonancia entre parciales y justificar/atribuir el origen de sus constantes."
+      },
+      "pregunta_reformulada_para_notebooklm": "CONTEXTO DEL MODELO:\nImplementamos una función de disonancia sensorial entre dos sinusoides d(fa,fb,Aa,Ab)=Aa·Ab·[C1·exp(A1·S·Δf)+C2·exp(A2·S·Δf)], con S=D*/(S1·min(fa,fb)+S2) y constantes numéricas (D*,S1,S2,C1,C2,A1,A2). Esta función es el átomo del cálculo de rugosidad entre notas y, por agregación, de Φ_raw.\n\nDECISIÓN ESPECÍFICA:\nNecesitamos atribuir con precisión el origen de esas constantes y explicar si provienen de ajuste a datos de Plomp–Levelt u otras fuentes, y qué tan “estándar” es usar exactamente esos valores.\n\nPREGUNTA:\n¿Cuál es la fuente primaria (paper/libro) donde se presentan estos valores numéricos y cuál fue el procedimiento de calibración/ajuste (a qué datos, qué criterio de error, qué rangos de frecuencia)? ¿Existen revisiones o reparametrizaciones posteriores que propongan otros valores (por timbre, rango de frecuencias o población experimental)? ¿Qué tan robusta es la forma de la curva frente a cambios razonables en estos parámetros?\n\nQUÉ BUSCAMOS:\nCitas exactas (autor/año y, si aplica, páginas) que documenten el origen de las constantes y un resumen de su estatus: “valores canónicos” vs “una parametrización entre varias”.",
+      "tema_notebook_sugerido": "psicoacustica",
+      "para_redactor": {
+        "donde_insertar": "§3.2.2, inmediatamente después de listar los parámetros de la ecuación 3.1.",
+        "tipo_contenido": "validacion",
+        "palabras_clave": [
+          "calibración",
+          "parámetros",
+          "Plomp-Levelt",
+          "Sethares",
+          "curva de disonancia"
+        ]
+      }
+    },
+    {
+      "id": "Q-016",
+      "tipo": "A",
+      "ubicacion_original": "Sección 3.2.2 La Función de Disonancia entre Parciales, línea 134",
+      "seccion_completa": "3.2.2 La Función de Disonancia entre Parciales",
+      "pregunta_original": "¿Cuál es la sensibilidad del modelo a variaciones en estos parámetros? (Señalar que el repositorio permite sobreescritura; discutir en §3.8 Supuestos).",
+      "contexto_extraido_del_capitulo": {
+        "modelo_general": "La rugosidad total depende de parámetros de la función d y del espectro; la sección anticipa discutir sensibilidad y supuestos.",
+        "decisiones_previas": [
+          "Parámetros numéricos fijados para d(·) en la implementación",
+          "El repositorio permite sobreescritura de parámetros (exploración), pero la tesis fija una elección base"
+        ],
+        "parametros_definidos": {
+          "parametros_d": "D*, S1, S2, C1, C2, A1, A2",
+          "eps_zeros": "1e-12 (mencionado para métricas de distribuciones más adelante, relevante si se comparan implementaciones)"
+        },
+        "objetivo_seccion": "Justificar la parametrización y anticipar análisis de robustez/sensibilidad del componente psicoacústico."
+      },
+      "pregunta_reformulada_para_notebooklm": "CONTEXTO DEL MODELO:\nNuestro cálculo de rugosidad se basa en una función paramétrica d(·) con constantes numéricas específicas. La rugosidad final de un acorde (y su vector Φ_raw) se obtiene por sumas anidadas (pares de notas × pares de parciales), por lo que errores o variaciones en parámetros podrían propagarse a la geometría del espacio resultante.\n\nDECISIÓN ESPECÍFICA:\nQueremos saber cuán sensible es el modelo a cambios razonables en los parámetros de d(·), para justificar que usar una parametrización fija no sesga de forma arbitraria el espacio, y para decidir si es necesario reportar un análisis de sensibilidad.\n\nPREGUNTA:\n¿Qué reporta la literatura sobre la sensibilidad/robustez de modelos tipo Sethares/Plomp–Levelt ante variaciones de parámetros (C1,C2,A1,A2,S1,S2, etc.)? ¿Se ha estudiado cómo cambian rankings de disonancia (por intervalos o por acordes) cuando se perturban parámetros o cuando se cambia la calibración? ¿Qué recomendaciones metodológicas existen para (i) elegir un conjunto de parámetros, y (ii) reportar sensibilidad (p.ej., análisis local, rangos, incertidumbre)?\n\nQUÉ BUSCAMOS:\nFuentes y metodología para escribir una nota de robustez: qué tan estable es el comportamiento cualitativo (mínimos/máximos de la curva) y si hay evidencia de que pequeñas variaciones cambien conclusiones perceptuales o solo reescalen resultados.",
+      "tema_notebook_sugerido": "psicoacustica",
+      "para_redactor": {
+        "donde_insertar": "§3.2.2, como párrafo final o como subapartado en §3.8.1 (Supuestos del modelo psicoacústico).",
+        "tipo_contenido": "validacion",
+        "palabras_clave": [
+          "sensibilidad",
+          "robustez",
+          "parámetros",
+          "incertidumbre",
+          "calibración"
+        ]
+      }
+    },
+    {
+      "id": "Q-017",
+      "tipo": "A",
+      "ubicacion_original": "Sección 3.2.3 Extensión a Tonos Complejos: Modelo de Parciales Armónicos, línea 150",
+      "seccion_completa": "3.2.3 Extensión a Tonos Complejos: Modelo de Parciales Armónicos",
+      "pregunta_original": "¿Es el supuesto de espectro armónico con decaimiento exponencial razonable? (Razonable para instrumentos de cuerda/viento; no para percusión o espectros inarmónicos).",
+      "contexto_extraido_del_capitulo": {
+        "modelo_general": "Cada nota se modela como tono complejo con espectro armónico ideal: parciales f0·k con amplitud δ^(k−1) hasta H parciales.",
+        "decisiones_previas": [
+          "Tonos sintéticos con espectro armónico",
+          "Decaimiento exponencial de amplitud",
+          "Parámetros fijados en el repositorio: H=6, δ=0.88"
+        ],
+        "parametros_definidos": {
+          "H": "6",
+          "delta": "0.88",
+          "amplitud_parcial_k": "δ^(k−1)"
+        },
+        "objetivo_seccion": "Justificar la extensión de díadas de tonos puros a tonos complejos mediante un modelo simple de espectro armónico."
+      },
+      "pregunta_reformulada_para_notebooklm": "CONTEXTO DEL MODELO:\nPara extender la disonancia sensorial a acordes con tonos complejos, modelamos cada nota como un espectro armónico ideal: parciales en frecuencias f0·k con amplitudes decrecientes δ^(k−1) para k=1..H. En el repositorio usamos valores fijos (H=6, δ=0.88) y calculamos rugosidad sumando interacciones entre todos los pares de parciales.\n\nDECISIÓN ESPECÍFICA:\nNecesitamos justificar que este timbre sintético (armónico + decaimiento exponencial) es una aproximación razonable para el objetivo de la tesis, y delimitar su validez (qué instrumentos/timbres quedan fuera).\n\nPREGUNTA:\n¿Qué dice la literatura (acústica musical/psicoacústica/MIR) sobre usar espectros armónicos ideales con decaimiento exponencial como aproximación de timbre para modelos de roughness/disonancia? ¿En qué contextos se considera una aproximación estándar y cuáles son sus limitaciones (instrumentos inarmónicos, percusión, formantes, envolventes temporales)? ¿Cómo se recomienda justificar, en metodología, el uso de tonos sintéticos frente a grabaciones reales cuando el objetivo es comparar estructuras armónicas (intervalos/voicings) de manera controlada?\n\nQUÉ BUSCAMOS:\nCitas y un argumento claro: por qué este modelo de espectro es suficiente para el objetivo (control + interpretabilidad) y cómo reconocer explícitamente sus amenazas a validez externa hacia timbres inarmónicos o dinámicas temporales.",
+      "tema_notebook_sugerido": "psicoacustica",
+      "para_redactor": {
+        "donde_insertar": "§3.2.3, después de Definición 3.8 (espectro armónico) y antes de Ecuación 3.2 (rugosidad entre notas).",
+        "tipo_contenido": "justificacion",
+        "palabras_clave": [
+          "espectro armónico",
+          "timbre",
+          "tono sintético",
+          "decaimiento exponencial",
+          "validez externa"
+        ]
+      }
+    },
+    {
+      "id": "Q-018",
+      "tipo": "A",
+      "ubicacion_original": "Sección 3.2.3 Extensión a Tonos Complejos: Modelo de Parciales Armónicos, línea 151",
+      "seccion_completa": "3.2.3 Extensión a Tonos Complejos: Modelo de Parciales Armónicos",
+      "pregunta_original": "¿Cómo afecta H=6 a la resolución del modelo? ¿Sería diferente con H=10?",
+      "contexto_extraido_del_capitulo": {
+        "modelo_general": "Rugosidad entre dos notas suma d(·) sobre todos los pares de parciales hasta H, por lo que H controla fidelidad vs costo (∝H^2).",
+        "decisiones_previas": [
+          "H fijo en el repositorio: 6 parciales",
+          "Complejidad por acorde: C(m,2)·H^2 evaluaciones de d(·)"
+        ],
+        "parametros_definidos": {
+          "H": "6 (actual)",
+          "delta": "0.88",
+          "costo": "proporcional a H^2"
+        },
+        "objetivo_seccion": "Justificar parámetros de síntesis/precisión del modelo de rugosidad y su impacto computacional."
+      },
+      "pregunta_reformulada_para_notebooklm": "CONTEXTO DEL MODELO:\nLa rugosidad entre dos notas se calcula como suma doble sobre pares de parciales hasta H (R(fi,fj)=Σ_{p,q≤H} d(fi·p,fj·q,δ^(p−1),δ^(q−1))). En el repositorio fijamos H=6 y δ=0.88, y el costo computacional crece como H^2 por par de notas.\n\nDECISIÓN ESPECÍFICA:\nDebemos justificar H=6 como compromiso precisión/tiempo, o proponer un criterio de convergencia (qué tan “estable” es la rugosidad al aumentar H).\n\nPREGUNTA:\nEn implementaciones y estudios previos de roughness/disonancia para tonos complejos, ¿qué valores típicos de H se usan y con qué justificación? ¿Existe evidencia o reglas prácticas sobre convergencia: a partir de qué H añadir más parciales cambia poco los rankings o perfiles de rugosidad para acordes? ¿Cómo se recomienda diseñar y reportar un experimento de sensibilidad en H (p.ej., comparar Φ_raw con H=6 vs H=10 bajo una métrica) para apoyar la elección en una tesis?\n\nQUÉ BUSCAMOS:\nFuentes y criterios citables para escoger H (y reportar su impacto): estabilidad cualitativa de la curva/ordenamientos, rango de frecuencias relevante, y trade-off con tractabilidad computacional en exploración poblacional.",
+      "tema_notebook_sugerido": "psicoacustica",
+      "para_redactor": {
+        "donde_insertar": "§3.2.3, después de ‘Parámetros del repositorio’ (H y δ) o en §3.8.1 como sensibilidad paramétrica.",
+        "tipo_contenido": "validacion",
+        "palabras_clave": [
+          "H",
+          "parciales",
+          "convergencia",
+          "costo computacional",
+          "sensibilidad"
+        ]
+      }
+    },
+    {
+      "id": "Q-019",
+      "tipo": "A",
+      "ubicacion_original": "Sección 3.2.5 Validación Interna del Componente de Rugosidad, línea 180",
+      "seccion_completa": "3.2.5 Validación Interna del Componente de Rugosidad",
+      "pregunta_original": "¿Es suficiente validar con díadas? ¿Cómo se verifica que la extensión a acordes de mayor cardinalidad es correcta?",
+      "contexto_extraido_del_capitulo": {
+        "modelo_general": "Se valida el componente de rugosidad comparando la curva de díadas con referencias; el modelo para acordes suma contribuciones por pares de notas/parciales.",
+        "decisiones_previas": [
+          "Validación interna: curva para díadas + tests automatizados cualitativos",
+          "Extensión a acordes: R_total(n)=Σ_{i<j} R(f(n_i),f(n_j)) (aditividad por pares)"
+        ],
+        "parametros_definidos": {
+          "R_total": "suma sobre pares de notas",
+          "tolerancia_tests": "1e-6"
+        },
+        "objetivo_seccion": "Argumentar corrección del cálculo de rugosidad implementado y su extensión de díadas a acordes."
+      },
+      "pregunta_reformulada_para_notebooklm": "CONTEXTO DEL MODELO:\nValidamos el componente de rugosidad comparando la curva de disonancia para díadas con referencias (Plomp–Levelt/Sethares) y con tests cualitativos automatizados. Sin embargo, nuestro objetivo es aplicar el modelo a acordes (m>2) usando una extensión aditiva: la rugosidad total del acorde es la suma de rugosidades por pares de notas, y cada par se calcula sumando interacciones entre parciales.\n\nDECISIÓN ESPECÍFICA:\nNecesitamos justificar que validar solo díadas es suficiente para confiar en la extensión a acordes, o proponer validaciones adicionales que detecten fenómenos no lineales (enmascaramiento, saturación, interacciones de múltiples tonos) no capturados por un modelo puramente aditivo.\n\nPREGUNTA:\n¿Qué discute la literatura sobre la validez de extender modelos de disonancia/rugosidad calibrados en díadas a acordes con m>2 mediante suma par‑a‑par? ¿Qué limitaciones o fenómenos adicionales se han reportado en acordes densos (masking, critical band interactions, non-linearities) y cómo se recomienda validar un modelo aditivo a nivel de acordes? ¿Qué tipos de pruebas (psicoacústicas o computacionales) se usan como “sanity checks” más allá de reproducir la curva de díadas?\n\nQUÉ BUSCAMOS:\nReferencias y propuestas concretas de validación para acordes: criterios perceptuales, datasets o protocolos experimentales, y cómo escribir en metodología una defensa honesta (qué se valida y qué queda fuera).",
+      "tema_notebook_sugerido": "psicoacustica",
+      "para_redactor": {
+        "donde_insertar": "§3.2.5, después del bloque de tests con díadas, como subsección “Validez de la extensión a m>2”.",
+        "tipo_contenido": "validacion",
+        "palabras_clave": [
+          "aditividad",
+          "acordes",
+          "validación",
+          "masking",
+          "no linealidad"
+        ]
+      }
+    },
+    {
+      "id": "Q-020",
+      "tipo": "A",
+      "ubicacion_original": "Sección 3.2.5 Validación Interna del Componente de Rugosidad, línea 181",
+      "seccion_completa": "3.2.5 Validación Interna del Componente de Rugosidad",
+      "pregunta_original": "¿Existe un “ground truth” perceptual contra el cual validar para tríadas o cuatríadas?",
+      "contexto_extraido_del_capitulo": {
+        "modelo_general": "El modelo produce valores de rugosidad para acordes; se reconoce ausencia de validación con juicio humano en amenazas a validez externa.",
+        "decisiones_previas": [
+          "Validación interna prioriza consistencia y casos canónicos (díadas)",
+          "Se cuestiona la existencia de ground truth para acordes y unidades interpretables"
+        ],
+        "parametros_definidos": {
+          "salida": "R_total y Φ_raw en unidades relativas (modelo)",
+          "objetivo_validacion": "comparar con ratings perceptuales de consonancia/dissonancia para acordes"
+        },
+        "objetivo_seccion": "Identificar estrategias realistas de validación perceptual para acordes más allá de díadas."
+      },
+      "pregunta_reformulada_para_notebooklm": "CONTEXTO DEL MODELO:\nCalculamos rugosidad psicoacústica para acordes completos (m=3,4,…) usando un modelo basado en Plomp–Levelt/Sethares y lo resumimos en un vector Φ_raw de 12 bins. Para defender la validez del modelo, quisiéramos contrastarlo con evidencia perceptual más allá de díadas.\n\nDECISIÓN ESPECÍFICA:\nDebemos determinar si existe (o no) un conjunto de datos/estudios con ratings perceptuales de disonancia/consonancia para tríadas/cuatríadas que pueda servir como referencia, y cómo se compararía con nuestra salida (ranking, correlación, etc.).\n\nPREGUNTA:\n¿Existen datasets o estudios psicofísicos que midan disonancia/consonancia (o rugosidad percibida) para acordes de 3 o más notas (tríadas, cuatríadas, clusters) con protocolos reproducibles? ¿Qué escalas/unidades se usan (ratings, comparaciones pareadas, magnitudes) y qué tan estables son entre sujetos? ¿Cómo suelen validar modelos computacionales contra esos datos (correlación, error de ranking, análisis por registro/timbre)?\n\nQUÉ BUSCAMOS:\nReferencias concretas (papers/datasets) y recomendaciones metodológicas para una validación perceptual mínima viable para acordes, o para justificar explícitamente por qué la tesis se limita a validación interna (y qué implica).",
+      "tema_notebook_sugerido": "psicoacustica",
+      "para_redactor": {
+        "donde_insertar": "§3.2.5, al final de la sección de validación, o en §3.8.5 (Amenazas a la validez externa).",
+        "tipo_contenido": "validacion",
+        "palabras_clave": [
+          "ground truth",
+          "percepción",
+          "tríadas",
+          "dissonance ratings",
+          "validación"
+        ]
+      }
+    },
+    {
+      "id": "Q-021",
+      "tipo": "A",
+      "ubicacion_original": "Sección 3.3.1 El Problema de la Comparabilidad, línea 199",
+      "seccion_completa": "3.3.1 El Problema de la Comparabilidad",
+      "pregunta_original": "¿La normalización destruye información relevante? ¿Cuál?",
+      "contexto_extraido_del_capitulo": {
+        "modelo_general": "El vector Φ_raw distribuye rugosidad total por bins; su magnitud crece con la cardinalidad (más pares) y con la rugosidad absoluta del acorde.",
+        "decisiones_previas": [
+          "Se evalúan normalizaciones para comparar acordes con distinta cardinalidad",
+          "Se reconoce dilema magnitud vs forma de distribución",
+          "El pipeline compara escenarios (normalización × métrica × reductor)"
+        ],
+        "parametros_definidos": {
+          "Φ_raw_dim": "12",
+          "dependencia_m": "magnitud crece con C(m,2)"
+        },
+        "objetivo_seccion": "Motivar por qué se proponen transformaciones/normalizaciones antes de medir distancias y reducir dimensionalidad."
+      },
+      "pregunta_reformulada_para_notebooklm": "CONTEXTO DEL MODELO:\nCada acorde se representa por un vector Φ_raw∈R_{≥0}^{12} que agrega rugosidad por clase de intervalo; la suma de sus componentes es la rugosidad total. Como un acorde con más notas tiene más pares, la magnitud de Φ_raw tiende a crecer con la cardinalidad m, mezclando “cantidad total de rugosidad” con “perfil relativo por intervalos”.\n\nDECISIÓN ESPECÍFICA:\nProponemos varias normalizaciones (proyección al simplex, división por número de pares, etc.) para volver comparables acordes de distinta cardinalidad. Necesitamos explicar qué información se pierde al normalizar y cuándo esa pérdida es aceptable.\n\nPREGUNTA:\nEn análisis de características (MIR / aprendizaje / análisis perceptual), ¿qué se considera “información relevante” que puede perderse al normalizar un vector no negativo como Φ_raw? En particular: ¿qué se pierde al pasar de magnitudes absolutas (rugosidad total) a perfiles relativos (L1/simplex)? ¿Qué criterios se usan para decidir si preservar magnitud es importante versus preservar forma/distribución? ¿Hay discusiones o guías aplicables a features que mezclan conteos y energía/percepción?\n\nQUÉ BUSCAMOS:\nUn marco y referencias para escribir una discusión breve: qué variables codifica la magnitud (cardinalidad/energía) y qué codifica la forma (perfil intervalar), y cómo la normalización cambia la interpretación de las distancias posteriores.",
+      "tema_notebook_sugerido": "reduccion_dimensionalidad",
+      "para_redactor": {
+        "donde_insertar": "§3.3.1, después del dilema normalizar/no normalizar y antes de listar el catálogo de propuestas (§3.3.2).",
+        "tipo_contenido": "justificacion",
+        "palabras_clave": [
+          "normalización",
+          "magnitud",
+          "simplex",
+          "interpretación",
+          "comparabilidad"
+        ]
+      }
+    },
+    {
+      "id": "Q-022",
+      "tipo": "A",
+      "ubicacion_original": "Sección 3.3.1 El Problema de la Comparabilidad, línea 200",
+      "seccion_completa": "3.3.1 El Problema de la Comparabilidad",
+      "pregunta_original": "¿Es posible que la mejor normalización dependa de la pregunta que se quiere responder?",
+      "contexto_extraido_del_capitulo": {
+        "modelo_general": "Se comparan normalizaciones con distintos objetivos (preservar magnitud vs comparar perfiles) y se evalúan experimentalmente en el pipeline.",
+        "decisiones_previas": [
+          "No hay ‘mejor’ normalización a priori; se define como pregunta experimental",
+          "El pipeline evalúa escenarios y mide calidad de embeddings"
+        ],
+        "parametros_definidos": {
+          "normalizaciones": [
+            "identity",
+            "simplex",
+            "simplex_sqrt",
+            "simplex_smooth",
+            "perclass_α",
+            "global_pairs",
+            "divide_mminus1"
+          ]
+        },
+        "objetivo_seccion": "Justificar la comparación de múltiples normalizaciones como parte del diseño experimental."
+      },
+      "pregunta_reformulada_para_notebooklm": "CONTEXTO DEL MODELO:\nPartimos de un vector Φ_raw de 12 bins que mezcla magnitud total de rugosidad y distribución por intervalos. Proponemos varias normalizaciones para controlar comparabilidad entre acordes con distinta cardinalidad y para habilitar métricas de distribuciones cuando Φ se interpreta como perfil.\n\nDECISIÓN ESPECÍFICA:\nQueremos argumentar que la ‘mejor’ normalización puede depender de la tarea: buscar acordes con rugosidad total similar vs buscar perfiles intervalares similares, o comparar acordes de cardinalidad distinta.\n\nPREGUNTA:\n¿Qué dice la literatura sobre la dependencia “tarea→preprocesamiento” en la elección de normalizaciones de features (especialmente vectores no negativos interpretables como perfiles/distribuciones)? ¿Qué criterios se proponen para elegir entre preservar magnitud (features en escala original) versus normalizar a simplex (comparar forma)? ¿Hay ejemplos en MIR o análisis perceptual donde diferentes normalizaciones se consideren óptimas según la pregunta (similitud, clustering, clasificación, visualización)?\n\nQUÉ BUSCAMOS:\nCitas y argumentos para justificar la evaluación comparativa de normalizaciones en nuestra metodología, y para escribir recomendaciones interpretables según el tipo de pregunta musical/perceptual.",
+      "tema_notebook_sugerido": "reduccion_dimensionalidad",
+      "para_redactor": {
+        "donde_insertar": "§3.3.1, como párrafo de cierre que conecta con §3.3.2 y con el diseño experimental §3.6.",
+        "tipo_contenido": "justificacion",
+        "palabras_clave": [
+          "task-dependent",
+          "feature scaling",
+          "simplex",
+          "MIR",
+          "preprocesamiento"
+        ]
+      }
+    },
+    {
+      "id": "Q-023",
+      "tipo": "A",
+      "ubicacion_original": "Sección 3.3.2 Catálogo de Propuestas Evaluadas, línea 229",
+      "seccion_completa": "3.3.2 Catálogo de Propuestas Evaluadas",
+      "pregunta_original": "¿El suavizado gaussiano tiene justificación perceptual o es una heurística?",
+      "contexto_extraido_del_capitulo": {
+        "modelo_general": "Una de las normalizaciones propuestas aplica suavizado gaussiano sobre sqrt(H) antes de normalizar al simplex para modelar difusión perceptual entre bins adyacentes.",
+        "decisiones_previas": [
+          "Normalización simplex_smooth: Gauss_σ(sqrt(H)) con σ=0.75 y luego L1",
+          "Interpretación propuesta: ‘difusión perceptual’ entre bins adyacentes"
+        ],
+        "parametros_definidos": {
+          "sigma": "0.75",
+          "transformacion": "Gauss_σ(sqrt(H))"
+        },
+        "objetivo_seccion": "Presentar y justificar transformaciones con interpretación perceptual, no solo heurísticas opacas."
+      },
+      "pregunta_reformulada_para_notebooklm": "CONTEXTO DEL MODELO:\nPara comparar acordes usamos normalizaciones del vector Φ_raw (12 bins). Una propuesta (`simplex_smooth`) aplica raíz cuadrada para comprimir rango dinámico y luego un suavizado gaussiano a lo largo de los bins de intervalo, antes de normalizar al simplex. La motivación es que bins adyacentes podrían representar intervalos perceptualmente cercanos y que el suavizado reduce picos dominantes.\n\nDECISIÓN ESPECÍFICA:\nNecesitamos decidir si presentar este suavizado como heurística práctica o respaldarlo con un argumento perceptual (p.ej., generalización, tolerancia perceptual, confusiones entre intervalos cercanos) y/o con referencias.\n\nPREGUNTA:\n¿Existe literatura (psicoacústica, percepción de intervalos, MIR) que justifique explícitamente suavizar representaciones discretas de intervalos/clases adyacentes (p.ej., difundir masa entre bins vecinos) como modelo de incertidumbre/tolerancia perceptual? Si no hay justificación directa, ¿cómo se recomienda presentar y evaluar este tipo de suavizado como técnica de regularización/robustez en features no negativas antes de medir distancias y hacer embeddings?\n\nQUÉ BUSCAMOS:\nReferencias o argumentos metodológicos para: (i) interpretar el suavizado como modelado de tolerancia perceptual o (ii) enmarcarlo como heurística/regularización con evaluación empírica (sin sobreafirmar).",
+      "tema_notebook_sugerido": "psicoacustica",
+      "para_redactor": {
+        "donde_insertar": "§3.3.2, justo después de definir `simplex_smooth` y antes de pasar a las proposiciones sobre el simplex.",
+        "tipo_contenido": "justificacion",
+        "palabras_clave": [
+          "suavizado",
+          "gaussiano",
+          "regularización",
+          "percepción",
+          "intervalos"
+        ]
+      }
+    },
+    {
+      "id": "Q-024",
+      "tipo": "A",
+      "ubicacion_original": "Sección 3.3.2 Catálogo de Propuestas Evaluadas, línea 230",
+      "seccion_completa": "3.3.2 Catálogo de Propuestas Evaluadas",
+      "pregunta_original": "¿Hay riesgo de sobreajuste al evaluar tantas propuestas? (Discutir en §3.8 corrección por comparaciones múltiples).",
+      "contexto_extraido_del_capitulo": {
+        "modelo_general": "Se evalúan múltiples normalizaciones y luego múltiples métricas/reductores, generando muchos escenarios; esto crea riesgo de ‘p-hacking’ o selección optimista.",
+        "decisiones_previas": [
+          "Catálogo de 10 normalizaciones",
+          "Luego se combinan con 5 métricas y 4 reductores (200 escenarios por seed/población)",
+          "Se anticipa discutir corrección por comparaciones múltiples"
+        ],
+        "parametros_definidos": {
+          "num_normalizaciones": "10",
+          "num_metricas": "5",
+          "num_reductores": "4",
+          "total_escenarios": "200"
+        },
+        "objetivo_seccion": "Anticipar problemas de selección de modelo al comparar muchas alternativas y definir cómo se mitigan."
+      },
+      "pregunta_reformulada_para_notebooklm": "CONTEXTO DEL MODELO:\nNuestra metodología compara muchas variantes del pipeline: 10 normalizaciones × 5 métricas × 4 reductores (≈200 escenarios por población y semilla). Elegir el ‘mejor’ embedding según métricas puede inflar resultados por selección optimista si no se controla el efecto de múltiples comparaciones.\n\nDECISIÓN ESPECÍFICA:\nDebemos decidir cómo mitigar sobreajuste/selección (múltiples comparaciones) y cómo reportarlo: corrección estadística, separación exploratorio vs confirmatorio, multi-seed, y/o poblaciones de validación.\n\nPREGUNTA:\n¿Qué recomienda la literatura metodológica para comparar y seleccionar entre muchos pipelines/escenarios basados en métricas de calidad de embeddings (stress, trustworthiness, etc.) sin caer en selección optimista? ¿Cuándo es apropiado aplicar correcciones por comparaciones múltiples (Bonferroni/FDR) versus tratar el estudio como exploratorio (ranking relativo) y usar replicación (multi-seed, múltiples poblaciones) como mitigación? ¿Cómo se reporta de forma transparente en un capítulo de metodología?\n\nQUÉ BUSCAMOS:\nGuías citables para redactar un protocolo de selección/evaluación que sea defendible: qué es exploratorio, qué es confirmatorio, cómo se controla el ‘multiple testing’ y cómo interpretar rankings de escenarios.",
+      "tema_notebook_sugerido": "reduccion_dimensionalidad",
+      "para_redactor": {
+        "donde_insertar": "§3.3.2 (nota de cierre) y/o §3.6.2 (factores) y §3.8.5 (amenazas a validez interna).",
+        "tipo_contenido": "validacion",
+        "palabras_clave": [
+          "múltiples comparaciones",
+          "model selection",
+          "overfitting",
+          "ranking",
+          "exploratorio"
+        ]
+      }
+    },
+    {
+      "id": "Q-025",
+      "tipo": "A",
+      "ubicacion_original": "Sección 3.4.1 Métricas Vectoriales, línea 257",
+      "seccion_completa": "3.4.1 Métricas Vectoriales",
+      "pregunta_original": "¿Tiene sentido usar la distancia euclidiana sobre vectores de rugosidad cruda (identity)? (Sí, pero dominarán las diferencias de magnitud, no de forma).",
+      "contexto_extraido_del_capitulo": {
+        "modelo_general": "Con Φ (crudo o normalizado) se define una disimilitud ρ y se construye una matriz D para reducción dimensional.",
+        "decisiones_previas": [
+          "Se consideran métricas vectoriales: coseno, euclidiana, Manhattan",
+          "Se reconoce que euclidiana sobre identity privilegia magnitud (rugosidad total) y cardinalidad"
+        ],
+        "parametros_definidos": {
+          "ρ_candidatas": [
+            "cosine",
+            "euclidean",
+            "manhattan"
+          ],
+          "Φ_identity": "Φ_raw sin normalizar"
+        },
+        "objetivo_seccion": "Elegir una disimilitud coherente con la interpretación deseada (magnitud vs perfil) para inducir geometría sobre A."
+      },
+      "pregunta_reformulada_para_notebooklm": "CONTEXTO DEL MODELO:\nRepresentamos cada acorde por un vector no negativo Φ_raw de 12 bins (rugosidad agregada por clase de intervalo). Luego definimos una disimilitud ρ para construir una matriz de distancias D y aplicar reducción dimensional (MDS/UMAP). Consideramos usar distancia euclidiana directamente sobre Φ_raw (normalización `identity`).\n\nDECISIÓN ESPECÍFICA:\nDebemos justificar cuándo tiene sentido usar euclidiana sobre features crudos, sabiendo que la magnitud (rugosidad total y/o cardinalidad) puede dominar y ocultar diferencias de “forma” del perfil.\n\nPREGUNTA:\nEn literatura de análisis perceptual/MIR, ¿cuándo se justifica usar distancia euclidiana sobre vectores de energía/medidas crudas (sin normalizar) versus normalizar para comparar perfiles? En un caso como Φ_raw, ¿qué interpreta la euclidiana (diferencia en rugosidad total + distribución) y qué sesgos introduce cuando se mezclan acordes de distinta cardinalidad? ¿Qué recomendaciones existen para decidir entre euclidiana (magnitud) y coseno (forma) cuando el objetivo es similitud sonora?\n\nQUÉ BUSCAMOS:\nCitas y argumentos para escribir una guía interpretativa corta: qué “descubre” cada métrica en este tipo de features y por qué se incluye `identity+euclidean` como baseline de control (o por qué se evita).",
+      "tema_notebook_sugerido": "reduccion_dimensionalidad",
+      "para_redactor": {
+        "donde_insertar": "§3.4.1, después de Definición 3.13 y antes de pasar a métricas de distribuciones.",
+        "tipo_contenido": "justificacion",
+        "palabras_clave": [
+          "euclidiana",
+          "baseline",
+          "magnitud",
+          "coseno",
+          "interpretación"
+        ]
+      }
+    },
+    {
+      "id": "Q-026",
+      "tipo": "A",
+      "ubicacion_original": "Sección 3.4.2 Métricas de Distribuciones de Probabilidad, línea 277",
+      "seccion_completa": "3.4.2 Métricas de Distribuciones de Probabilidad",
+      "pregunta_original": "¿Cuándo preferir JSD vs Hellinger?",
+      "contexto_extraido_del_capitulo": {
+        "modelo_general": "Cuando Φ se normaliza al simplex (L1), puede interpretarse como distribución y permite usar JSD y Hellinger.",
+        "decisiones_previas": [
+          "JSD y Hellinger se consideran cuando Φ∈Δ^11",
+          "Se reconoce presencia de ceros (sparse) y necesidad de manejo numérico (eps)",
+          "Se busca cerrar el conjunto de métricas para no abrir un ‘hoyo’ de discusión"
+        ],
+        "parametros_definidos": {
+          "eps": "1e-12 (manejo de ceros)",
+          "simplex": "Σ_k x_k=1, x_k≥0"
+        },
+        "objetivo_seccion": "Elegir métricas de distancia apropiadas para comparar perfiles (distribuciones) y discutir su estabilidad numérica e interpretabilidad."
+      },
+      "pregunta_reformulada_para_notebooklm": "CONTEXTO DEL MODELO:\nDespués de transformar Φ_raw, algunas propuestas normalizan al simplex (L1) para interpretar el vector como un perfil/distribución de rugosidad por clase de intervalo. En ese caso consideramos métricas de distribuciones: Jensen–Shannon Divergence (JSD) y distancia de Hellinger, para construir D y hacer embeddings (MDS/UMAP). Nuestros vectores pueden ser dispersos (componentes cero) por baja cardinalidad.\n\nDECISIÓN ESPECÍFICA:\nNecesitamos decidir cuándo usar JSD vs Hellinger en este contexto, considerando soporte diferente, ceros numéricos y estabilidad, y cómo justificar la elección sin extender demasiado la discusión.\n\nPREGUNTA:\n¿Qué guía ofrece la literatura (teoría de la información / estadística / ML) sobre cuándo preferir JSD frente a Hellinger para comparar distribuciones discretas no negativas, especialmente cuando hay ceros o soportes distintos? En un pipeline de embeddings (MDS/UMAP) aplicado a perfiles de rugosidad normalizados, ¿qué implicaciones prácticas se reportan (sensibilidad a diferencias en colas, robustez numérica, interpretabilidad, compatibilidad con MDS métrico)? ¿Recomiendan un manejo estándar de ceros (epsilon) y cómo afecta la comparación?\n\nQUÉ BUSCAMOS:\nCitas y un criterio operativo (1–2 párrafos) para elegir y justificar una de estas métricas (o mantener ambas como comparación breve) para perfiles de rugosidad con cardinalidad mixta.",
+      "tema_notebook_sugerido": "reduccion_dimensionalidad",
+      "para_redactor": {
+        "donde_insertar": "§3.4.2, al final del bloque ‘Contenido adicional’ antes de ‘Preguntas clave’.",
+        "tipo_contenido": "justificacion",
+        "palabras_clave": [
+          "JSD",
+          "Hellinger",
+          "simplex",
+          "ceros",
+          "estabilidad numérica"
+        ]
+      }
+    },
+    {
+      "id": "Q-027",
+      "tipo": "A",
+      "ubicacion_original": "Sección 3.4.2 Métricas de Distribuciones de Probabilidad, línea 278",
+      "seccion_completa": "3.4.2 Métricas de Distribuciones de Probabilidad",
+      "pregunta_original": "¿El uso de log2 vs ln en JSD afecta la métrica? (Solo escala; la propiedad métrica de sqrt(JSD) se mantiene).",
+      "contexto_extraido_del_capitulo": {
+        "modelo_general": "JSD se define vía KL con log base 2 en el texto; se afirma que cambiar base solo reescala.",
+        "decisiones_previas": [
+          "Se reporta que sqrt(JSD) es métrica en el simplex",
+          "Se usa log2 por convención de bits, pero podría usarse ln"
+        ],
+        "parametros_definidos": {
+          "base_log": "2 (en la definición del capítulo)"
+        },
+        "objetivo_seccion": "Asegurar rigor matemático y evitar ambigüedad de definiciones en distancias de teoría de la información."
+      },
+      "pregunta_reformulada_para_notebooklm": "CONTEXTO DEL MODELO:\nDefinimos JSD(p,q)=1/2·KL(p‖m)+1/2·KL(q‖m), con KL(p‖q)=Σ p_k log(p_k/q_k). En el capítulo escribimos el logaritmo en base 2 por convención, y luego usamos √JSD como distancia para construir D.\n\nDECISIÓN ESPECÍFICA:\nQueremos afirmar correctamente qué cambia si usamos log2 o ln: si solo es un factor de escala, cómo afecta la interpretación (bits vs nats) y si afecta propiedades métricas.\n\nPREGUNTA:\n¿En qué sentido formal el cambio de base del logaritmo en KL/JSD solo reescala la divergencia? ¿Se preserva la propiedad de que √JSD es una métrica independientemente de la base, y cómo se debe redactar esta aclaración en un capítulo metodológico? ¿Qué convención recomiendan las fuentes (bits vs nats) para reportar valores y compararlos con trabajos previos?\n\nQUÉ BUSCAMOS:\nUna explicación citables (con una referencia estándar) y una redacción breve para evitar confusiones: “la base solo cambia una constante multiplicativa; no cambia ordenamientos ni validez de la métrica”.",
+      "tema_notebook_sugerido": "math",
+      "para_redactor": {
+        "donde_insertar": "§3.4.2, como nota al pie o frase aclaratoria inmediata después de la definición de KL/JSD.",
+        "tipo_contenido": "definicion",
+        "palabras_clave": [
+          "log base",
+          "bits",
+          "nats",
+          "JSD",
+          "escala"
+        ]
+      }
+    },
+    {
+      "id": "Q-028",
+      "tipo": "A",
+      "ubicacion_original": "Sección 3.4.3 Construcción de la Matriz de Distancias D, línea 294",
+      "seccion_completa": "3.4.3 Construcción de la Matriz de Distancias D",
+      "pregunta_original": "¿La elección de ρ induce una topología diferente sobre A? ¿Cómo verificarlo?",
+      "contexto_extraido_del_capitulo": {
+        "modelo_general": "Se define D_ij=ρ(Φ(c_i),Φ(c_j)); cambiar ρ cambia la geometría usada por MDS/UMAP y por las métricas de evaluación.",
+        "decisiones_previas": [
+          "Se comparan varias ρ (cosine, euclidean, manhattan, js, hellinger) sobre diferentes normalizaciones",
+          "Se evalúa calidad del embedding con métricas de vecindarios y stress"
+        ],
+        "parametros_definidos": {
+          "ρ_candidatas": [
+            "cosine",
+            "euclidean",
+            "manhattan",
+            "js",
+            "hellinger"
+          ],
+          "A": "espacio de acordes (tuplas MIDI)"
+        },
+        "objetivo_seccion": "Formalizar cómo una disimilitud induce estructura geométrica/topológica sobre el conjunto de acordes y cómo esa elección afecta los resultados."
+      },
+      "pregunta_reformulada_para_notebooklm": "CONTEXTO DEL MODELO:\nConstruimos un espacio de acordes A (tuplas de MIDI) y lo representamos en R^{12} vía Φ (crudo o normalizado). Luego definimos una disimilitud ρ para comparar acordes y construir una matriz D que alimenta MDS/UMAP y las métricas de evaluación. Diferentes ρ priorizan magnitud, forma o propiedades de distribución.\n\nDECISIÓN ESPECÍFICA:\nQueremos explicar con rigor qué significa que diferentes ρ induzcan “geometrías/topologías” distintas sobre A y cómo verificarlo empíricamente en el pipeline.\n\nPREGUNTA:\nDesde teoría de métricas/topología aplicada a datos, ¿cómo se formaliza la idea de que cambiar ρ cambia la topología inducida (por ejemplo, cambia vecindarios abiertos y estructura de k‑NN) sobre un conjunto finito de puntos representados por Φ? ¿Qué criterios se usan para decir que dos métricas inducen topologías “equivalentes” (p.ej., métricas equivalentes/Lipschitz) y qué verificaciones empíricas son razonables en práctica (estabilidad de vecindarios, correlación de rangos de distancias, estabilidad de clusters, etc.)?\n\nQUÉ BUSCAMOS:\nUna explicación citables y un set de verificaciones simples para redactar en metodología: cómo comparar métricas en términos de estructura local/global y qué resultados indicarían que la elección de ρ cambia sustancialmente el espacio de acordes.",
+      "tema_notebook_sugerido": "math",
+      "para_redactor": {
+        "donde_insertar": "§3.4.3, después de definir D y antes de pasar a reducción dimensional (§3.5).",
+        "tipo_contenido": "justificacion",
+        "palabras_clave": [
+          "topología inducida",
+          "equivalencia de métricas",
+          "kNN",
+          "estabilidad",
+          "geometría"
+        ]
+      }
+    },
+    {
+      "id": "Q-029",
+      "tipo": "A",
+      "ubicacion_original": "Sección 3.4.3 Construcción de la Matriz de Distancias D, línea 295",
+      "seccion_completa": "3.4.3 Construcción de la Matriz de Distancias D",
+      "pregunta_original": "¿Es la matriz D definida positiva / semidefinida? (Relevante para MDS clásico; no necesariamente para SMACOF).",
+      "contexto_extraido_del_capitulo": {
+        "modelo_general": "La matriz D proviene de disimilitudes; algunas son métricas, otras no. MDS clásico requiere estructura euclidiana (relacionada con PSD tras doble centrado).",
+        "decisiones_previas": [
+          "MDS principal se implementa como optimización (SMACOF) sobre distancias",
+          "Se mencionan condiciones de PSD/SDP como relevantes para MDS clásico"
+        ],
+        "parametros_definidos": {
+          "D": "matriz de distancias N×N",
+          "MDS": "clásico vs SMACOF"
+        },
+        "objetivo_seccion": "Aclarar condiciones matemáticas para que una disimilitud sea embeddable en espacio euclidiano y cómo eso afecta los métodos de reducción."
+      },
+      "pregunta_reformulada_para_notebooklm": "CONTEXTO DEL MODELO:\nConstruimos una matriz de distancias D a partir de una disimilitud ρ aplicada a vectores Φ. Luego usamos MDS (vía SMACOF) y comparamos con otros reductores. Algunas disimilitudes consideradas no son métricas estrictas (p.ej., coseno) y otras sí (p.ej., √JSD, Hellinger).\n\nDECISIÓN ESPECÍFICA:\nQueremos saber qué propiedades matemáticas debe cumplir D (o su transformación por doble centrado) para que exista un embedding euclidiano exacto, y cómo interpretar casos donde no se cumple (stress > 0, distorsión inevitable).\n\nPREGUNTA:\n¿Qué condiciones teóricas caracterizan cuándo una matriz de distancias proviene de puntos en un espacio euclidiano (p.ej., relación con matrices Gram PSD después de doble centrado / distancias de tipo negativo)? Para disimilitudes comunes como coseno, JSD/Hellinger o Manhattan sobre simplex, ¿qué se sabe sobre embeddability euclidiana y qué consecuencias tiene para MDS clásico vs MDS por optimización (SMACOF)? ¿Cómo se recomienda explicar esto en un capítulo metodológico sin entrar en demasiada teoría?\n\nQUÉ BUSCAMOS:\nUna explicación citables y una redacción práctica: qué significa “no PSD/ no euclidiana”, por qué SMACOF aún aplica, y cómo se refleja en stress/Shepard.",
+      "tema_notebook_sugerido": "math",
+      "para_redactor": {
+        "donde_insertar": "§3.4.3 o §3.5.1, como nota breve sobre diferencias entre MDS clásico y SMACOF.",
+        "tipo_contenido": "definicion",
+        "palabras_clave": [
+          "embeddability",
+          "PSD",
+          "Gram matrix",
+          "double centering",
+          "SMACOF"
+        ]
+      }
+    },
+    {
+      "id": "Q-030",
+      "tipo": "A",
+      "ubicacion_original": "Sección 3.5.1 Formulación como Problema de Optimización (MDS), línea 322",
+      "seccion_completa": "3.5.1 Formulación como Problema de Optimización (MDS)",
+      "pregunta_original": "¿Por qué MDS métrico y no no-métrico? (Métrico preserva magnitudes, no solo rangos; apropiado cuando la escala de ρ es informativa).",
+      "contexto_extraido_del_capitulo": {
+        "modelo_general": "Se usa MDS (SMACOF) sobre D, con stress de Kruskal como objetivo; se configura metric=True.",
+        "decisiones_previas": [
+          "MDS es método principal para preservar distancias",
+          "Se asume que la escala de ρ contiene información (no solo orden)"
+        ],
+        "parametros_definidos": {
+          "metric": "True (MDS métrico)",
+          "n_init": "4",
+          "n_components": "2"
+        },
+        "objetivo_seccion": "Justificar el tipo de MDS usado y su adecuación a las disimilitudes definidas."
+      },
+      "pregunta_reformulada_para_notebooklm": "CONTEXTO DEL MODELO:\nConstruimos una matriz D a partir de una disimilitud ρ sobre vectores Φ (rugosidad por intervalos) y reducimos a 2D con MDS optimizando el stress de Kruskal vía SMACOF. En la implementación se usa MDS métrico (metric=True) y múltiples inicializaciones (n_init=4).\n\nDECISIÓN ESPECÍFICA:\nDebemos justificar por qué tratamos D como portadora de magnitudes significativas (MDS métrico) en lugar de preservar solo ordenamientos de disimilitud (MDS no-métrico), y qué implicaría cada opción para interpretar el espacio de acordes.\n\nPREGUNTA:\n¿Qué criterios ofrece la literatura para elegir MDS métrico vs no-métrico cuando las distancias provienen de features perceptuales/computacionales (no de juicios humanos directos)? ¿Cómo se relaciona la elección con (i) el significado de la escala de ρ, (ii) la presencia de no-linealidades o sesgos de escala, y (iii) la interpretabilidad de distancias en el embedding? ¿Qué recomendaciones o ejemplos existen en trabajos de representación musical (o en dominios similares) que usen MDS y discutan esta decisión?\n\nQUÉ BUSCAMOS:\nCitas y una justificación breve para defender MDS métrico como opción principal (o para reconocer cuándo sería preferible no-métrico) en el contexto de un modelo de similitud basado en rugosidad.",
+      "tema_notebook_sugerido": "reduccion_dimensionalidad",
+      "para_redactor": {
+        "donde_insertar": "§3.5.1, inmediatamente antes de ‘Preguntas clave’ o como respuesta redactada dentro de esa subsección.",
+        "tipo_contenido": "justificacion",
+        "palabras_clave": [
+          "MDS",
+          "métrico",
+          "no-métrico",
+          "stress",
+          "interpretabilidad"
+        ]
+      }
+    },
+    {
+      "id": "Q-031",
+      "tipo": "A",
+      "ubicacion_original": "Sección 3.5.1 Formulación como Problema de Optimización (MDS), línea 323",
+      "seccion_completa": "3.5.1 Formulación como Problema de Optimización (MDS)",
+      "pregunta_original": "¿Es el stress una medida suficiente o necesitamos métricas complementarias?",
+      "contexto_extraido_del_capitulo": {
+        "modelo_general": "Stress mide preservación global de distancias en MDS; el capítulo define métricas complementarias en §3.7 (vecindarios, correlación global, clustering).",
+        "decisiones_previas": [
+          "Stress es función objetivo de MDS y también métrica post-hoc",
+          "Se propone un marco de evaluación con trustworthiness/continuity, Spearman, Shepard, silhouette, etc."
+        ],
+        "parametros_definidos": {
+          "MAX_SHEPARD_PAIRS": "20000",
+          "k": "3 (para vecindarios)"
+        },
+        "objetivo_seccion": "Justificar criterios de evaluación del embedding más allá del objetivo de optimización."
+      },
+      "pregunta_reformulada_para_notebooklm": "CONTEXTO DEL MODELO:\nEn MDS optimizamos el stress de Kruskal para encontrar un embedding 2D que aproxime las distancias D. El stress captura un tipo de error global cuadrático, pero el pipeline también evalúa preservación de vecindarios, correlación global (Spearman), muestreos Shepard y métricas de clustering.\n\nDECISIÓN ESPECÍFICA:\nDebemos justificar si reportar solo stress es suficiente o si, metodológicamente, es estándar complementar con métricas locales/globales porque diferentes métodos (UMAP/t-SNE) no optimizan stress y porque stress puede ocultar fallas locales.\n\nPREGUNTA:\n¿Qué recomienda la literatura de reducción dimensional sobre evaluar embeddings: cuándo stress (o métricas análogas) es suficiente y cuándo se requieren métricas complementarias (trustworthiness/continuity, kNN recall, correlación de distancias, Shepard, etc.)? ¿Qué combina­ciones de métricas se consideran buenas prácticas para comparar métodos que preservan estructura local vs global (MDS vs UMAP vs t‑SNE)?\n\nQUÉ BUSCAMOS:\nReferencias y una recomendación práctica para nuestro capítulo: un conjunto mínimo de métricas complementarias y cómo interpretar desacuerdos (p.ej., buen stress pero mala preservación local).",
+      "tema_notebook_sugerido": "reduccion_dimensionalidad",
+      "para_redactor": {
+        "donde_insertar": "§3.5.1, al final; y conectar con §3.7 como ‘marco de evaluación’.",
+        "tipo_contenido": "justificacion",
+        "palabras_clave": [
+          "evaluación",
+          "stress",
+          "trustworthiness",
+          "Shepard",
+          "comparación de métodos"
+        ]
+      }
+    },
+    {
+      "id": "Q-032",
+      "tipo": "A",
+      "ubicacion_original": "Sección 3.5.2 Métodos Complementarios: UMAP, t-SNE, ISOMAP, línea 352",
+      "seccion_completa": "3.5.2 Métodos Complementarios: UMAP, t-SNE, ISOMAP",
+      "pregunta_original": "¿Los embeddings de diferentes métodos son directamente comparables?",
+      "contexto_extraido_del_capitulo": {
+        "modelo_general": "Se comparan reductores con objetivos diferentes (MDS preserva distancias globales; UMAP/t-SNE preservan estructura local).",
+        "decisiones_previas": [
+          "MDS se declara método principal; UMAP/t-SNE/ISOMAP complementarios",
+          "Se evalúan con métricas comunes en §3.7"
+        ],
+        "parametros_definidos": {
+          "reductores": [
+            "MDS",
+            "UMAP",
+            "t-SNE",
+            "ISOMAP"
+          ],
+          "UMAP_n_neighbors": "max(2,min(15,N−1))"
+        },
+        "objetivo_seccion": "Introducir métodos alternativos y aclarar qué aspectos preserva cada uno y qué comparaciones son válidas."
+      },
+      "pregunta_reformulada_para_notebooklm": "CONTEXTO DEL MODELO:\nNuestro pipeline genera embeddings 2D de la misma población de acordes usando reductores distintos (MDS, UMAP, t‑SNE, ISOMAP) sobre la misma matriz de distancias D. Sin embargo, cada método optimiza objetivos diferentes (global vs local) y tiene invariancias (rotación/escala) que hacen que las coordenadas no sean directamente interpretables.\n\nDECISIÓN ESPECÍFICA:\nNecesitamos explicar qué significa “comparar embeddings” entre métodos: qué comparaciones son válidas (vecindarios, correlación de distancias, rankings) y cuáles no (coordenadas absolutas, distancias globales en UMAP/t‑SNE).\n\nPREGUNTA:\n¿Qué establece la literatura de reducción dimensional sobre comparabilidad entre embeddings producidos por métodos distintos? En particular: ¿qué es comparable (p.ej., preservación de vecindarios, correlación de rangos de distancias, estabilidad de clusters) y qué no lo es (orientación, escala, distancias globales para métodos locales)? ¿Qué procedimientos se recomiendan para alinear/estandarizar embeddings si se requiere comparación (Procrustes, normalización de escala, etc.) y qué precauciones deben declararse?\n\nQUÉ BUSCAMOS:\nGuías citables para escribir una sección “interpretación y comparabilidad” que evite sobreinterpretación y delimite qué métricas usaremos para comparar MDS vs UMAP vs t‑SNE/ISOMAP.",
+      "tema_notebook_sugerido": "reduccion_dimensionalidad",
+      "para_redactor": {
+        "donde_insertar": "§3.5.2, después de la tabla comparativa local/global y antes de ‘Debilidades a vigilar’.",
+        "tipo_contenido": "definicion",
+        "palabras_clave": [
+          "comparabilidad",
+          "alineamiento",
+          "Procrustes",
+          "invariancias",
+          "interpretación"
+        ]
+      }
+    },
+    {
+      "id": "Q-033",
+      "tipo": "A",
+      "ubicacion_original": "Sección 3.5.2 Métodos Complementarios: UMAP, t-SNE, ISOMAP, línea 353",
+      "seccion_completa": "3.5.2 Métodos Complementarios: UMAP, t-SNE, ISOMAP",
+      "pregunta_original": "¿Cómo interpretar un embedding UMAP donde las distancias globales no son significativas?",
+      "contexto_extraido_del_capitulo": {
+        "modelo_general": "UMAP preserva estructura local vía grafos fuzzy; se advierte que distancias globales no son interpretables.",
+        "decisiones_previas": [
+          "UMAP se usa como método complementario (local)",
+          "Se evaluará con métricas de vecindarios y correlación global"
+        ],
+        "parametros_definidos": {
+          "UMAP_n_neighbors": "max(2,min(15,N−1))",
+          "UMAP_n_epochs": "200",
+          "UMAP_init": "spectral"
+        },
+        "objetivo_seccion": "Asegurar interpretación correcta de UMAP en el contexto del espacio de acordes."
+      },
+      "pregunta_reformulada_para_notebooklm": "CONTEXTO DEL MODELO:\nUMAP se usa para obtener una visualización 2D del espacio de acordes cuando interesa preservar vecindarios locales. El método construye un grafo fuzzy y optimiza una representación que conserva estructura local, pero no garantiza que distancias globales en el plano representen distancias originales.\n\nDECISIÓN ESPECÍFICA:\nNecesitamos guiar al lector sobre cómo leer un scatter UMAP de acordes: qué significa “cerca”, qué no significa “lejos”, y qué métricas/reportes complementan la interpretación.\n\nPREGUNTA:\n¿Qué recomendaciones da la literatura de UMAP sobre interpretar sus embeddings, especialmente respecto a distancias globales y tamaños/relaciones entre clusters? En un uso metodológico (no solo visual), ¿qué métricas se recomiendan reportar para respaldar afirmaciones basadas en UMAP (trustworthiness, kNN recall, correlaciones locales)? ¿Qué advertencias estándar se citan para evitar sobreinterpretación (p.ej., comparar distancias entre clusters, usar ejes como variables)?\n\nQUÉ BUSCAMOS:\nUna guía citables para redactar 1–2 párrafos de interpretación responsable de UMAP en nuestro capítulo y en los reportes del repositorio.",
+      "tema_notebook_sugerido": "reduccion_dimensionalidad",
+      "para_redactor": {
+        "donde_insertar": "§3.5.2, en el apartado UMAP y/o en §3.7.1 (métricas de vecindario) como nota interpretativa.",
+        "tipo_contenido": "definicion",
+        "palabras_clave": [
+          "UMAP",
+          "interpretación",
+          "distancias globales",
+          "vecindarios",
+          "sobreinterpretación"
+        ]
+      }
+    },
+    {
+      "id": "Q-034",
+      "tipo": "B",
+      "ubicacion_original": "Sección 3.6.1 Preguntas Experimentales, línea 386",
+      "pregunta_original": "¿Las preguntas son falsificables? ¿Qué resultado descartaría la hipótesis?",
+      "razon_skip": "Autoevaluación de hipótesis/criterios de rechazo: requiere fijar hipótesis específicas de la tesis y umbrales de decisión; no se resuelve únicamente con bibliografía sin anclar a tus P1–P4 y a tus métricas.",
+      "accion_sugerida": "Convertir P1–P4 en hipótesis falsables con criterio de rechazo explícito (p.ej., “si ninguna combinación supera T(k)≥… y stress≤… en poblaciones de control, entonces Φ es inadecuada”). Declarar qué métricas/umbrales cuentan como evidencia y cómo se manejarán múltiples escenarios (exploratorio vs confirmatorio)."
+    },
+    {
+      "id": "Q-035",
+      "tipo": "A",
+      "ubicacion_original": "Sección 3.6.2 Factores Controlables y sus Niveles, línea 410",
+      "seccion_completa": "3.6.2 Factores Controlables y sus Niveles",
+      "pregunta_original": "¿Hay combinaciones inválidas? Sí: métricas de distribución (js, hellinger) con normalización identity requieren normalización L1 previa (documentar cómo el pipeline lo maneja).",
+      "contexto_extraido_del_capitulo": {
+        "modelo_general": "El diseño experimental combina normalizaciones, métricas y reductores; algunas métricas (JSD/Hellinger) requieren vectores en el simplex (L1=1).",
+        "decisiones_previas": [
+          "Escenarios = (normalización, métrica), configuraciones completas añaden reductor/seed/población",
+          "JSD/Hellinger se justifican cuando Φ se interpreta como distribución (simplex)",
+          "Se reconoce que no todos los 200 escenarios son significativos"
+        ],
+        "parametros_definidos": {
+          "total_escenarios": "200",
+          "metricas_distribucion": [
+            "js",
+            "hellinger"
+          ],
+          "requisito": "Φ∈Δ^11 (L1=1)"
+        },
+        "objetivo_seccion": "Definir el espacio de configuraciones experimentalmente evaluables y documentar restricciones matemáticas de compatibilidad."
+      },
+      "pregunta_reformulada_para_notebooklm": "CONTEXTO DEL MODELO:\nNuestro pipeline evalúa combinaciones de (normalización × métrica × reductor). Algunas métricas, como JSD o Hellinger, están definidas para distribuciones de probabilidad (vectores no negativos que suman 1), por lo que solo tienen sentido cuando Φ se normaliza al simplex. Sin embargo, otras normalizaciones (`identity`) mantienen magnitud absoluta.\n\nDECISIÓN ESPECÍFICA:\nDebemos documentar qué combinaciones son matemáticamente inválidas o conceptualmente incoherentes, y cómo las maneja el pipeline (descartar, normalizar automáticamente, o redefinir la interpretación).\n\nPREGUNTA:\n¿Qué dice la literatura (teoría de la información / estadística / ML) sobre aplicar JSD/Hellinger a vectores no normalizados (medidas, conteos, energías) y sobre cuándo se considera obligatorio normalizar a simplex? ¿Existen generalizaciones (p.ej., divergencias para medidas no normalizadas) o prácticas estándar (L1 previa) para hacer comparables perfiles? ¿Cómo se recomienda documentar en un diseño experimental un “espacio de configuraciones” con restricciones de validez (combinaciones permitidas vs prohibidas) para evitar comparaciones engañosas?\n\nQUÉ BUSCAMOS:\nCitas y un criterio claro para definir “combinación inválida” en nuestro contexto y cómo reportar/implementar esa restricción de forma transparente y reproducible.",
+      "tema_notebook_sugerido": "reduccion_dimensionalidad",
+      "para_redactor": {
+        "donde_insertar": "§3.6.2, inmediatamente después de la observación sobre 200 escenarios y antes de iniciar la sección de poblaciones.",
+        "tipo_contenido": "definicion",
+        "palabras_clave": [
+          "compatibilidad",
+          "simplex",
+          "JSD",
+          "Hellinger",
+          "restricciones"
+        ]
+      }
+    },
+    {
+      "id": "Q-036",
+      "tipo": "A",
+      "ubicacion_original": "Sección 3.6.2 Factores Controlables y sus Niveles, línea 411",
+      "seccion_completa": "3.6.2 Factores Controlables y sus Niveles",
+      "pregunta_original": "¿Es necesario corregir por comparaciones múltiples al comparar 200 escenarios?",
+      "contexto_extraido_del_capitulo": {
+        "modelo_general": "Se comparan 200 escenarios por población/seed; esto induce riesgo de selección optimista y falsos positivos.",
+        "decisiones_previas": [
+          "Se reportan métricas por escenario y se rankean",
+          "Se propone multi-seed como mitigación (agregación media±std)",
+          "Se menciona como debilidad/amenaza en evaluación adversarial (W2)"
+        ],
+        "parametros_definidos": {
+          "escenarios": "200 (=10×5×4)",
+          "multi_seed": "promedio±desv. estándar"
+        },
+        "objetivo_seccion": "Asegurar validez estadística/metodológica del proceso de comparación y selección de escenarios."
+      },
+      "pregunta_reformulada_para_notebooklm": "CONTEXTO DEL MODELO:\nNuestro diseño experimental compara muchas combinaciones de preprocesamiento y reducción (≈200 escenarios). Se calcula un conjunto de métricas de calidad del embedding por escenario y se produce un ranking. Esto puede generar resultados optimistas por exploración masiva si no se controla el efecto de múltiples comparaciones.\n\nDECISIÓN ESPECÍFICA:\nQueremos decidir si debemos aplicar correcciones por comparaciones múltiples (y cuáles) o si es suficiente tratar el estudio como exploratorio con replicación (multi-seed, múltiples poblaciones) y reportes transparentes.\n\nPREGUNTA:\n¿Qué recomiendan las fuentes metodológicas cuando se comparan muchas alternativas de un pipeline (model selection) usando métricas de desempeño/calidad: aplicar correcciones por múltiples comparaciones (Bonferroni, Holm, FDR) versus separar explícitamente evaluación exploratoria de confirmatoria, usar validación en datasets independientes y/o replicación por seeds? En el caso de comparar embeddings, ¿se considera adecuado aplicar pruebas de significancia y correcciones, o se prefiere reportar rankings y estabilidad (varianza) como evidencia?\n\nQUÉ BUSCAMOS:\nUn protocolo citables (breve) para nuestra tesis: cómo reportar 200 escenarios sin p‑hacking, qué tipo de corrección (si aplica) tiene sentido y cómo interpretar diferencias pequeñas entre escenarios.",
+      "tema_notebook_sugerido": "reduccion_dimensionalidad",
+      "para_redactor": {
+        "donde_insertar": "§3.6.2 (después de ‘Preguntas clave’) y/o §3.8.5 (validez interna).",
+        "tipo_contenido": "validacion",
+        "palabras_clave": [
+          "multiple comparisons",
+          "FDR",
+          "ranking",
+          "estabilidad",
+          "model selection"
+        ]
+      }
+    },
+    {
+      "id": "Q-037",
+      "tipo": "B",
+      "ubicacion_original": "Sección 3.6.4 Experimentos de Referencia Implementados, línea 434",
+      "pregunta_original": "¿Los experimentos implementados cubren suficientemente los objetivos de la tesis?",
+      "razon_skip": "Decisión de planificación/alcance: se responde comparando tus objetivos específicos con los experimentos realmente implementados (trazabilidad), no consultando bibliografía.",
+      "accion_sugerida": "Construir una matriz de trazabilidad Objetivo↔Pregunta (P1–P4)↔Experimento↔Métrica (stress, trustworthiness, etc.). Marcar huecos (objetivos sin experimento o sin métrica) y decidir si (i) se implementa un experimento mínimo adicional, o (ii) se documenta explícitamente como limitación."
+    },
+    {
+      "id": "Q-038",
+      "tipo": "B",
+      "ubicacion_original": "Sección 3.6.4 Experimentos de Referencia Implementados, línea 436",
+      "pregunta_original": "¿Hay gaps experimentales? (El Exp1–Exp6 planteado originalmente no está implementado como tal; documentar honestamente).",
+      "razon_skip": "Auditoría interna del proyecto (qué se planeó vs qué está implementado): no es una consulta bibliográfica sino una revisión del repositorio y del plan de tesis.",
+      "accion_sugerida": "En §3.6.4, listar explícitamente qué experimentos existen (Golden Master, seed study, inversiones) y cuáles del plan original no. Añadir una subsección ‘Limitaciones/Trabajo futuro’ con 2–3 experimentos no implementados pero justificables, y por qué quedaron fuera (tiempo, costo O(N^2), etc.)."
+    },
+    {
+      "id": "Q-039",
+      "tipo": "A",
+      "ubicacion_original": "Sección 3.7.1 Métricas de Preservación de Vecindarios, línea 461",
+      "seccion_completa": "3.7.1 Métricas de Preservación de Vecindarios",
+      "pregunta_original": "¿Por qué k = 3? ¿Es sensible la evaluación a este parámetro?",
+      "contexto_extraido_del_capitulo": {
+        "modelo_general": "Se evalúa calidad del embedding con métricas de vecindario (trustworthiness, continuity, kNN recall) parametrizadas por k.",
+        "decisiones_previas": [
+          "Se fija k=3 en config.py (EVAL_N_NEIGHBORS)",
+          "Se sugiere discutir sensibilidad en §3.8"
+        ],
+        "parametros_definidos": {
+          "k": "3",
+          "metricas": [
+            "trustworthiness",
+            "continuity",
+            "kNN recall"
+          ]
+        },
+        "objetivo_seccion": "Justificar el parámetro k y asegurar que la evaluación no depende arbitrariamente de un único valor."
+      },
+      "pregunta_reformulada_para_notebooklm": "CONTEXTO DEL MODELO:\nEvaluamos la calidad de embeddings 2D con métricas de preservación de vecindarios como trustworthiness, continuity y kNN recall, que dependen de un parámetro k (número de vecinos). En el repositorio se fija k=3 como valor por defecto.\n\nDECISIÓN ESPECÍFICA:\nDebemos justificar k=3 o, al menos, discutir sensibilidad: cómo cambia la evaluación si k varía, y qué significa elegir un k pequeño (estructura muy local) vs grande (mezcla local+global).\n\nPREGUNTA:\n¿Qué guías ofrece la literatura sobre cómo elegir k en métricas de preservación de vecindarios para reducción dimensional? ¿Qué prácticas son comunes (p.ej., reportar curvas T(k) para varios k, elegir k según tamaño de muestra o según escala local relevante) y qué sensibilidad típica se observa? En un contexto de embeddings para similitud (vecinos musicales), ¿hay argumentos para preferir un k pequeño (3–5) vs moderado (10–15)?\n\nQUÉ BUSCAMOS:\nCitas y recomendaciones concretas para justificar k=3 y/o proponer una evaluación de sensibilidad (reportar T(k), C(k) para varios k) sin expandir demasiado el capítulo.",
+      "tema_notebook_sugerido": "reduccion_dimensionalidad",
+      "para_redactor": {
+        "donde_insertar": "§3.7.1, después de definir trustworthiness/continuity y antes de fijar el parámetro k; o como nota en §3.8.5 (amenazas).",
+        "tipo_contenido": "justificacion",
+        "palabras_clave": [
+          "k",
+          "neighborhood preservation",
+          "trustworthiness",
+          "continuity",
+          "sensibilidad"
+        ]
+      }
+    },
+    {
+      "id": "Q-040",
+      "tipo": "A",
+      "ubicacion_original": "Sección 3.7.1 Métricas de Preservación de Vecindarios, línea 462",
+      "seccion_completa": "3.7.1 Métricas de Preservación de Vecindarios",
+      "pregunta_original": "¿Trustworthiness y continuity son redundantes o complementarios?",
+      "contexto_extraido_del_capitulo": {
+        "modelo_general": "Trustworthiness penaliza falsos vecinos; continuity penaliza vecinos originales perdidos. Se presentan como métricas duales.",
+        "decisiones_previas": [
+          "Se propone reportar varias métricas locales",
+          "Se reconoce necesidad de justificar elección con teoría/bibliografía"
+        ],
+        "parametros_definidos": {
+          "trustworthiness": "falsos vecinos en embedding",
+          "continuity": "vecinos perdidos del espacio original"
+        },
+        "objetivo_seccion": "Evitar redundancia en métricas y explicar qué error captura cada una al evaluar embeddings."
+      },
+      "pregunta_reformulada_para_notebooklm": "CONTEXTO DEL MODELO:\nPara evaluar embeddings 2D usamos métricas de vecindario. Trustworthiness mide cuántos “vecinos” aparecen en el embedding pero no lo eran en el espacio original (falsos vecinos). Continuity mide cuántos vecinos originales se pierden en el embedding (falsos lejanos). Ambas dependen de k.\n\nDECISIÓN ESPECÍFICA:\nDebemos decidir si reportar ambas o si una es suficiente, y cómo interpretar casos donde una es alta y la otra baja.\n\nPREGUNTA:\n¿Qué discute la literatura sobre la relación entre trustworthiness y continuity: son redundantes, altamente correlacionadas, o complementarias (capturan errores asimétricos distintos)? ¿En qué escenarios se recomienda reportar ambas (por ejemplo, métodos que crean falsos vecinos vs métodos que “rompen” vecindarios originales)? ¿Cómo se interpretan conjuntamente y qué visualizaciones/resúmenes se recomiendan?\n\nQUÉ BUSCAMOS:\nCitas y una guía interpretativa para redactar una explicación corta: por qué incluir ambas métricas (o por qué elegir una) y cómo leer sus resultados en el contexto de comparar MDS vs UMAP/t‑SNE.",
+      "tema_notebook_sugerido": "reduccion_dimensionalidad",
+      "para_redactor": {
+        "donde_insertar": "§3.7.1, como párrafo de interpretación inmediatamente después de definir continuity.",
+        "tipo_contenido": "definicion",
+        "palabras_clave": [
+          "trustworthiness",
+          "continuity",
+          "redundancia",
+          "errores asimétricos",
+          "vecindarios"
+        ]
+      }
+    },
+    {
+      "id": "Q-041",
+      "tipo": "A",
+      "ubicacion_original": "Sección 3.8.4 Decisiones Críticas de Diseño, línea 538",
+      "seccion_completa": "3.8.4 Decisiones Críticas de Diseño",
+      "pregunta_original": "Nota de santimath: “En 3.8.4 (Modo determinista: n_jobs=1, mds_n_init=4, seed fija) falta detalle. ¿Es relevante mencionarlo? ¿Qué dice la literatura?”",
+      "contexto_extraido_del_capitulo": {
+        "modelo_general": "El pipeline usa reductores estocásticos (MDS con múltiples inicializaciones, UMAP/t-SNE) y se define un modo determinista para priorizar reproducibilidad (n_jobs=1, seed fija).",
+        "decisiones_previas": [
+          "Modo determinista: n_jobs=1, mds_n_init=4, seed fija",
+          "Se reconoce trade-off reproducibilidad vs velocidad",
+          "El reporte/pipeline incluye artefactos (config, run_metadata, outputs con timestamp) para trazabilidad"
+        ],
+        "parametros_definidos": {
+          "n_jobs": "1 (determinista)",
+          "mds_n_init": "4",
+          "seed": "fija (producción: 17 mencionada en §3.5.3)"
+        },
+        "objetivo_seccion": "Declarar decisiones que afectan reproducibilidad y comparabilidad de resultados, y justificar por qué se prioriza determinismo."
+      },
+      "pregunta_reformulada_para_notebooklm": "CONTEXTO DEL MODELO:\nNuestro pipeline genera embeddings 2D usando métodos con componentes estocásticos (inicializaciones en MDS/SMACOF, aleatoriedad en UMAP/t‑SNE, paralelismo). Para asegurar reproducibilidad, definimos un “modo determinista” que fija semilla, usa n_jobs=1 y controla hiperparámetros como mds_n_init=4.\n\nDECISIÓN ESPECÍFICA:\nDebemos decidir si esta decisión de diseño es relevante de reportar en la tesis (y cómo), y justificarla como buena práctica metodológica (reproducibilidad end‑to‑end) sin desviar el foco del modelo.\n\nPREGUNTA:\n¿Qué recomienda la literatura sobre reproducibilidad en experimentos computacionales con algoritmos estocásticos y/o paralelos (dimensionality reduction, optimización iterativa)? ¿Qué buenas prácticas se consideran mínimas para poder replicar resultados (fijar seeds, controlar paralelismo, registrar versiones y parámetros, múltiples inicializaciones, reportar variabilidad multi-seed)? ¿Cómo se justifica el trade‑off entre reproducibilidad bit‑a‑bit y desempeño, y cuándo es aceptable priorizar determinismo en un estudio comparativo?\n\nQUÉ BUSCAMOS:\nFuentes citables y un texto breve para metodología: por qué declaramos un modo determinista, qué garantiza (y qué no), y cómo se integra con nuestro protocolo de reporte (config/run_metadata) para trazabilidad.",
+      "tema_notebook_sugerido": "reduccion_dimensionalidad",
+      "para_redactor": {
+        "donde_insertar": "§3.8.4, como párrafo ampliado en el punto ‘Modo determinista’ y con referencia cruzada a §3.5.3 (semillas).",
+        "tipo_contenido": "justificacion",
+        "palabras_clave": [
+          "reproducibilidad",
+          "semillas",
+          "paralelismo",
+          "determinismo",
+          "variabilidad"
+        ]
+      }
+    },
+    {
+      "id": "Q-042",
+      "tipo": "A",
+      "ubicacion_original": "Sección 3.8.5 Amenazas a la Validez, línea 552",
+      "seccion_completa": "3.8.5 Amenazas a la Validez",
+      "pregunta_original": "¿La rugosidad de Sethares realmente captura “similitud sonora”? Es un proxy, no una medida directa.",
+      "contexto_extraido_del_capitulo": {
+        "modelo_general": "El modelo usa rugosidad como proxy principal de ‘similitud sonora’ y reconoce que omite otros descriptores (brightness, centroid, attack, etc.).",
+        "decisiones_previas": [
+          "Rugosidad (Sethares) es la característica principal",
+          "Se omiten otras dimensiones tímbricas y temporales",
+          "No se valida con juicio humano (amenaza a validez externa)"
+        ],
+        "parametros_definidos": {
+          "proxy": "rugosidad/disonancia sensorial",
+          "omitidos": [
+            "brightness",
+            "spectral centroid",
+            "attack transients"
+          ]
+        },
+        "objetivo_seccion": "Enunciar amenazas a validez de constructo: qué constructo se mide realmente con rugosidad y qué no."
+      },
+      "pregunta_reformulada_para_notebooklm": "CONTEXTO DEL MODELO:\nLa tesis construye un espacio de acordes donde la distancia se deriva principalmente de rugosidad psicoacústica (Sethares/Plomp–Levelt) agregada por clases de intervalo. Usamos rugosidad como proxy de ‘similitud sonora’, pero reconocemos que el sonido percibido de un acorde también depende de otras variables (timbre, brillo, centroides espectrales, transitorios, dinámica, contexto musical).\n\nDECISIÓN ESPECÍFICA:\nDebemos justificar por qué rugosidad es un proxy razonable para el tipo de similitud que buscamos (p.ej., consonancia/dissonancia sensorial) y, al mismo tiempo, delimitar con rigor su alcance como constructo (qué aspectos de ‘similitud sonora’ no captura).\n\nPREGUNTA:\n¿Qué afirma la literatura sobre qué constructo perceptual mide la rugosidad/disonancia sensorial (roughness) y cómo se relaciona (o no) con “similitud sonora” entre acordes? ¿Qué limitaciones documentadas existen al usar roughness como único descriptor (p.ej., dependencia de timbre, contexto, factores cognitivos) y qué otros descriptores se suelen combinar cuando el objetivo es similitud tímbrica/sonora más amplia? ¿Cómo se recomienda enmarcar, en términos de validez de constructo, el uso de roughness como proxy en un estudio computacional de exploración armónica?\n\nQUÉ BUSCAMOS:\nReferencias citables para redactar una amenaza a la validez de constructo bien formulada: qué captura roughness, qué no, y por qué aun así es un proxy defendible para el alcance declarado de la tesis (similitud por disonancia sensorial).",
+      "tema_notebook_sugerido": "psicoacustica",
+      "para_redactor": {
+        "donde_insertar": "§3.8.5, en ‘Validez de constructo’, ampliando el punto de rugosidad como proxy con 2–3 citas y una delimitación explícita del alcance.",
+        "tipo_contenido": "validacion",
+        "palabras_clave": [
+          "validez de constructo",
+          "roughness",
+          "proxy",
+          "similitud sonora",
+          "timbre"
+        ]
+      }
+    }
+  ]
+}

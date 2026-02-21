@@ -34,6 +34,7 @@ class RoughnessConfig:
     ])
     metrics: List[str] = field(default_factory=lambda: ["cosine", "js", "hellinger", "euclidean"])
     disable_baseline: bool = False
+    metric_params: Dict[str, Dict[str, float]] = field(default_factory=dict)
 
 @dataclass
 class ReductionConfig:

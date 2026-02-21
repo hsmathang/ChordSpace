@@ -1,0 +1,832 @@
+{
+  "metadata": {
+    "paso_0_mcp": {
+      "conexion_exitosa": true,
+      "nota": "Conectado pero sin recursos PDFs_Tesis_* expuestos. Requiere consulta manual.",
+      "notebooks_encontrados": [],
+      "total_notebooks": 0
+    },
+    "inventario": {
+      "total_comentarios_santimath_raw": 73,
+      "comentarios_tipo_a_investigacion": 27,
+      "comentarios_tipo_b_omitidos": 46,
+      "total_preguntas_nativas": 31,
+      "total_consultas_realizadas": 58
+    },
+    "fecha_consulta": "2026-02-15"
+  },
+  "respuestas_documentadas": [
+    {
+      "id": "RESP-001",
+      "tipo": "pregunta_nativa",
+      "ubicacion": "### 3.0 Introducción al capítulo y flujo metodológico, linea 22",
+      "texto_original": "¿Puede el lector, solo leyendo esta introducción, entender qué va a leer y por qué en ese orden?",
+      "clasificacion": "NATIVA",
+      "notebooks_consultados": [
+        "PDFs_Tesis_Armonia",
+        "PDFs_Tesis_ChordSpace_Math"
+      ],
+      "consulta_enviada": "¿Puede el lector, solo leyendo esta introducción, entender qué va a leer y por qué en ese orden?\n\nREQUISITO OBLIGATORIO DE CITACIÓN:\n- Responde citando ÚNICAMENTE las FUENTES ORIGINALES (papers, libros, capítulos) que consultaste\n- NO cites \"NotebookLM\" como fuente\n- Incluye para CADA fuente mencionada:\n  * Autor(es) completo(s)\n  * Título completo\n  * Año de publicación\n  * Páginas específicas (si aplica)\n  * Editorial o Journal\n\nFORMATO DE CADA CITA:\nAutor, A. (Año). Título del trabajo. Editorial/Journal. Páginas: X-Y.\n\nEJEMPLO:\nSethares, W. A. (2005). Tuning, Timbre, Spectrum, Scale (2nd ed.). Springer. Páginas: 45-67.\nPlomp, R., & Levelt, W. J. M. (1965). Tonal consonance and critical bandwidth. The Journal of the Acoustical Society of America, 38(4), 548-560.\n\nIMPORTANTE: Si respondes con información de múltiples fuentes, lista TODAS las referencias al final de tu respuesta.",
+      "respuesta_notebooklm": "[PENDIENTE: Consultar manualmente]",
+      "fuentes_originales": []
+    },
+    {
+      "id": "RESP-002",
+      "tipo": "pregunta_nativa",
+      "ubicacion": "### 3.0 Introducción al capítulo y flujo metodológico, linea 23",
+      "texto_original": "¿Queda claro que el capítulo NO es un manual de software sino la descripción de un modelo matemático con su realización computacional?",
+      "clasificacion": "NATIVA",
+      "notebooks_consultados": [
+        "PDFs_Tesis_Armonia",
+        "PDFs_Tesis_ChordSpace_Math"
+      ],
+      "consulta_enviada": "¿Queda claro que el capítulo NO es un manual de software sino la descripción de un modelo matemático con su realización computacional?\n\nREQUISITO OBLIGATORIO DE CITACIÓN:\n- Responde citando ÚNICAMENTE las FUENTES ORIGINALES (papers, libros, capítulos) que consultaste\n- NO cites \"NotebookLM\" como fuente\n- Incluye para CADA fuente mencionada:\n  * Autor(es) completo(s)\n  * Título completo\n  * Año de publicación\n  * Páginas específicas (si aplica)\n  * Editorial o Journal\n\nFORMATO DE CADA CITA:\nAutor, A. (Año). Título del trabajo. Editorial/Journal. Páginas: X-Y.\n\nEJEMPLO:\nSethares, W. A. (2005). Tuning, Timbre, Spectrum, Scale (2nd ed.). Springer. Páginas: 45-67.\nPlomp, R., & Levelt, W. J. M. (1965). Tonal consonance and critical bandwidth. The Journal of the Acoustical Society of America, 38(4), 548-560.\n\nIMPORTANTE: Si respondes con información de múltiples fuentes, lista TODAS las referencias al final de tu respuesta.",
+      "respuesta_notebooklm": "[PENDIENTE: Consultar manualmente]",
+      "fuentes_originales": []
+    },
+    {
+      "id": "RESP-003",
+      "tipo": "pregunta_nativa",
+      "ubicacion": "#### 3.1.1 Espacio de Notas y Sistema de Referencia, linea 48",
+      "texto_original": "¿Es necesario definir $\\mathcal{N}$ como todo $\\{0,...,127\\}$ o basta con el subrango usado experimentalmente?",
+      "clasificacion": "NATIVA",
+      "notebooks_consultados": [
+        "PDFs_Tesis_Armonia",
+        "PDFs_Tesis_ChordSpace_Math"
+      ],
+      "consulta_enviada": "¿Es necesario definir $\\mathcal{N}$ como todo $\\{0,...,127\\}$ o basta con el subrango usado experimentalmente?\n\nREQUISITO OBLIGATORIO DE CITACIÓN:\n- Responde citando ÚNICAMENTE las FUENTES ORIGINALES (papers, libros, capítulos) que consultaste\n- NO cites \"NotebookLM\" como fuente\n- Incluye para CADA fuente mencionada:\n  * Autor(es) completo(s)\n  * Título completo\n  * Año de publicación\n  * Páginas específicas (si aplica)\n  * Editorial o Journal\n\nFORMATO DE CADA CITA:\nAutor, A. (Año). Título del trabajo. Editorial/Journal. Páginas: X-Y.\n\nEJEMPLO:\nSethares, W. A. (2005). Tuning, Timbre, Spectrum, Scale (2nd ed.). Springer. Páginas: 45-67.\nPlomp, R., & Levelt, W. J. M. (1965). Tonal consonance and critical bandwidth. The Journal of the Acoustical Society of America, 38(4), 548-560.\n\nIMPORTANTE: Si respondes con información de múltiples fuentes, lista TODAS las referencias al final de tu respuesta.",
+      "respuesta_notebooklm": "[PENDIENTE: Consultar manualmente]",
+      "fuentes_originales": []
+    },
+    {
+      "id": "RESP-004",
+      "tipo": "pregunta_nativa",
+      "ubicacion": "#### 3.1.1 Espacio de Notas y Sistema de Referencia, linea 49",
+      "texto_original": "¿Cómo justificar la elección de 12-TET frente a un lector que podría preguntar por afinaciones alternativas?",
+      "clasificacion": "NATIVA",
+      "notebooks_consultados": [
+        "PDFs_Tesis_Armonia",
+        "PDFs_Tesis_ChordSpace_Math"
+      ],
+      "consulta_enviada": "¿Cómo justificar la elección de 12-TET frente a un lector que podría preguntar por afinaciones alternativas?\n\nREQUISITO OBLIGATORIO DE CITACIÓN:\n- Responde citando ÚNICAMENTE las FUENTES ORIGINALES (papers, libros, capítulos) que consultaste\n- NO cites \"NotebookLM\" como fuente\n- Incluye para CADA fuente mencionada:\n  * Autor(es) completo(s)\n  * Título completo\n  * Año de publicación\n  * Páginas específicas (si aplica)\n  * Editorial o Journal\n\nFORMATO DE CADA CITA:\nAutor, A. (Año). Título del trabajo. Editorial/Journal. Páginas: X-Y.\n\nEJEMPLO:\nSethares, W. A. (2005). Tuning, Timbre, Spectrum, Scale (2nd ed.). Springer. Páginas: 45-67.\nPlomp, R., & Levelt, W. J. M. (1965). Tonal consonance and critical bandwidth. The Journal of the Acoustical Society of America, 38(4), 548-560.\n\nIMPORTANTE: Si respondes con información de múltiples fuentes, lista TODAS las referencias al final de tu respuesta.",
+      "respuesta_notebooklm": "[PENDIENTE: Consultar manualmente]",
+      "fuentes_originales": []
+    },
+    {
+      "id": "RESP-005",
+      "tipo": "comentario_santimath",
+      "ubicacion": "#### 3.1.2 Formalización del Acorde, linea 55",
+      "texto_original": "estoy leyendo hasta ahora, pero acá me parece que hay que abordar el tamaño del espácio y modelar como crecen los acordes de acuerdo a los parametros y al tipo de representación que se les imponga, no? en el repo y en la GUI tenemos un modo estructural y eso hace que sean menos acordes, y también hay un modo de rango, que hace que sean menos acordes, etc.",
+      "clasificacion": "TIPO_A",
+      "notebooks_consultados": [
+        "PDFs_Tesis_Armonia",
+        "PDFs_Tesis_ChordSpace_Math"
+      ],
+      "consulta_enviada": "estoy leyendo hasta ahora, pero acá me parece que hay que abordar el tamaño del espácio y modelar como crecen los acordes de acuerdo a los parametros y al tipo de representación que se les imponga, no? en el repo y en la GUI tenemos un modo estructural y eso hace que sean menos acordes, y también hay un modo de rango, que hace que sean menos acordes, etc.\n\nREQUISITO OBLIGATORIO DE CITACIÓN:\n- Responde citando ÚNICAMENTE las FUENTES ORIGINALES (papers, libros, capítulos) que consultaste\n- NO cites \"NotebookLM\" como fuente\n- Incluye para CADA fuente mencionada:\n  * Autor(es) completo(s)\n  * Título completo\n  * Año de publicación\n  * Páginas específicas (si aplica)\n  * Editorial o Journal\n\nFORMATO DE CADA CITA:\nAutor, A. (Año). Título del trabajo. Editorial/Journal. Páginas: X-Y.\n\nEJEMPLO:\nSethares, W. A. (2005). Tuning, Timbre, Spectrum, Scale (2nd ed.). Springer. Páginas: 45-67.\nPlomp, R., & Levelt, W. J. M. (1965). Tonal consonance and critical bandwidth. The Journal of the Acoustical Society of America, 38(4), 548-560.\n\nIMPORTANTE: Si respondes con información de múltiples fuentes, lista TODAS las referencias al final de tu respuesta.",
+      "respuesta_notebooklm": "[PENDIENTE: Consultar manualmente]",
+      "fuentes_originales": []
+    },
+    {
+      "id": "RESP-006",
+      "tipo": "comentario_santimath",
+      "ubicacion": "#### 3.1.2 Formalización del Acorde, linea 57",
+      "texto_original": "El vector es una funcion una aplciacion la notacion no es clara o si?",
+      "clasificacion": "TIPO_A",
+      "notebooks_consultados": [
+        "PDFs_Tesis_Armonia",
+        "PDFs_Tesis_ChordSpace_Math"
+      ],
+      "consulta_enviada": "El vector es una funcion una aplciacion la notacion no es clara o si?\n\nREQUISITO OBLIGATORIO DE CITACIÓN:\n- Responde citando ÚNICAMENTE las FUENTES ORIGINALES (papers, libros, capítulos) que consultaste\n- NO cites \"NotebookLM\" como fuente\n- Incluye para CADA fuente mencionada:\n  * Autor(es) completo(s)\n  * Título completo\n  * Año de publicación\n  * Páginas específicas (si aplica)\n  * Editorial o Journal\n\nFORMATO DE CADA CITA:\nAutor, A. (Año). Título del trabajo. Editorial/Journal. Páginas: X-Y.\n\nEJEMPLO:\nSethares, W. A. (2005). Tuning, Timbre, Spectrum, Scale (2nd ed.). Springer. Páginas: 45-67.\nPlomp, R., & Levelt, W. J. M. (1965). Tonal consonance and critical bandwidth. The Journal of the Acoustical Society of America, 38(4), 548-560.\n\nIMPORTANTE: Si respondes con información de múltiples fuentes, lista TODAS las referencias al final de tu respuesta.",
+      "respuesta_notebooklm": "[PENDIENTE: Consultar manualmente]",
+      "fuentes_originales": []
+    },
+    {
+      "id": "RESP-007",
+      "tipo": "pregunta_nativa",
+      "ubicacion": "#### 3.1.2 Formalización del Acorde, linea 66",
+      "texto_original": "¿Se justifica exigir $n_1 < \\cdots < n_m$ (estrictamente creciente) o podrían admitirse unísonos?",
+      "clasificacion": "NATIVA",
+      "notebooks_consultados": [
+        "PDFs_Tesis_Armonia",
+        "PDFs_Tesis_ChordSpace_Math"
+      ],
+      "consulta_enviada": "¿Se justifica exigir $n_1 < \\cdots < n_m$ (estrictamente creciente) o podrían admitirse unísonos?\n\nREQUISITO OBLIGATORIO DE CITACIÓN:\n- Responde citando ÚNICAMENTE las FUENTES ORIGINALES (papers, libros, capítulos) que consultaste\n- NO cites \"NotebookLM\" como fuente\n- Incluye para CADA fuente mencionada:\n  * Autor(es) completo(s)\n  * Título completo\n  * Año de publicación\n  * Páginas específicas (si aplica)\n  * Editorial o Journal\n\nFORMATO DE CADA CITA:\nAutor, A. (Año). Título del trabajo. Editorial/Journal. Páginas: X-Y.\n\nEJEMPLO:\nSethares, W. A. (2005). Tuning, Timbre, Spectrum, Scale (2nd ed.). Springer. Páginas: 45-67.\nPlomp, R., & Levelt, W. J. M. (1965). Tonal consonance and critical bandwidth. The Journal of the Acoustical Society of America, 38(4), 548-560.\n\nIMPORTANTE: Si respondes con información de múltiples fuentes, lista TODAS las referencias al final de tu respuesta.",
+      "respuesta_notebooklm": "[PENDIENTE: Consultar manualmente]",
+      "fuentes_originales": []
+    },
+    {
+      "id": "RESP-008",
+      "tipo": "pregunta_nativa",
+      "ubicacion": "#### 3.1.3 Decisión de Identidad: Distinción frente a la Teoría de PC-sets, linea 79",
+      "texto_original": "¿Cómo responder a un evaluador que objete la falta de invariancia por transposición?",
+      "clasificacion": "NATIVA",
+      "notebooks_consultados": [
+        "PDFs_Tesis_Armonia",
+        "PDFs_Tesis_ChordSpace_Math"
+      ],
+      "consulta_enviada": "¿Cómo responder a un evaluador que objete la falta de invariancia por transposición?\n\nREQUISITO OBLIGATORIO DE CITACIÓN:\n- Responde citando ÚNICAMENTE las FUENTES ORIGINALES (papers, libros, capítulos) que consultaste\n- NO cites \"NotebookLM\" como fuente\n- Incluye para CADA fuente mencionada:\n  * Autor(es) completo(s)\n  * Título completo\n  * Año de publicación\n  * Páginas específicas (si aplica)\n  * Editorial o Journal\n\nFORMATO DE CADA CITA:\nAutor, A. (Año). Título del trabajo. Editorial/Journal. Páginas: X-Y.\n\nEJEMPLO:\nSethares, W. A. (2005). Tuning, Timbre, Spectrum, Scale (2nd ed.). Springer. Páginas: 45-67.\nPlomp, R., & Levelt, W. J. M. (1965). Tonal consonance and critical bandwidth. The Journal of the Acoustical Society of America, 38(4), 548-560.\n\nIMPORTANTE: Si respondes con información de múltiples fuentes, lista TODAS las referencias al final de tu respuesta.",
+      "respuesta_notebooklm": "[PENDIENTE: Consultar manualmente]",
+      "fuentes_originales": []
+    },
+    {
+      "id": "RESP-009",
+      "tipo": "comentario_santimath",
+      "ubicacion": "#### 3.1.3 Decisión de Identidad: Distinción frente a la Teoría de PC-sets, linea 83",
+      "texto_original": "trabajo para el notebooklm",
+      "clasificacion": "TIPO_A",
+      "notebooks_consultados": [
+        "PDFs_Tesis_Armonia",
+        "PDFs_Tesis_ChordSpace_Math"
+      ],
+      "consulta_enviada": "trabajo para el notebooklm\n\nREQUISITO OBLIGATORIO DE CITACIÓN:\n- Responde citando ÚNICAMENTE las FUENTES ORIGINALES (papers, libros, capítulos) que consultaste\n- NO cites \"NotebookLM\" como fuente\n- Incluye para CADA fuente mencionada:\n  * Autor(es) completo(s)\n  * Título completo\n  * Año de publicación\n  * Páginas específicas (si aplica)\n  * Editorial o Journal\n\nFORMATO DE CADA CITA:\nAutor, A. (Año). Título del trabajo. Editorial/Journal. Páginas: X-Y.\n\nEJEMPLO:\nSethares, W. A. (2005). Tuning, Timbre, Spectrum, Scale (2nd ed.). Springer. Páginas: 45-67.\nPlomp, R., & Levelt, W. J. M. (1965). Tonal consonance and critical bandwidth. The Journal of the Acoustical Society of America, 38(4), 548-560.\n\nIMPORTANTE: Si respondes con información de múltiples fuentes, lista TODAS las referencias al final de tu respuesta.",
+      "respuesta_notebooklm": "[PENDIENTE: Consultar manualmente]",
+      "fuentes_originales": []
+    },
+    {
+      "id": "RESP-010",
+      "tipo": "comentario_santimath",
+      "ubicacion": "#### 3.1.4 Vector de Conteo de Clases de Intervalo (12 bins), linea 93",
+      "texto_original": "y tambien lo muestra el modelo de seathaeres y su graficasu curva de percicion de rugosidad en los intervalos, tambien hay que decir que hay trabajos que si represnetan con 6 dimencioens a los acordes no estamos tan de aceurdo anivel percepcion habra que ver como podemos probar que destacamos en algo en ese aspecto respecto a los trabajos como el TIS",
+      "clasificacion": "TIPO_A",
+      "notebooks_consultados": [
+        "PDFs_Tesis_Armonia",
+        "PDFs_Tesis_ChordSpace_Math"
+      ],
+      "consulta_enviada": "y tambien lo muestra el modelo de seathaeres y su graficasu curva de percicion de rugosidad en los intervalos, tambien hay que decir que hay trabajos que si represnetan con 6 dimencioens a los acordes no estamos tan de aceurdo anivel percepcion habra que ver como podemos probar que destacamos en algo en ese aspecto respecto a los trabajos como el TIS\n\nREQUISITO OBLIGATORIO DE CITACIÓN:\n- Responde citando ÚNICAMENTE las FUENTES ORIGINALES (papers, libros, capítulos) que consultaste\n- NO cites \"NotebookLM\" como fuente\n- Incluye para CADA fuente mencionada:\n  * Autor(es) completo(s)\n  * Título completo\n  * Año de publicación\n  * Páginas específicas (si aplica)\n  * Editorial o Journal\n\nFORMATO DE CADA CITA:\nAutor, A. (Año). Título del trabajo. Editorial/Journal. Páginas: X-Y.\n\nEJEMPLO:\nSethares, W. A. (2005). Tuning, Timbre, Spectrum, Scale (2nd ed.). Springer. Páginas: 45-67.\nPlomp, R., & Levelt, W. J. M. (1965). Tonal consonance and critical bandwidth. The Journal of the Acoustical Society of America, 38(4), 548-560.\n\nIMPORTANTE: Si respondes con información de múltiples fuentes, lista TODAS las referencias al final de tu respuesta.",
+      "respuesta_notebooklm": "[PENDIENTE: Consultar manualmente]",
+      "fuentes_originales": []
+    },
+    {
+      "id": "RESP-011",
+      "tipo": "comentario_santimath",
+      "ubicacion": "### 3.2 Modelo Psicoacústico de Rugosidad, linea 106",
+      "texto_original": "esta pregunta es clave para el lector.) (Nota de santimath: y que tiene que ver con la rugosidad?",
+      "clasificacion": "TIPO_A",
+      "notebooks_consultados": [
+        "PDFs_Tesis_Armonia",
+        "PDFs_Tesis_ChordSpace_Math"
+      ],
+      "consulta_enviada": "esta pregunta es clave para el lector.) (Nota de santimath: y que tiene que ver con la rugosidad?\n\nREQUISITO OBLIGATORIO DE CITACIÓN:\n- Responde citando ÚNICAMENTE las FUENTES ORIGINALES (papers, libros, capítulos) que consultaste\n- NO cites \"NotebookLM\" como fuente\n- Incluye para CADA fuente mencionada:\n  * Autor(es) completo(s)\n  * Título completo\n  * Año de publicación\n  * Páginas específicas (si aplica)\n  * Editorial o Journal\n\nFORMATO DE CADA CITA:\nAutor, A. (Año). Título del trabajo. Editorial/Journal. Páginas: X-Y.\n\nEJEMPLO:\nSethares, W. A. (2005). Tuning, Timbre, Spectrum, Scale (2nd ed.). Springer. Páginas: 45-67.\nPlomp, R., & Levelt, W. J. M. (1965). Tonal consonance and critical bandwidth. The Journal of the Acoustical Society of America, 38(4), 548-560.\n\nIMPORTANTE: Si respondes con información de múltiples fuentes, lista TODAS las referencias al final de tu respuesta.",
+      "respuesta_notebooklm": "[PENDIENTE: Consultar manualmente]",
+      "fuentes_originales": []
+    },
+    {
+      "id": "RESP-012",
+      "tipo": "comentario_santimath",
+      "ubicacion": "#### 3.2.1 Fundamentos del Modelo de Plomp-Levelt y Sethares, linea 111",
+      "texto_original": "hay que explicar que es la banda critica auditiva. y que es la disonancia sensorial. y que tiene que ver con la rugosidad?  aunque eso debio habalrse a mas profundidad en otros capituslo prvios no? creeria yo.",
+      "clasificacion": "TIPO_A",
+      "notebooks_consultados": [
+        "PDFs_Tesis_Armonia",
+        "PDFs_Tesis_ChordSpace_Math"
+      ],
+      "consulta_enviada": "hay que explicar que es la banda critica auditiva. y que es la disonancia sensorial. y que tiene que ver con la rugosidad?  aunque eso debio habalrse a mas profundidad en otros capituslo prvios no? creeria yo.\n\nREQUISITO OBLIGATORIO DE CITACIÓN:\n- Responde citando ÚNICAMENTE las FUENTES ORIGINALES (papers, libros, capítulos) que consultaste\n- NO cites \"NotebookLM\" como fuente\n- Incluye para CADA fuente mencionada:\n  * Autor(es) completo(s)\n  * Título completo\n  * Año de publicación\n  * Páginas específicas (si aplica)\n  * Editorial o Journal\n\nFORMATO DE CADA CITA:\nAutor, A. (Año). Título del trabajo. Editorial/Journal. Páginas: X-Y.\n\nEJEMPLO:\nSethares, W. A. (2005). Tuning, Timbre, Spectrum, Scale (2nd ed.). Springer. Páginas: 45-67.\nPlomp, R., & Levelt, W. J. M. (1965). Tonal consonance and critical bandwidth. The Journal of the Acoustical Society of America, 38(4), 548-560.\n\nIMPORTANTE: Si respondes con información de múltiples fuentes, lista TODAS las referencias al final de tu respuesta.",
+      "respuesta_notebooklm": "[PENDIENTE: Consultar manualmente]",
+      "fuentes_originales": []
+    },
+    {
+      "id": "RESP-013",
+      "tipo": "comentario_santimath",
+      "ubicacion": "#### 3.2.1 Fundamentos del Modelo de Plomp-Levelt y Sethares, linea 112",
+      "texto_original": "Nosotros estamos tomando tonos sinteticos esto como interfeire o apoya esto, si combinan bien?",
+      "clasificacion": "TIPO_A",
+      "notebooks_consultados": [
+        "PDFs_Tesis_Armonia",
+        "PDFs_Tesis_ChordSpace_Math"
+      ],
+      "consulta_enviada": "Nosotros estamos tomando tonos sinteticos esto como interfeire o apoya esto, si combinan bien?\n\nREQUISITO OBLIGATORIO DE CITACIÓN:\n- Responde citando ÚNICAMENTE las FUENTES ORIGINALES (papers, libros, capítulos) que consultaste\n- NO cites \"NotebookLM\" como fuente\n- Incluye para CADA fuente mencionada:\n  * Autor(es) completo(s)\n  * Título completo\n  * Año de publicación\n  * Páginas específicas (si aplica)\n  * Editorial o Journal\n\nFORMATO DE CADA CITA:\nAutor, A. (Año). Título del trabajo. Editorial/Journal. Páginas: X-Y.\n\nEJEMPLO:\nSethares, W. A. (2005). Tuning, Timbre, Spectrum, Scale (2nd ed.). Springer. Páginas: 45-67.\nPlomp, R., & Levelt, W. J. M. (1965). Tonal consonance and critical bandwidth. The Journal of the Acoustical Society of America, 38(4), 548-560.\n\nIMPORTANTE: Si respondes con información de múltiples fuentes, lista TODAS las referencias al final de tu respuesta.",
+      "respuesta_notebooklm": "[PENDIENTE: Consultar manualmente]",
+      "fuentes_originales": []
+    },
+    {
+      "id": "RESP-014",
+      "tipo": "pregunta_nativa",
+      "ubicacion": "#### 3.2.1 Fundamentos del Modelo de Plomp-Levelt y Sethares, linea 116",
+      "texto_original": "¿Hasta qué punto la parametrización de Sethares es \"el\" modelo o \"un\" modelo posible?",
+      "clasificacion": "NATIVA",
+      "notebooks_consultados": [
+        "PDFs_Tesis_Armonia",
+        "PDFs_Tesis_ChordSpace_Math"
+      ],
+      "consulta_enviada": "¿Hasta qué punto la parametrización de Sethares es \"el\" modelo o \"un\" modelo posible?\n\nREQUISITO OBLIGATORIO DE CITACIÓN:\n- Responde citando ÚNICAMENTE las FUENTES ORIGINALES (papers, libros, capítulos) que consultaste\n- NO cites \"NotebookLM\" como fuente\n- Incluye para CADA fuente mencionada:\n  * Autor(es) completo(s)\n  * Título completo\n  * Año de publicación\n  * Páginas específicas (si aplica)\n  * Editorial o Journal\n\nFORMATO DE CADA CITA:\nAutor, A. (Año). Título del trabajo. Editorial/Journal. Páginas: X-Y.\n\nEJEMPLO:\nSethares, W. A. (2005). Tuning, Timbre, Spectrum, Scale (2nd ed.). Springer. Páginas: 45-67.\nPlomp, R., & Levelt, W. J. M. (1965). Tonal consonance and critical bandwidth. The Journal of the Acoustical Society of America, 38(4), 548-560.\n\nIMPORTANTE: Si respondes con información de múltiples fuentes, lista TODAS las referencias al final de tu respuesta.",
+      "respuesta_notebooklm": "[PENDIENTE: Consultar manualmente]",
+      "fuentes_originales": []
+    },
+    {
+      "id": "RESP-015",
+      "tipo": "comentario_santimath",
+      "ubicacion": "#### 3.2.2 La Función de Disonancia entre Parciales, linea 133",
+      "texto_original": "y que tan robusto es este modelo?",
+      "clasificacion": "TIPO_A",
+      "notebooks_consultados": [
+        "PDFs_Tesis_Armonia",
+        "PDFs_Tesis_ChordSpace_Math"
+      ],
+      "consulta_enviada": "y que tan robusto es este modelo?\n\nREQUISITO OBLIGATORIO DE CITACIÓN:\n- Responde citando ÚNICAMENTE las FUENTES ORIGINALES (papers, libros, capítulos) que consultaste\n- NO cites \"NotebookLM\" como fuente\n- Incluye para CADA fuente mencionada:\n  * Autor(es) completo(s)\n  * Título completo\n  * Año de publicación\n  * Páginas específicas (si aplica)\n  * Editorial o Journal\n\nFORMATO DE CADA CITA:\nAutor, A. (Año). Título del trabajo. Editorial/Journal. Páginas: X-Y.\n\nEJEMPLO:\nSethares, W. A. (2005). Tuning, Timbre, Spectrum, Scale (2nd ed.). Springer. Páginas: 45-67.\nPlomp, R., & Levelt, W. J. M. (1965). Tonal consonance and critical bandwidth. The Journal of the Acoustical Society of America, 38(4), 548-560.\n\nIMPORTANTE: Si respondes con información de múltiples fuentes, lista TODAS las referencias al final de tu respuesta.",
+      "respuesta_notebooklm": "[PENDIENTE: Consultar manualmente]",
+      "fuentes_originales": []
+    },
+    {
+      "id": "RESP-016",
+      "tipo": "comentario_santimath",
+      "ubicacion": "#### 3.2.3 Extensión a Tonos Complejos: Modelo de Parciales Armónicos, linea 138",
+      "texto_original": "esta deficnion es estandar? para un matemaotico quedara claro la palabra espectro armonio aca? algo más de detalle habra que decir o almenos rcordar que antras se explico con mas detalle en otro capitulo",
+      "clasificacion": "TIPO_A",
+      "notebooks_consultados": [
+        "PDFs_Tesis_Armonia",
+        "PDFs_Tesis_ChordSpace_Math"
+      ],
+      "consulta_enviada": "esta deficnion es estandar? para un matemaotico quedara claro la palabra espectro armonio aca? algo más de detalle habra que decir o almenos rcordar que antras se explico con mas detalle en otro capitulo\n\nREQUISITO OBLIGATORIO DE CITACIÓN:\n- Responde citando ÚNICAMENTE las FUENTES ORIGINALES (papers, libros, capítulos) que consultaste\n- NO cites \"NotebookLM\" como fuente\n- Incluye para CADA fuente mencionada:\n  * Autor(es) completo(s)\n  * Título completo\n  * Año de publicación\n  * Páginas específicas (si aplica)\n  * Editorial o Journal\n\nFORMATO DE CADA CITA:\nAutor, A. (Año). Título del trabajo. Editorial/Journal. Páginas: X-Y.\n\nEJEMPLO:\nSethares, W. A. (2005). Tuning, Timbre, Spectrum, Scale (2nd ed.). Springer. Páginas: 45-67.\nPlomp, R., & Levelt, W. J. M. (1965). Tonal consonance and critical bandwidth. The Journal of the Acoustical Society of America, 38(4), 548-560.\n\nIMPORTANTE: Si respondes con información de múltiples fuentes, lista TODAS las referencias al final de tu respuesta.",
+      "respuesta_notebooklm": "[PENDIENTE: Consultar manualmente]",
+      "fuentes_originales": []
+    },
+    {
+      "id": "RESP-017",
+      "tipo": "comentario_santimath",
+      "ubicacion": "#### 3.2.3 Extensión a Tonos Complejos: Modelo de Parciales Armónicos, linea 147",
+      "texto_original": "real? verifiquemos esto con el repo y mostremos un poco el detalle",
+      "clasificacion": "TIPO_A",
+      "notebooks_consultados": [
+        "PDFs_Tesis_Armonia",
+        "PDFs_Tesis_ChordSpace_Math"
+      ],
+      "consulta_enviada": "real? verifiquemos esto con el repo y mostremos un poco el detalle\n\nREQUISITO OBLIGATORIO DE CITACIÓN:\n- Responde citando ÚNICAMENTE las FUENTES ORIGINALES (papers, libros, capítulos) que consultaste\n- NO cites \"NotebookLM\" como fuente\n- Incluye para CADA fuente mencionada:\n  * Autor(es) completo(s)\n  * Título completo\n  * Año de publicación\n  * Páginas específicas (si aplica)\n  * Editorial o Journal\n\nFORMATO DE CADA CITA:\nAutor, A. (Año). Título del trabajo. Editorial/Journal. Páginas: X-Y.\n\nEJEMPLO:\nSethares, W. A. (2005). Tuning, Timbre, Spectrum, Scale (2nd ed.). Springer. Páginas: 45-67.\nPlomp, R., & Levelt, W. J. M. (1965). Tonal consonance and critical bandwidth. The Journal of the Acoustical Society of America, 38(4), 548-560.\n\nIMPORTANTE: Si respondes con información de múltiples fuentes, lista TODAS las referencias al final de tu respuesta.",
+      "respuesta_notebooklm": "[PENDIENTE: Consultar manualmente]",
+      "fuentes_originales": []
+    },
+    {
+      "id": "RESP-018",
+      "tipo": "comentario_santimath",
+      "ubicacion": "#### 3.2.4 Rugosidad Total y Vectorización por Clase de Intervalo, linea 166",
+      "texto_original": "Esto m,e hace pensar en que no se si hemos meniconado epxlcaimtemene ejemplos de la cantidadde intervalos que tiene un acorde y que digamos ideas para otros capitulos com la discucision seria que quiza el peso o la improtancia del intervalo varia dpeendeindosi esta en los extremos medios del acorde me gustaria ver que hay en los notebooklm sobre esto la perepccion de un intervalo interno que onda que hace el verrobo con eso",
+      "clasificacion": "TIPO_A",
+      "notebooks_consultados": [
+        "PDFs_Tesis_Armonia",
+        "PDFs_Tesis_ChordSpace_Math"
+      ],
+      "consulta_enviada": "Esto m,e hace pensar en que no se si hemos meniconado epxlcaimtemene ejemplos de la cantidadde intervalos que tiene un acorde y que digamos ideas para otros capitulos com la discucision seria que quiza el peso o la improtancia del intervalo varia dpeendeindosi esta en los extremos medios del acorde me gustaria ver que hay en los notebooklm sobre esto la perepccion de un intervalo interno que onda que hace el verrobo con eso\n\nREQUISITO OBLIGATORIO DE CITACIÓN:\n- Responde citando ÚNICAMENTE las FUENTES ORIGINALES (papers, libros, capítulos) que consultaste\n- NO cites \"NotebookLM\" como fuente\n- Incluye para CADA fuente mencionada:\n  * Autor(es) completo(s)\n  * Título completo\n  * Año de publicación\n  * Páginas específicas (si aplica)\n  * Editorial o Journal\n\nFORMATO DE CADA CITA:\nAutor, A. (Año). Título del trabajo. Editorial/Journal. Páginas: X-Y.\n\nEJEMPLO:\nSethares, W. A. (2005). Tuning, Timbre, Spectrum, Scale (2nd ed.). Springer. Páginas: 45-67.\nPlomp, R., & Levelt, W. J. M. (1965). Tonal consonance and critical bandwidth. The Journal of the Acoustical Society of America, 38(4), 548-560.\n\nIMPORTANTE: Si respondes con información de múltiples fuentes, lista TODAS las referencias al final de tu respuesta.",
+      "respuesta_notebooklm": "[PENDIENTE: Consultar manualmente]",
+      "fuentes_originales": []
+    },
+    {
+      "id": "RESP-019",
+      "tipo": "comentario_santimath",
+      "ubicacion": "#### 3.2.4 Rugosidad Total y Vectorización por Clase de Intervalo, linea 170",
+      "texto_original": "claro esto es deseable nos diferencia de otros enfoques prometemos reprensentar el acorde tal cual el musico lo intepretaria en el controlador midi, a proposito ya le contamos al lector sobre el protocolo MIDI? eso se hace en este capitulo o en el marco teorico?",
+      "clasificacion": "TIPO_A",
+      "notebooks_consultados": [
+        "PDFs_Tesis_Armonia",
+        "PDFs_Tesis_ChordSpace_Math"
+      ],
+      "consulta_enviada": "claro esto es deseable nos diferencia de otros enfoques prometemos reprensentar el acorde tal cual el musico lo intepretaria en el controlador midi, a proposito ya le contamos al lector sobre el protocolo MIDI? eso se hace en este capitulo o en el marco teorico?\n\nREQUISITO OBLIGATORIO DE CITACIÓN:\n- Responde citando ÚNICAMENTE las FUENTES ORIGINALES (papers, libros, capítulos) que consultaste\n- NO cites \"NotebookLM\" como fuente\n- Incluye para CADA fuente mencionada:\n  * Autor(es) completo(s)\n  * Título completo\n  * Año de publicación\n  * Páginas específicas (si aplica)\n  * Editorial o Journal\n\nFORMATO DE CADA CITA:\nAutor, A. (Año). Título del trabajo. Editorial/Journal. Páginas: X-Y.\n\nEJEMPLO:\nSethares, W. A. (2005). Tuning, Timbre, Spectrum, Scale (2nd ed.). Springer. Páginas: 45-67.\nPlomp, R., & Levelt, W. J. M. (1965). Tonal consonance and critical bandwidth. The Journal of the Acoustical Society of America, 38(4), 548-560.\n\nIMPORTANTE: Si respondes con información de múltiples fuentes, lista TODAS las referencias al final de tu respuesta.",
+      "respuesta_notebooklm": "[PENDIENTE: Consultar manualmente]",
+      "fuentes_originales": []
+    },
+    {
+      "id": "RESP-020",
+      "tipo": "comentario_santimath",
+      "ubicacion": "#### 3.2.5 Validación Interna del Componente de Rugosidad, linea 180",
+      "texto_original": "excelente pregunta",
+      "clasificacion": "TIPO_A",
+      "notebooks_consultados": [
+        "PDFs_Tesis_Armonia",
+        "PDFs_Tesis_ChordSpace_Math"
+      ],
+      "consulta_enviada": "excelente pregunta\n\nREQUISITO OBLIGATORIO DE CITACIÓN:\n- Responde citando ÚNICAMENTE las FUENTES ORIGINALES (papers, libros, capítulos) que consultaste\n- NO cites \"NotebookLM\" como fuente\n- Incluye para CADA fuente mencionada:\n  * Autor(es) completo(s)\n  * Título completo\n  * Año de publicación\n  * Páginas específicas (si aplica)\n  * Editorial o Journal\n\nFORMATO DE CADA CITA:\nAutor, A. (Año). Título del trabajo. Editorial/Journal. Páginas: X-Y.\n\nEJEMPLO:\nSethares, W. A. (2005). Tuning, Timbre, Spectrum, Scale (2nd ed.). Springer. Páginas: 45-67.\nPlomp, R., & Levelt, W. J. M. (1965). Tonal consonance and critical bandwidth. The Journal of the Acoustical Society of America, 38(4), 548-560.\n\nIMPORTANTE: Si respondes con información de múltiples fuentes, lista TODAS las referencias al final de tu respuesta.",
+      "respuesta_notebooklm": "[PENDIENTE: Consultar manualmente]",
+      "fuentes_originales": []
+    },
+    {
+      "id": "RESP-021",
+      "tipo": "comentario_santimath",
+      "ubicacion": "#### 3.2.5 Validación Interna del Componente de Rugosidad, linea 181",
+      "texto_original": "creo que tambien vale la pena preguntarse en que unidades de medida se mide la rugosidad? que significa un valor de 0.5? o 1? o 100?",
+      "clasificacion": "TIPO_A",
+      "notebooks_consultados": [
+        "PDFs_Tesis_Armonia",
+        "PDFs_Tesis_ChordSpace_Math"
+      ],
+      "consulta_enviada": "creo que tambien vale la pena preguntarse en que unidades de medida se mide la rugosidad? que significa un valor de 0.5? o 1? o 100?\n\nREQUISITO OBLIGATORIO DE CITACIÓN:\n- Responde citando ÚNICAMENTE las FUENTES ORIGINALES (papers, libros, capítulos) que consultaste\n- NO cites \"NotebookLM\" como fuente\n- Incluye para CADA fuente mencionada:\n  * Autor(es) completo(s)\n  * Título completo\n  * Año de publicación\n  * Páginas específicas (si aplica)\n  * Editorial o Journal\n\nFORMATO DE CADA CITA:\nAutor, A. (Año). Título del trabajo. Editorial/Journal. Páginas: X-Y.\n\nEJEMPLO:\nSethares, W. A. (2005). Tuning, Timbre, Spectrum, Scale (2nd ed.). Springer. Páginas: 45-67.\nPlomp, R., & Levelt, W. J. M. (1965). Tonal consonance and critical bandwidth. The Journal of the Acoustical Society of America, 38(4), 548-560.\n\nIMPORTANTE: Si respondes con información de múltiples fuentes, lista TODAS las referencias al final de tu respuesta.",
+      "respuesta_notebooklm": "[PENDIENTE: Consultar manualmente]",
+      "fuentes_originales": []
+    },
+    {
+      "id": "RESP-022",
+      "tipo": "pregunta_nativa",
+      "ubicacion": "#### 3.3.1 El Problema de la Comparabilidad, linea 199",
+      "texto_original": "¿La normalización destruye información relevante?",
+      "clasificacion": "NATIVA",
+      "notebooks_consultados": [
+        "PDFs_Tesis_Armonia",
+        "PDFs_Tesis_ChordSpace_Math"
+      ],
+      "consulta_enviada": "¿La normalización destruye información relevante?\n\nREQUISITO OBLIGATORIO DE CITACIÓN:\n- Responde citando ÚNICAMENTE las FUENTES ORIGINALES (papers, libros, capítulos) que consultaste\n- NO cites \"NotebookLM\" como fuente\n- Incluye para CADA fuente mencionada:\n  * Autor(es) completo(s)\n  * Título completo\n  * Año de publicación\n  * Páginas específicas (si aplica)\n  * Editorial o Journal\n\nFORMATO DE CADA CITA:\nAutor, A. (Año). Título del trabajo. Editorial/Journal. Páginas: X-Y.\n\nEJEMPLO:\nSethares, W. A. (2005). Tuning, Timbre, Spectrum, Scale (2nd ed.). Springer. Páginas: 45-67.\nPlomp, R., & Levelt, W. J. M. (1965). Tonal consonance and critical bandwidth. The Journal of the Acoustical Society of America, 38(4), 548-560.\n\nIMPORTANTE: Si respondes con información de múltiples fuentes, lista TODAS las referencias al final de tu respuesta.",
+      "respuesta_notebooklm": "[PENDIENTE: Consultar manualmente]",
+      "fuentes_originales": []
+    },
+    {
+      "id": "RESP-023",
+      "tipo": "pregunta_nativa",
+      "ubicacion": "#### 3.3.1 El Problema de la Comparabilidad, linea 200",
+      "texto_original": "¿Es posible que la mejor normalización dependa de la pregunta que se quiere responder?",
+      "clasificacion": "NATIVA",
+      "notebooks_consultados": [
+        "PDFs_Tesis_Armonia",
+        "PDFs_Tesis_ChordSpace_Math"
+      ],
+      "consulta_enviada": "¿Es posible que la mejor normalización dependa de la pregunta que se quiere responder?\n\nREQUISITO OBLIGATORIO DE CITACIÓN:\n- Responde citando ÚNICAMENTE las FUENTES ORIGINALES (papers, libros, capítulos) que consultaste\n- NO cites \"NotebookLM\" como fuente\n- Incluye para CADA fuente mencionada:\n  * Autor(es) completo(s)\n  * Título completo\n  * Año de publicación\n  * Páginas específicas (si aplica)\n  * Editorial o Journal\n\nFORMATO DE CADA CITA:\nAutor, A. (Año). Título del trabajo. Editorial/Journal. Páginas: X-Y.\n\nEJEMPLO:\nSethares, W. A. (2005). Tuning, Timbre, Spectrum, Scale (2nd ed.). Springer. Páginas: 45-67.\nPlomp, R., & Levelt, W. J. M. (1965). Tonal consonance and critical bandwidth. The Journal of the Acoustical Society of America, 38(4), 548-560.\n\nIMPORTANTE: Si respondes con información de múltiples fuentes, lista TODAS las referencias al final de tu respuesta.",
+      "respuesta_notebooklm": "[PENDIENTE: Consultar manualmente]",
+      "fuentes_originales": []
+    },
+    {
+      "id": "RESP-024",
+      "tipo": "comentario_santimath",
+      "ubicacion": "#### 3.3.2 Catálogo de Propuestas Evaluadas, linea 216",
+      "texto_original": "sera que toca poner graficas de esto o explirar que la GUI permite elegir las normalziacion y con un delizador configrar esto para acomodar a lo que el musico quiere ? o este capitulo no debe llevar graficas? sino donde iria?",
+      "clasificacion": "TIPO_A",
+      "notebooks_consultados": [
+        "PDFs_Tesis_Armonia",
+        "PDFs_Tesis_ChordSpace_Math"
+      ],
+      "consulta_enviada": "sera que toca poner graficas de esto o explirar que la GUI permite elegir las normalziacion y con un delizador configrar esto para acomodar a lo que el musico quiere ? o este capitulo no debe llevar graficas? sino donde iria?\n\nREQUISITO OBLIGATORIO DE CITACIÓN:\n- Responde citando ÚNICAMENTE las FUENTES ORIGINALES (papers, libros, capítulos) que consultaste\n- NO cites \"NotebookLM\" como fuente\n- Incluye para CADA fuente mencionada:\n  * Autor(es) completo(s)\n  * Título completo\n  * Año de publicación\n  * Páginas específicas (si aplica)\n  * Editorial o Journal\n\nFORMATO DE CADA CITA:\nAutor, A. (Año). Título del trabajo. Editorial/Journal. Páginas: X-Y.\n\nEJEMPLO:\nSethares, W. A. (2005). Tuning, Timbre, Spectrum, Scale (2nd ed.). Springer. Páginas: 45-67.\nPlomp, R., & Levelt, W. J. M. (1965). Tonal consonance and critical bandwidth. The Journal of the Acoustical Society of America, 38(4), 548-560.\n\nIMPORTANTE: Si respondes con información de múltiples fuentes, lista TODAS las referencias al final de tu respuesta.",
+      "respuesta_notebooklm": "[PENDIENTE: Consultar manualmente]",
+      "fuentes_originales": []
+    },
+    {
+      "id": "RESP-025",
+      "tipo": "pregunta_nativa",
+      "ubicacion": "#### 3.3.2 Catálogo de Propuestas Evaluadas, linea 226",
+      "texto_original": "Discusión: ¿cuál normalización es \"mejor\"?",
+      "clasificacion": "NATIVA",
+      "notebooks_consultados": [
+        "PDFs_Tesis_Armonia",
+        "PDFs_Tesis_ChordSpace_Math"
+      ],
+      "consulta_enviada": "Discusión: ¿cuál normalización es \"mejor\"?\n\nREQUISITO OBLIGATORIO DE CITACIÓN:\n- Responde citando ÚNICAMENTE las FUENTES ORIGINALES (papers, libros, capítulos) que consultaste\n- NO cites \"NotebookLM\" como fuente\n- Incluye para CADA fuente mencionada:\n  * Autor(es) completo(s)\n  * Título completo\n  * Año de publicación\n  * Páginas específicas (si aplica)\n  * Editorial o Journal\n\nFORMATO DE CADA CITA:\nAutor, A. (Año). Título del trabajo. Editorial/Journal. Páginas: X-Y.\n\nEJEMPLO:\nSethares, W. A. (2005). Tuning, Timbre, Spectrum, Scale (2nd ed.). Springer. Páginas: 45-67.\nPlomp, R., & Levelt, W. J. M. (1965). Tonal consonance and critical bandwidth. The Journal of the Acoustical Society of America, 38(4), 548-560.\n\nIMPORTANTE: Si respondes con información de múltiples fuentes, lista TODAS las referencias al final de tu respuesta.",
+      "respuesta_notebooklm": "[PENDIENTE: Consultar manualmente]",
+      "fuentes_originales": []
+    },
+    {
+      "id": "RESP-026",
+      "tipo": "pregunta_nativa",
+      "ubicacion": "#### 3.3.2 Catálogo de Propuestas Evaluadas, linea 229",
+      "texto_original": "¿El suavizado gaussiano tiene justificación perceptual o es una heurística?",
+      "clasificacion": "NATIVA",
+      "notebooks_consultados": [
+        "PDFs_Tesis_Armonia",
+        "PDFs_Tesis_ChordSpace_Math"
+      ],
+      "consulta_enviada": "¿El suavizado gaussiano tiene justificación perceptual o es una heurística?\n\nREQUISITO OBLIGATORIO DE CITACIÓN:\n- Responde citando ÚNICAMENTE las FUENTES ORIGINALES (papers, libros, capítulos) que consultaste\n- NO cites \"NotebookLM\" como fuente\n- Incluye para CADA fuente mencionada:\n  * Autor(es) completo(s)\n  * Título completo\n  * Año de publicación\n  * Páginas específicas (si aplica)\n  * Editorial o Journal\n\nFORMATO DE CADA CITA:\nAutor, A. (Año). Título del trabajo. Editorial/Journal. Páginas: X-Y.\n\nEJEMPLO:\nSethares, W. A. (2005). Tuning, Timbre, Spectrum, Scale (2nd ed.). Springer. Páginas: 45-67.\nPlomp, R., & Levelt, W. J. M. (1965). Tonal consonance and critical bandwidth. The Journal of the Acoustical Society of America, 38(4), 548-560.\n\nIMPORTANTE: Si respondes con información de múltiples fuentes, lista TODAS las referencias al final de tu respuesta.",
+      "respuesta_notebooklm": "[PENDIENTE: Consultar manualmente]",
+      "fuentes_originales": []
+    },
+    {
+      "id": "RESP-027",
+      "tipo": "pregunta_nativa",
+      "ubicacion": "#### 3.3.2 Catálogo de Propuestas Evaluadas, linea 230",
+      "texto_original": "¿Hay riesgo de sobreajuste al evaluar tantas propuestas?",
+      "clasificacion": "NATIVA",
+      "notebooks_consultados": [
+        "PDFs_Tesis_Armonia",
+        "PDFs_Tesis_ChordSpace_Math"
+      ],
+      "consulta_enviada": "¿Hay riesgo de sobreajuste al evaluar tantas propuestas?\n\nREQUISITO OBLIGATORIO DE CITACIÓN:\n- Responde citando ÚNICAMENTE las FUENTES ORIGINALES (papers, libros, capítulos) que consultaste\n- NO cites \"NotebookLM\" como fuente\n- Incluye para CADA fuente mencionada:\n  * Autor(es) completo(s)\n  * Título completo\n  * Año de publicación\n  * Páginas específicas (si aplica)\n  * Editorial o Journal\n\nFORMATO DE CADA CITA:\nAutor, A. (Año). Título del trabajo. Editorial/Journal. Páginas: X-Y.\n\nEJEMPLO:\nSethares, W. A. (2005). Tuning, Timbre, Spectrum, Scale (2nd ed.). Springer. Páginas: 45-67.\nPlomp, R., & Levelt, W. J. M. (1965). Tonal consonance and critical bandwidth. The Journal of the Acoustical Society of America, 38(4), 548-560.\n\nIMPORTANTE: Si respondes con información de múltiples fuentes, lista TODAS las referencias al final de tu respuesta.",
+      "respuesta_notebooklm": "[PENDIENTE: Consultar manualmente]",
+      "fuentes_originales": []
+    },
+    {
+      "id": "RESP-028",
+      "tipo": "comentario_santimath",
+      "ubicacion": "#### 3.3.2 Catálogo de Propuestas Evaluadas, linea 233",
+      "texto_original": "cual sera la idea ahi? hay que buscarlo en el repo explircarlo con el detalle suficiente",
+      "clasificacion": "TIPO_A",
+      "notebooks_consultados": [
+        "PDFs_Tesis_Armonia",
+        "PDFs_Tesis_ChordSpace_Math"
+      ],
+      "consulta_enviada": "cual sera la idea ahi? hay que buscarlo en el repo explircarlo con el detalle suficiente\n\nREQUISITO OBLIGATORIO DE CITACIÓN:\n- Responde citando ÚNICAMENTE las FUENTES ORIGINALES (papers, libros, capítulos) que consultaste\n- NO cites \"NotebookLM\" como fuente\n- Incluye para CADA fuente mencionada:\n  * Autor(es) completo(s)\n  * Título completo\n  * Año de publicación\n  * Páginas específicas (si aplica)\n  * Editorial o Journal\n\nFORMATO DE CADA CITA:\nAutor, A. (Año). Título del trabajo. Editorial/Journal. Páginas: X-Y.\n\nEJEMPLO:\nSethares, W. A. (2005). Tuning, Timbre, Spectrum, Scale (2nd ed.). Springer. Páginas: 45-67.\nPlomp, R., & Levelt, W. J. M. (1965). Tonal consonance and critical bandwidth. The Journal of the Acoustical Society of America, 38(4), 548-560.\n\nIMPORTANTE: Si respondes con información de múltiples fuentes, lista TODAS las referencias al final de tu respuesta.",
+      "respuesta_notebooklm": "[PENDIENTE: Consultar manualmente]",
+      "fuentes_originales": []
+    },
+    {
+      "id": "RESP-029",
+      "tipo": "comentario_santimath",
+      "ubicacion": "#### 3.4.1 Métricas Vectoriales, linea 257",
+      "texto_original": "uf, esto es muy importante hay que gastarle tiempo al lector aca en que entienda que haria cada metrica que dominca en cada una que eonfque teiene y que´descubrimos esto hayq ue ahcerlo con ayuda de experimentar sobre el repo y buscr refenrtes en el notebooklm",
+      "clasificacion": "TIPO_A",
+      "notebooks_consultados": [
+        "PDFs_Tesis_Armonia",
+        "PDFs_Tesis_ChordSpace_Math"
+      ],
+      "consulta_enviada": "uf, esto es muy importante hay que gastarle tiempo al lector aca en que entienda que haria cada metrica que dominca en cada una que eonfque teiene y que´descubrimos esto hayq ue ahcerlo con ayuda de experimentar sobre el repo y buscr refenrtes en el notebooklm\n\nREQUISITO OBLIGATORIO DE CITACIÓN:\n- Responde citando ÚNICAMENTE las FUENTES ORIGINALES (papers, libros, capítulos) que consultaste\n- NO cites \"NotebookLM\" como fuente\n- Incluye para CADA fuente mencionada:\n  * Autor(es) completo(s)\n  * Título completo\n  * Año de publicación\n  * Páginas específicas (si aplica)\n  * Editorial o Journal\n\nFORMATO DE CADA CITA:\nAutor, A. (Año). Título del trabajo. Editorial/Journal. Páginas: X-Y.\n\nEJEMPLO:\nSethares, W. A. (2005). Tuning, Timbre, Spectrum, Scale (2nd ed.). Springer. Páginas: 45-67.\nPlomp, R., & Levelt, W. J. M. (1965). Tonal consonance and critical bandwidth. The Journal of the Acoustical Society of America, 38(4), 548-560.\n\nIMPORTANTE: Si respondes con información de múltiples fuentes, lista TODAS las referencias al final de tu respuesta.",
+      "respuesta_notebooklm": "[PENDIENTE: Consultar manualmente]",
+      "fuentes_originales": []
+    },
+    {
+      "id": "RESP-030",
+      "tipo": "pregunta_nativa",
+      "ubicacion": "#### 3.4.2 Métricas de Distribuciones de Probabilidad, linea 278",
+      "texto_original": "¿El uso de $\\log_2$ vs $\\ln$ en JSD afecta la métrica?",
+      "clasificacion": "NATIVA",
+      "notebooks_consultados": [
+        "PDFs_Tesis_Armonia",
+        "PDFs_Tesis_ChordSpace_Math"
+      ],
+      "consulta_enviada": "¿El uso de $\\log_2$ vs $\\ln$ en JSD afecta la métrica?\n\nREQUISITO OBLIGATORIO DE CITACIÓN:\n- Responde citando ÚNICAMENTE las FUENTES ORIGINALES (papers, libros, capítulos) que consultaste\n- NO cites \"NotebookLM\" como fuente\n- Incluye para CADA fuente mencionada:\n  * Autor(es) completo(s)\n  * Título completo\n  * Año de publicación\n  * Páginas específicas (si aplica)\n  * Editorial o Journal\n\nFORMATO DE CADA CITA:\nAutor, A. (Año). Título del trabajo. Editorial/Journal. Páginas: X-Y.\n\nEJEMPLO:\nSethares, W. A. (2005). Tuning, Timbre, Spectrum, Scale (2nd ed.). Springer. Páginas: 45-67.\nPlomp, R., & Levelt, W. J. M. (1965). Tonal consonance and critical bandwidth. The Journal of the Acoustical Society of America, 38(4), 548-560.\n\nIMPORTANTE: Si respondes con información de múltiples fuentes, lista TODAS las referencias al final de tu respuesta.",
+      "respuesta_notebooklm": "[PENDIENTE: Consultar manualmente]",
+      "fuentes_originales": []
+    },
+    {
+      "id": "RESP-031",
+      "tipo": "comentario_santimath",
+      "ubicacion": "#### 3.4.2 Métricas de Distribuciones de Probabilidad, linea 281",
+      "texto_original": "por ejemplo!!! esa es una gran pregunta y creo que hay que resovlerlo de manera intelignte para no perder tiempo, decir que el modelo permite poner varias metricas y que esocgmos unaspara probar no como tal la mejor no se como decir esto pero queiza tu contu concociemitno de esto peudas decirnos cual es la mejor metrica o porque",
+      "clasificacion": "TIPO_A",
+      "notebooks_consultados": [
+        "PDFs_Tesis_Armonia",
+        "PDFs_Tesis_ChordSpace_Math"
+      ],
+      "consulta_enviada": "por ejemplo!!! esa es una gran pregunta y creo que hay que resovlerlo de manera intelignte para no perder tiempo, decir que el modelo permite poner varias metricas y que esocgmos unaspara probar no como tal la mejor no se como decir esto pero queiza tu contu concociemitno de esto peudas decirnos cual es la mejor metrica o porque\n\nREQUISITO OBLIGATORIO DE CITACIÓN:\n- Responde citando ÚNICAMENTE las FUENTES ORIGINALES (papers, libros, capítulos) que consultaste\n- NO cites \"NotebookLM\" como fuente\n- Incluye para CADA fuente mencionada:\n  * Autor(es) completo(s)\n  * Título completo\n  * Año de publicación\n  * Páginas específicas (si aplica)\n  * Editorial o Journal\n\nFORMATO DE CADA CITA:\nAutor, A. (Año). Título del trabajo. Editorial/Journal. Páginas: X-Y.\n\nEJEMPLO:\nSethares, W. A. (2005). Tuning, Timbre, Spectrum, Scale (2nd ed.). Springer. Páginas: 45-67.\nPlomp, R., & Levelt, W. J. M. (1965). Tonal consonance and critical bandwidth. The Journal of the Acoustical Society of America, 38(4), 548-560.\n\nIMPORTANTE: Si respondes con información de múltiples fuentes, lista TODAS las referencias al final de tu respuesta.",
+      "respuesta_notebooklm": "[PENDIENTE: Consultar manualmente]",
+      "fuentes_originales": []
+    },
+    {
+      "id": "RESP-032",
+      "tipo": "comentario_santimath",
+      "ubicacion": "#### 3.4.3 Construcción de la Matriz de Distancias $D$, linea 286",
+      "texto_original": "aca hay que ser muy precisos con la definicion de matriz de distancias y que es lo que representa, hay que ser muy claros con la notacion y que significa cada cosa, porque c_i que es? la notacion es consisntente con la que venismo trayendo? un lector matemático estará muy pendient de la notacion y su consistencia",
+      "clasificacion": "TIPO_A",
+      "notebooks_consultados": [
+        "PDFs_Tesis_Armonia",
+        "PDFs_Tesis_ChordSpace_Math"
+      ],
+      "consulta_enviada": "aca hay que ser muy precisos con la definicion de matriz de distancias y que es lo que representa, hay que ser muy claros con la notacion y que significa cada cosa, porque c_i que es? la notacion es consisntente con la que venismo trayendo? un lector matemático estará muy pendient de la notacion y su consistencia\n\nREQUISITO OBLIGATORIO DE CITACIÓN:\n- Responde citando ÚNICAMENTE las FUENTES ORIGINALES (papers, libros, capítulos) que consultaste\n- NO cites \"NotebookLM\" como fuente\n- Incluye para CADA fuente mencionada:\n  * Autor(es) completo(s)\n  * Título completo\n  * Año de publicación\n  * Páginas específicas (si aplica)\n  * Editorial o Journal\n\nFORMATO DE CADA CITA:\nAutor, A. (Año). Título del trabajo. Editorial/Journal. Páginas: X-Y.\n\nEJEMPLO:\nSethares, W. A. (2005). Tuning, Timbre, Spectrum, Scale (2nd ed.). Springer. Páginas: 45-67.\nPlomp, R., & Levelt, W. J. M. (1965). Tonal consonance and critical bandwidth. The Journal of the Acoustical Society of America, 38(4), 548-560.\n\nIMPORTANTE: Si respondes con información de múltiples fuentes, lista TODAS las referencias al final de tu respuesta.",
+      "respuesta_notebooklm": "[PENDIENTE: Consultar manualmente]",
+      "fuentes_originales": []
+    },
+    {
+      "id": "RESP-033",
+      "tipo": "pregunta_nativa",
+      "ubicacion": "#### 3.4.3 Construcción de la Matriz de Distancias $D$, linea 294",
+      "texto_original": "¿La elección de $\\rho$ induce una topología diferente sobre $\\mathcal{A}$?",
+      "clasificacion": "NATIVA",
+      "notebooks_consultados": [
+        "PDFs_Tesis_Armonia",
+        "PDFs_Tesis_ChordSpace_Math"
+      ],
+      "consulta_enviada": "¿La elección de $\\rho$ induce una topología diferente sobre $\\mathcal{A}$?\n\nREQUISITO OBLIGATORIO DE CITACIÓN:\n- Responde citando ÚNICAMENTE las FUENTES ORIGINALES (papers, libros, capítulos) que consultaste\n- NO cites \"NotebookLM\" como fuente\n- Incluye para CADA fuente mencionada:\n  * Autor(es) completo(s)\n  * Título completo\n  * Año de publicación\n  * Páginas específicas (si aplica)\n  * Editorial o Journal\n\nFORMATO DE CADA CITA:\nAutor, A. (Año). Título del trabajo. Editorial/Journal. Páginas: X-Y.\n\nEJEMPLO:\nSethares, W. A. (2005). Tuning, Timbre, Spectrum, Scale (2nd ed.). Springer. Páginas: 45-67.\nPlomp, R., & Levelt, W. J. M. (1965). Tonal consonance and critical bandwidth. The Journal of the Acoustical Society of America, 38(4), 548-560.\n\nIMPORTANTE: Si respondes con información de múltiples fuentes, lista TODAS las referencias al final de tu respuesta.",
+      "respuesta_notebooklm": "[PENDIENTE: Consultar manualmente]",
+      "fuentes_originales": []
+    },
+    {
+      "id": "RESP-034",
+      "tipo": "pregunta_nativa",
+      "ubicacion": "#### 3.4.3 Construcción de la Matriz de Distancias $D$, linea 294",
+      "texto_original": "¿Cómo verificarlo?",
+      "clasificacion": "NATIVA",
+      "notebooks_consultados": [
+        "PDFs_Tesis_Armonia",
+        "PDFs_Tesis_ChordSpace_Math"
+      ],
+      "consulta_enviada": "¿Cómo verificarlo?\n\nREQUISITO OBLIGATORIO DE CITACIÓN:\n- Responde citando ÚNICAMENTE las FUENTES ORIGINALES (papers, libros, capítulos) que consultaste\n- NO cites \"NotebookLM\" como fuente\n- Incluye para CADA fuente mencionada:\n  * Autor(es) completo(s)\n  * Título completo\n  * Año de publicación\n  * Páginas específicas (si aplica)\n  * Editorial o Journal\n\nFORMATO DE CADA CITA:\nAutor, A. (Año). Título del trabajo. Editorial/Journal. Páginas: X-Y.\n\nEJEMPLO:\nSethares, W. A. (2005). Tuning, Timbre, Spectrum, Scale (2nd ed.). Springer. Páginas: 45-67.\nPlomp, R., & Levelt, W. J. M. (1965). Tonal consonance and critical bandwidth. The Journal of the Acoustical Society of America, 38(4), 548-560.\n\nIMPORTANTE: Si respondes con información de múltiples fuentes, lista TODAS las referencias al final de tu respuesta.",
+      "respuesta_notebooklm": "[PENDIENTE: Consultar manualmente]",
+      "fuentes_originales": []
+    },
+    {
+      "id": "RESP-035",
+      "tipo": "pregunta_nativa",
+      "ubicacion": "#### 3.4.3 Construcción de la Matriz de Distancias $D$, linea 295",
+      "texto_original": "¿Es la matriz $D$ definida positiva / semidefinida?",
+      "clasificacion": "NATIVA",
+      "notebooks_consultados": [
+        "PDFs_Tesis_Armonia",
+        "PDFs_Tesis_ChordSpace_Math"
+      ],
+      "consulta_enviada": "¿Es la matriz $D$ definida positiva / semidefinida?\n\nREQUISITO OBLIGATORIO DE CITACIÓN:\n- Responde citando ÚNICAMENTE las FUENTES ORIGINALES (papers, libros, capítulos) que consultaste\n- NO cites \"NotebookLM\" como fuente\n- Incluye para CADA fuente mencionada:\n  * Autor(es) completo(s)\n  * Título completo\n  * Año de publicación\n  * Páginas específicas (si aplica)\n  * Editorial o Journal\n\nFORMATO DE CADA CITA:\nAutor, A. (Año). Título del trabajo. Editorial/Journal. Páginas: X-Y.\n\nEJEMPLO:\nSethares, W. A. (2005). Tuning, Timbre, Spectrum, Scale (2nd ed.). Springer. Páginas: 45-67.\nPlomp, R., & Levelt, W. J. M. (1965). Tonal consonance and critical bandwidth. The Journal of the Acoustical Society of America, 38(4), 548-560.\n\nIMPORTANTE: Si respondes con información de múltiples fuentes, lista TODAS las referencias al final de tu respuesta.",
+      "respuesta_notebooklm": "[PENDIENTE: Consultar manualmente]",
+      "fuentes_originales": []
+    },
+    {
+      "id": "RESP-036",
+      "tipo": "comentario_santimath",
+      "ubicacion": "#### 3.5.2 Métodos Complementarios: UMAP, t-SNE, ISOMAP, linea 335",
+      "texto_original": "Claro por eso MDS y tambien por eso las otras tenicas porque teien valor encontrar cluster eso en si mismo puede resultar ser una nueva forma de explorar la musica, los acordes de sustituior de encontrar vecinos o acordes que suenen similarres, tener una metrica compuesta!!! algo como: \"este acorde es vecino de este acorde\" en UMAP y en MDS esta a esta distancia entonces un algoritmo de sustitucuin custerizado? algoasi creo que esta idea se puede desaroollar y engorosar el trabajo y la relevancia NOTEBOOKLM revisa estooo!",
+      "clasificacion": "TIPO_A",
+      "notebooks_consultados": [
+        "PDFs_Tesis_Armonia",
+        "PDFs_Tesis_ChordSpace_Math"
+      ],
+      "consulta_enviada": "Claro por eso MDS y tambien por eso las otras tenicas porque teien valor encontrar cluster eso en si mismo puede resultar ser una nueva forma de explorar la musica, los acordes de sustituior de encontrar vecinos o acordes que suenen similarres, tener una metrica compuesta!!! algo como: \"este acorde es vecino de este acorde\" en UMAP y en MDS esta a esta distancia entonces un algoritmo de sustitucuin custerizado? algoasi creo que esta idea se puede desaroollar y engorosar el trabajo y la relevancia NOTEBOOKLM revisa estooo!\n\nREQUISITO OBLIGATORIO DE CITACIÓN:\n- Responde citando ÚNICAMENTE las FUENTES ORIGINALES (papers, libros, capítulos) que consultaste\n- NO cites \"NotebookLM\" como fuente\n- Incluye para CADA fuente mencionada:\n  * Autor(es) completo(s)\n  * Título completo\n  * Año de publicación\n  * Páginas específicas (si aplica)\n  * Editorial o Journal\n\nFORMATO DE CADA CITA:\nAutor, A. (Año). Título del trabajo. Editorial/Journal. Páginas: X-Y.\n\nEJEMPLO:\nSethares, W. A. (2005). Tuning, Timbre, Spectrum, Scale (2nd ed.). Springer. Páginas: 45-67.\nPlomp, R., & Levelt, W. J. M. (1965). Tonal consonance and critical bandwidth. The Journal of the Acoustical Society of America, 38(4), 548-560.\n\nIMPORTANTE: Si respondes con información de múltiples fuentes, lista TODAS las referencias al final de tu respuesta.",
+      "respuesta_notebooklm": "[PENDIENTE: Consultar manualmente]",
+      "fuentes_originales": []
+    },
+    {
+      "id": "RESP-037",
+      "tipo": "pregunta_nativa",
+      "ubicacion": "#### 3.6.1 Preguntas Experimentales, linea 378",
+      "texto_original": "| P1: ¿Qué combinación (normalización × métrica × reductor) produce el embedding más fiel?",
+      "clasificacion": "NATIVA",
+      "notebooks_consultados": [
+        "PDFs_Tesis_Armonia",
+        "PDFs_Tesis_ChordSpace_Math"
+      ],
+      "consulta_enviada": "| P1: ¿Qué combinación (normalización × métrica × reductor) produce el embedding más fiel?\n\nREQUISITO OBLIGATORIO DE CITACIÓN:\n- Responde citando ÚNICAMENTE las FUENTES ORIGINALES (papers, libros, capítulos) que consultaste\n- NO cites \"NotebookLM\" como fuente\n- Incluye para CADA fuente mencionada:\n  * Autor(es) completo(s)\n  * Título completo\n  * Año de publicación\n  * Páginas específicas (si aplica)\n  * Editorial o Journal\n\nFORMATO DE CADA CITA:\nAutor, A. (Año). Título del trabajo. Editorial/Journal. Páginas: X-Y.\n\nEJEMPLO:\nSethares, W. A. (2005). Tuning, Timbre, Spectrum, Scale (2nd ed.). Springer. Páginas: 45-67.\nPlomp, R., & Levelt, W. J. M. (1965). Tonal consonance and critical bandwidth. The Journal of the Acoustical Society of America, 38(4), 548-560.\n\nIMPORTANTE: Si respondes con información de múltiples fuentes, lista TODAS las referencias al final de tu respuesta.",
+      "respuesta_notebooklm": "[PENDIENTE: Consultar manualmente]",
+      "fuentes_originales": []
+    },
+    {
+      "id": "RESP-038",
+      "tipo": "pregunta_nativa",
+      "ubicacion": "#### 3.6.1 Preguntas Experimentales, linea 379",
+      "texto_original": "| P2: ¿El embedding discrimina entre tipos de acordes (por cardinalidad)?",
+      "clasificacion": "NATIVA",
+      "notebooks_consultados": [
+        "PDFs_Tesis_Armonia",
+        "PDFs_Tesis_ChordSpace_Math"
+      ],
+      "consulta_enviada": "| P2: ¿El embedding discrimina entre tipos de acordes (por cardinalidad)?\n\nREQUISITO OBLIGATORIO DE CITACIÓN:\n- Responde citando ÚNICAMENTE las FUENTES ORIGINALES (papers, libros, capítulos) que consultaste\n- NO cites \"NotebookLM\" como fuente\n- Incluye para CADA fuente mencionada:\n  * Autor(es) completo(s)\n  * Título completo\n  * Año de publicación\n  * Páginas específicas (si aplica)\n  * Editorial o Journal\n\nFORMATO DE CADA CITA:\nAutor, A. (Año). Título del trabajo. Editorial/Journal. Páginas: X-Y.\n\nEJEMPLO:\nSethares, W. A. (2005). Tuning, Timbre, Spectrum, Scale (2nd ed.). Springer. Páginas: 45-67.\nPlomp, R., & Levelt, W. J. M. (1965). Tonal consonance and critical bandwidth. The Journal of the Acoustical Society of America, 38(4), 548-560.\n\nIMPORTANTE: Si respondes con información de múltiples fuentes, lista TODAS las referencias al final de tu respuesta.",
+      "respuesta_notebooklm": "[PENDIENTE: Consultar manualmente]",
+      "fuentes_originales": []
+    },
+    {
+      "id": "RESP-039",
+      "tipo": "pregunta_nativa",
+      "ubicacion": "#### 3.6.1 Preguntas Experimentales, linea 380",
+      "texto_original": "| P3: ¿El modelo preserva relaciones perceptuales conocidas (e.g., consonancia < disonancia en rugosidad)?",
+      "clasificacion": "NATIVA",
+      "notebooks_consultados": [
+        "PDFs_Tesis_Armonia",
+        "PDFs_Tesis_ChordSpace_Math"
+      ],
+      "consulta_enviada": "| P3: ¿El modelo preserva relaciones perceptuales conocidas (e.g., consonancia < disonancia en rugosidad)?\n\nREQUISITO OBLIGATORIO DE CITACIÓN:\n- Responde citando ÚNICAMENTE las FUENTES ORIGINALES (papers, libros, capítulos) que consultaste\n- NO cites \"NotebookLM\" como fuente\n- Incluye para CADA fuente mencionada:\n  * Autor(es) completo(s)\n  * Título completo\n  * Año de publicación\n  * Páginas específicas (si aplica)\n  * Editorial o Journal\n\nFORMATO DE CADA CITA:\nAutor, A. (Año). Título del trabajo. Editorial/Journal. Páginas: X-Y.\n\nEJEMPLO:\nSethares, W. A. (2005). Tuning, Timbre, Spectrum, Scale (2nd ed.). Springer. Páginas: 45-67.\nPlomp, R., & Levelt, W. J. M. (1965). Tonal consonance and critical bandwidth. The Journal of the Acoustical Society of America, 38(4), 548-560.\n\nIMPORTANTE: Si respondes con información de múltiples fuentes, lista TODAS las referencias al final de tu respuesta.",
+      "respuesta_notebooklm": "[PENDIENTE: Consultar manualmente]",
+      "fuentes_originales": []
+    },
+    {
+      "id": "RESP-040",
+      "tipo": "pregunta_nativa",
+      "ubicacion": "#### 3.6.1 Preguntas Experimentales, linea 381",
+      "texto_original": "| P4: ¿Cómo afecta la inclusión de inversiones musicales a la estructura del espacio?",
+      "clasificacion": "NATIVA",
+      "notebooks_consultados": [
+        "PDFs_Tesis_Armonia",
+        "PDFs_Tesis_ChordSpace_Math"
+      ],
+      "consulta_enviada": "| P4: ¿Cómo afecta la inclusión de inversiones musicales a la estructura del espacio?\n\nREQUISITO OBLIGATORIO DE CITACIÓN:\n- Responde citando ÚNICAMENTE las FUENTES ORIGINALES (papers, libros, capítulos) que consultaste\n- NO cites \"NotebookLM\" como fuente\n- Incluye para CADA fuente mencionada:\n  * Autor(es) completo(s)\n  * Título completo\n  * Año de publicación\n  * Páginas específicas (si aplica)\n  * Editorial o Journal\n\nFORMATO DE CADA CITA:\nAutor, A. (Año). Título del trabajo. Editorial/Journal. Páginas: X-Y.\n\nEJEMPLO:\nSethares, W. A. (2005). Tuning, Timbre, Spectrum, Scale (2nd ed.). Springer. Páginas: 45-67.\nPlomp, R., & Levelt, W. J. M. (1965). Tonal consonance and critical bandwidth. The Journal of the Acoustical Society of America, 38(4), 548-560.\n\nIMPORTANTE: Si respondes con información de múltiples fuentes, lista TODAS las referencias al final de tu respuesta.",
+      "respuesta_notebooklm": "[PENDIENTE: Consultar manualmente]",
+      "fuentes_originales": []
+    },
+    {
+      "id": "RESP-041",
+      "tipo": "comentario_santimath",
+      "ubicacion": "#### 3.6.1 Preguntas Experimentales, linea 383",
+      "texto_original": "Yo creo que aca faltan mas preguntas, que pasa si tengo dos acorde scasi iguales pero le agrego una nta arriba o abajo o n el medio que pasa con ese tipo demovimeintos en nuestro espacio, o que apsa is enteinteamos emular otros movimeintos de la teoria calsica de la armonia ennuetros espcaio cuales expiermtnos hacer ? esto es una nueva familai de expeirmtinacion? donde quedan los experitnos sobre el barroco que escirbismo jaja eso fue graciosos lo propuesse sin saber mucho y ahora sigo sin saber nada del barroco imagino que pensaaba enque  ciertos tipos de intervalos musicales se usabvan con muy poca freucenai por asuntos culkturales porejemplo acorde napolitnano y otros que no se suabancomo expeirmtnar en eso ?",
+      "clasificacion": "TIPO_A",
+      "notebooks_consultados": [
+        "PDFs_Tesis_Armonia",
+        "PDFs_Tesis_ChordSpace_Math"
+      ],
+      "consulta_enviada": "Yo creo que aca faltan mas preguntas, que pasa si tengo dos acorde scasi iguales pero le agrego una nta arriba o abajo o n el medio que pasa con ese tipo demovimeintos en nuestro espacio, o que apsa is enteinteamos emular otros movimeintos de la teoria calsica de la armonia ennuetros espcaio cuales expiermtnos hacer ? esto es una nueva familai de expeirmtinacion? donde quedan los experitnos sobre el barroco que escirbismo jaja eso fue graciosos lo propuesse sin saber mucho y ahora sigo sin saber nada del barroco imagino que pensaaba enque  ciertos tipos de intervalos musicales se usabvan con muy poca freucenai por asuntos culkturales porejemplo acorde napolitnano y otros que no se suabancomo expeirmtnar en eso ?\n\nREQUISITO OBLIGATORIO DE CITACIÓN:\n- Responde citando ÚNICAMENTE las FUENTES ORIGINALES (papers, libros, capítulos) que consultaste\n- NO cites \"NotebookLM\" como fuente\n- Incluye para CADA fuente mencionada:\n  * Autor(es) completo(s)\n  * Título completo\n  * Año de publicación\n  * Páginas específicas (si aplica)\n  * Editorial o Journal\n\nFORMATO DE CADA CITA:\nAutor, A. (Año). Título del trabajo. Editorial/Journal. Páginas: X-Y.\n\nEJEMPLO:\nSethares, W. A. (2005). Tuning, Timbre, Spectrum, Scale (2nd ed.). Springer. Páginas: 45-67.\nPlomp, R., & Levelt, W. J. M. (1965). Tonal consonance and critical bandwidth. The Journal of the Acoustical Society of America, 38(4), 548-560.\n\nIMPORTANTE: Si respondes con información de múltiples fuentes, lista TODAS las referencias al final de tu respuesta.",
+      "respuesta_notebooklm": "[PENDIENTE: Consultar manualmente]",
+      "fuentes_originales": []
+    },
+    {
+      "id": "RESP-042",
+      "tipo": "pregunta_nativa",
+      "ubicacion": "#### 3.6.1 Preguntas Experimentales, linea 386",
+      "texto_original": "¿Las preguntas son falsificables?",
+      "clasificacion": "NATIVA",
+      "notebooks_consultados": [
+        "PDFs_Tesis_Armonia",
+        "PDFs_Tesis_ChordSpace_Math"
+      ],
+      "consulta_enviada": "¿Las preguntas son falsificables?\n\nREQUISITO OBLIGATORIO DE CITACIÓN:\n- Responde citando ÚNICAMENTE las FUENTES ORIGINALES (papers, libros, capítulos) que consultaste\n- NO cites \"NotebookLM\" como fuente\n- Incluye para CADA fuente mencionada:\n  * Autor(es) completo(s)\n  * Título completo\n  * Año de publicación\n  * Páginas específicas (si aplica)\n  * Editorial o Journal\n\nFORMATO DE CADA CITA:\nAutor, A. (Año). Título del trabajo. Editorial/Journal. Páginas: X-Y.\n\nEJEMPLO:\nSethares, W. A. (2005). Tuning, Timbre, Spectrum, Scale (2nd ed.). Springer. Páginas: 45-67.\nPlomp, R., & Levelt, W. J. M. (1965). Tonal consonance and critical bandwidth. The Journal of the Acoustical Society of America, 38(4), 548-560.\n\nIMPORTANTE: Si respondes con información de múltiples fuentes, lista TODAS las referencias al final de tu respuesta.",
+      "respuesta_notebooklm": "[PENDIENTE: Consultar manualmente]",
+      "fuentes_originales": []
+    },
+    {
+      "id": "RESP-043",
+      "tipo": "pregunta_nativa",
+      "ubicacion": "#### 3.6.1 Preguntas Experimentales, linea 386",
+      "texto_original": "¿Qué resultado descartaría la hipótesis?",
+      "clasificacion": "NATIVA",
+      "notebooks_consultados": [
+        "PDFs_Tesis_Armonia",
+        "PDFs_Tesis_ChordSpace_Math"
+      ],
+      "consulta_enviada": "¿Qué resultado descartaría la hipótesis?\n\nREQUISITO OBLIGATORIO DE CITACIÓN:\n- Responde citando ÚNICAMENTE las FUENTES ORIGINALES (papers, libros, capítulos) que consultaste\n- NO cites \"NotebookLM\" como fuente\n- Incluye para CADA fuente mencionada:\n  * Autor(es) completo(s)\n  * Título completo\n  * Año de publicación\n  * Páginas específicas (si aplica)\n  * Editorial o Journal\n\nFORMATO DE CADA CITA:\nAutor, A. (Año). Título del trabajo. Editorial/Journal. Páginas: X-Y.\n\nEJEMPLO:\nSethares, W. A. (2005). Tuning, Timbre, Spectrum, Scale (2nd ed.). Springer. Páginas: 45-67.\nPlomp, R., & Levelt, W. J. M. (1965). Tonal consonance and critical bandwidth. The Journal of the Acoustical Society of America, 38(4), 548-560.\n\nIMPORTANTE: Si respondes con información de múltiples fuentes, lista TODAS las referencias al final de tu respuesta.",
+      "respuesta_notebooklm": "[PENDIENTE: Consultar manualmente]",
+      "fuentes_originales": []
+    },
+    {
+      "id": "RESP-044",
+      "tipo": "comentario_santimath",
+      "ubicacion": "#### 3.6.1 Preguntas Experimentales, linea 389",
+      "texto_original": "como antes quiza aca faltan preguntas y hay que dejar claro donde se le va a explciar el lenguaje muscial al matemático aca. en este capiutlo? en otro? que seria lo correccto segun las rubricas de modelamiento y los estandares en tesiss de posgrado ?",
+      "clasificacion": "TIPO_A",
+      "notebooks_consultados": [
+        "PDFs_Tesis_Armonia",
+        "PDFs_Tesis_ChordSpace_Math"
+      ],
+      "consulta_enviada": "como antes quiza aca faltan preguntas y hay que dejar claro donde se le va a explciar el lenguaje muscial al matemático aca. en este capiutlo? en otro? que seria lo correccto segun las rubricas de modelamiento y los estandares en tesiss de posgrado ?\n\nREQUISITO OBLIGATORIO DE CITACIÓN:\n- Responde citando ÚNICAMENTE las FUENTES ORIGINALES (papers, libros, capítulos) que consultaste\n- NO cites \"NotebookLM\" como fuente\n- Incluye para CADA fuente mencionada:\n  * Autor(es) completo(s)\n  * Título completo\n  * Año de publicación\n  * Páginas específicas (si aplica)\n  * Editorial o Journal\n\nFORMATO DE CADA CITA:\nAutor, A. (Año). Título del trabajo. Editorial/Journal. Páginas: X-Y.\n\nEJEMPLO:\nSethares, W. A. (2005). Tuning, Timbre, Spectrum, Scale (2nd ed.). Springer. Páginas: 45-67.\nPlomp, R., & Levelt, W. J. M. (1965). Tonal consonance and critical bandwidth. The Journal of the Acoustical Society of America, 38(4), 548-560.\n\nIMPORTANTE: Si respondes con información de múltiples fuentes, lista TODAS las referencias al final de tu respuesta.",
+      "respuesta_notebooklm": "[PENDIENTE: Consultar manualmente]",
+      "fuentes_originales": []
+    },
+    {
+      "id": "RESP-045",
+      "tipo": "comentario_santimath",
+      "ubicacion": "#### 3.6.2 Factores Controlables y sus Niveles, linea 407",
+      "texto_original": "naaah 200 escenarios?? no creo que haya que hacer todo eso en el codigo hay que arguemtanr de alguna manera para no recisar todo eso.",
+      "clasificacion": "TIPO_A",
+      "notebooks_consultados": [
+        "PDFs_Tesis_Armonia",
+        "PDFs_Tesis_ChordSpace_Math"
+      ],
+      "consulta_enviada": "naaah 200 escenarios?? no creo que haya que hacer todo eso en el codigo hay que arguemtanr de alguna manera para no recisar todo eso.\n\nREQUISITO OBLIGATORIO DE CITACIÓN:\n- Responde citando ÚNICAMENTE las FUENTES ORIGINALES (papers, libros, capítulos) que consultaste\n- NO cites \"NotebookLM\" como fuente\n- Incluye para CADA fuente mencionada:\n  * Autor(es) completo(s)\n  * Título completo\n  * Año de publicación\n  * Páginas específicas (si aplica)\n  * Editorial o Journal\n\nFORMATO DE CADA CITA:\nAutor, A. (Año). Título del trabajo. Editorial/Journal. Páginas: X-Y.\n\nEJEMPLO:\nSethares, W. A. (2005). Tuning, Timbre, Spectrum, Scale (2nd ed.). Springer. Páginas: 45-67.\nPlomp, R., & Levelt, W. J. M. (1965). Tonal consonance and critical bandwidth. The Journal of the Acoustical Society of America, 38(4), 548-560.\n\nIMPORTANTE: Si respondes con información de múltiples fuentes, lista TODAS las referencias al final de tu respuesta.",
+      "respuesta_notebooklm": "[PENDIENTE: Consultar manualmente]",
+      "fuentes_originales": []
+    },
+    {
+      "id": "RESP-046",
+      "tipo": "pregunta_nativa",
+      "ubicacion": "#### 3.6.2 Factores Controlables y sus Niveles, linea 411",
+      "texto_original": "¿Es necesario corregir por comparaciones múltiples al comparar 200 escenarios?",
+      "clasificacion": "NATIVA",
+      "notebooks_consultados": [
+        "PDFs_Tesis_Armonia",
+        "PDFs_Tesis_ChordSpace_Math"
+      ],
+      "consulta_enviada": "¿Es necesario corregir por comparaciones múltiples al comparar 200 escenarios?\n\nREQUISITO OBLIGATORIO DE CITACIÓN:\n- Responde citando ÚNICAMENTE las FUENTES ORIGINALES (papers, libros, capítulos) que consultaste\n- NO cites \"NotebookLM\" como fuente\n- Incluye para CADA fuente mencionada:\n  * Autor(es) completo(s)\n  * Título completo\n  * Año de publicación\n  * Páginas específicas (si aplica)\n  * Editorial o Journal\n\nFORMATO DE CADA CITA:\nAutor, A. (Año). Título del trabajo. Editorial/Journal. Páginas: X-Y.\n\nEJEMPLO:\nSethares, W. A. (2005). Tuning, Timbre, Spectrum, Scale (2nd ed.). Springer. Páginas: 45-67.\nPlomp, R., & Levelt, W. J. M. (1965). Tonal consonance and critical bandwidth. The Journal of the Acoustical Society of America, 38(4), 548-560.\n\nIMPORTANTE: Si respondes con información de múltiples fuentes, lista TODAS las referencias al final de tu respuesta.",
+      "respuesta_notebooklm": "[PENDIENTE: Consultar manualmente]",
+      "fuentes_originales": []
+    },
+    {
+      "id": "RESP-047",
+      "tipo": "comentario_santimath",
+      "ubicacion": "#### 3.6.3 Poblaciones de Experimentación, linea 417",
+      "texto_original": "porque 13? no son 12 diadas? que es la 13ava que se incluye?",
+      "clasificacion": "TIPO_A",
+      "notebooks_consultados": [
+        "PDFs_Tesis_Armonia",
+        "PDFs_Tesis_ChordSpace_Math"
+      ],
+      "consulta_enviada": "porque 13? no son 12 diadas? que es la 13ava que se incluye?\n\nREQUISITO OBLIGATORIO DE CITACIÓN:\n- Responde citando ÚNICAMENTE las FUENTES ORIGINALES (papers, libros, capítulos) que consultaste\n- NO cites \"NotebookLM\" como fuente\n- Incluye para CADA fuente mencionada:\n  * Autor(es) completo(s)\n  * Título completo\n  * Año de publicación\n  * Páginas específicas (si aplica)\n  * Editorial o Journal\n\nFORMATO DE CADA CITA:\nAutor, A. (Año). Título del trabajo. Editorial/Journal. Páginas: X-Y.\n\nEJEMPLO:\nSethares, W. A. (2005). Tuning, Timbre, Spectrum, Scale (2nd ed.). Springer. Páginas: 45-67.\nPlomp, R., & Levelt, W. J. M. (1965). Tonal consonance and critical bandwidth. The Journal of the Acoustical Society of America, 38(4), 548-560.\n\nIMPORTANTE: Si respondes con información de múltiples fuentes, lista TODAS las referencias al final de tu respuesta.",
+      "respuesta_notebooklm": "[PENDIENTE: Consultar manualmente]",
+      "fuentes_originales": []
+    },
+    {
+      "id": "RESP-048",
+      "tipo": "pregunta_nativa",
+      "ubicacion": "#### 3.6.4 Experimentos de Referencia Implementados, linea 434",
+      "texto_original": "¿Los experimentos implementados cubren suficientemente los objetivos de la tesis?",
+      "clasificacion": "NATIVA",
+      "notebooks_consultados": [
+        "PDFs_Tesis_Armonia",
+        "PDFs_Tesis_ChordSpace_Math"
+      ],
+      "consulta_enviada": "¿Los experimentos implementados cubren suficientemente los objetivos de la tesis?\n\nREQUISITO OBLIGATORIO DE CITACIÓN:\n- Responde citando ÚNICAMENTE las FUENTES ORIGINALES (papers, libros, capítulos) que consultaste\n- NO cites \"NotebookLM\" como fuente\n- Incluye para CADA fuente mencionada:\n  * Autor(es) completo(s)\n  * Título completo\n  * Año de publicación\n  * Páginas específicas (si aplica)\n  * Editorial o Journal\n\nFORMATO DE CADA CITA:\nAutor, A. (Año). Título del trabajo. Editorial/Journal. Páginas: X-Y.\n\nEJEMPLO:\nSethares, W. A. (2005). Tuning, Timbre, Spectrum, Scale (2nd ed.). Springer. Páginas: 45-67.\nPlomp, R., & Levelt, W. J. M. (1965). Tonal consonance and critical bandwidth. The Journal of the Acoustical Society of America, 38(4), 548-560.\n\nIMPORTANTE: Si respondes con información de múltiples fuentes, lista TODAS las referencias al final de tu respuesta.",
+      "respuesta_notebooklm": "[PENDIENTE: Consultar manualmente]",
+      "fuentes_originales": []
+    },
+    {
+      "id": "RESP-049",
+      "tipo": "comentario_santimath",
+      "ubicacion": "#### 3.6.4 Experimentos de Referencia Implementados, linea 435",
+      "texto_original": "si, esa es una buena pregunta tampoco nos podemos poner locos hay que revisar la literatura y escoger buenos pocos y representativos",
+      "clasificacion": "TIPO_A",
+      "notebooks_consultados": [
+        "PDFs_Tesis_Armonia",
+        "PDFs_Tesis_ChordSpace_Math"
+      ],
+      "consulta_enviada": "si, esa es una buena pregunta tampoco nos podemos poner locos hay que revisar la literatura y escoger buenos pocos y representativos\n\nREQUISITO OBLIGATORIO DE CITACIÓN:\n- Responde citando ÚNICAMENTE las FUENTES ORIGINALES (papers, libros, capítulos) que consultaste\n- NO cites \"NotebookLM\" como fuente\n- Incluye para CADA fuente mencionada:\n  * Autor(es) completo(s)\n  * Título completo\n  * Año de publicación\n  * Páginas específicas (si aplica)\n  * Editorial o Journal\n\nFORMATO DE CADA CITA:\nAutor, A. (Año). Título del trabajo. Editorial/Journal. Páginas: X-Y.\n\nEJEMPLO:\nSethares, W. A. (2005). Tuning, Timbre, Spectrum, Scale (2nd ed.). Springer. Páginas: 45-67.\nPlomp, R., & Levelt, W. J. M. (1965). Tonal consonance and critical bandwidth. The Journal of the Acoustical Society of America, 38(4), 548-560.\n\nIMPORTANTE: Si respondes con información de múltiples fuentes, lista TODAS las referencias al final de tu respuesta.",
+      "respuesta_notebooklm": "[PENDIENTE: Consultar manualmente]",
+      "fuentes_originales": []
+    },
+    {
+      "id": "RESP-050",
+      "tipo": "pregunta_nativa",
+      "ubicacion": "#### 3.6.4 Experimentos de Referencia Implementados, linea 436",
+      "texto_original": "¿Hay gaps experimentales?",
+      "clasificacion": "NATIVA",
+      "notebooks_consultados": [
+        "PDFs_Tesis_Armonia",
+        "PDFs_Tesis_ChordSpace_Math"
+      ],
+      "consulta_enviada": "¿Hay gaps experimentales?\n\nREQUISITO OBLIGATORIO DE CITACIÓN:\n- Responde citando ÚNICAMENTE las FUENTES ORIGINALES (papers, libros, capítulos) que consultaste\n- NO cites \"NotebookLM\" como fuente\n- Incluye para CADA fuente mencionada:\n  * Autor(es) completo(s)\n  * Título completo\n  * Año de publicación\n  * Páginas específicas (si aplica)\n  * Editorial o Journal\n\nFORMATO DE CADA CITA:\nAutor, A. (Año). Título del trabajo. Editorial/Journal. Páginas: X-Y.\n\nEJEMPLO:\nSethares, W. A. (2005). Tuning, Timbre, Spectrum, Scale (2nd ed.). Springer. Páginas: 45-67.\nPlomp, R., & Levelt, W. J. M. (1965). Tonal consonance and critical bandwidth. The Journal of the Acoustical Society of America, 38(4), 548-560.\n\nIMPORTANTE: Si respondes con información de múltiples fuentes, lista TODAS las referencias al final de tu respuesta.",
+      "respuesta_notebooklm": "[PENDIENTE: Consultar manualmente]",
+      "fuentes_originales": []
+    },
+    {
+      "id": "RESP-051",
+      "tipo": "pregunta_nativa",
+      "ubicacion": "### 3.7 Marco de Evaluación y Métricas de Calidad, linea 442",
+      "texto_original": "*Motivación: ¿Cómo sabemos si el embedding es \"bueno\"?",
+      "clasificacion": "NATIVA",
+      "notebooks_consultados": [
+        "PDFs_Tesis_Armonia",
+        "PDFs_Tesis_ChordSpace_Math"
+      ],
+      "consulta_enviada": "*Motivación: ¿Cómo sabemos si el embedding es \"bueno\"?\n\nREQUISITO OBLIGATORIO DE CITACIÓN:\n- Responde citando ÚNICAMENTE las FUENTES ORIGINALES (papers, libros, capítulos) que consultaste\n- NO cites \"NotebookLM\" como fuente\n- Incluye para CADA fuente mencionada:\n  * Autor(es) completo(s)\n  * Título completo\n  * Año de publicación\n  * Páginas específicas (si aplica)\n  * Editorial o Journal\n\nFORMATO DE CADA CITA:\nAutor, A. (Año). Título del trabajo. Editorial/Journal. Páginas: X-Y.\n\nEJEMPLO:\nSethares, W. A. (2005). Tuning, Timbre, Spectrum, Scale (2nd ed.). Springer. Páginas: 45-67.\nPlomp, R., & Levelt, W. J. M. (1965). Tonal consonance and critical bandwidth. The Journal of the Acoustical Society of America, 38(4), 548-560.\n\nIMPORTANTE: Si respondes con información de múltiples fuentes, lista TODAS las referencias al final de tu respuesta.",
+      "respuesta_notebooklm": "[PENDIENTE: Consultar manualmente]",
+      "fuentes_originales": []
+    },
+    {
+      "id": "RESP-052",
+      "tipo": "comentario_santimath",
+      "ubicacion": "#### 3.7.1 Métricas de Preservación de Vecindarios, linea 453",
+      "texto_original": "Y? como se define? no esta escrito, además todas estas hay que justificar su eleccion con base en teoria quiza en trabajos que no son de musucia pero si de ingenieria de caracterisitcas no? aca toca que revises bien",
+      "clasificacion": "TIPO_A",
+      "notebooks_consultados": [
+        "PDFs_Tesis_Armonia",
+        "PDFs_Tesis_ChordSpace_Math"
+      ],
+      "consulta_enviada": "Y? como se define? no esta escrito, además todas estas hay que justificar su eleccion con base en teoria quiza en trabajos que no son de musucia pero si de ingenieria de caracterisitcas no? aca toca que revises bien\n\nREQUISITO OBLIGATORIO DE CITACIÓN:\n- Responde citando ÚNICAMENTE las FUENTES ORIGINALES (papers, libros, capítulos) que consultaste\n- NO cites \"NotebookLM\" como fuente\n- Incluye para CADA fuente mencionada:\n  * Autor(es) completo(s)\n  * Título completo\n  * Año de publicación\n  * Páginas específicas (si aplica)\n  * Editorial o Journal\n\nFORMATO DE CADA CITA:\nAutor, A. (Año). Título del trabajo. Editorial/Journal. Páginas: X-Y.\n\nEJEMPLO:\nSethares, W. A. (2005). Tuning, Timbre, Spectrum, Scale (2nd ed.). Springer. Páginas: 45-67.\nPlomp, R., & Levelt, W. J. M. (1965). Tonal consonance and critical bandwidth. The Journal of the Acoustical Society of America, 38(4), 548-560.\n\nIMPORTANTE: Si respondes con información de múltiples fuentes, lista TODAS las referencias al final de tu respuesta.",
+      "respuesta_notebooklm": "[PENDIENTE: Consultar manualmente]",
+      "fuentes_originales": []
+    },
+    {
+      "id": "RESP-053",
+      "tipo": "pregunta_nativa",
+      "ubicacion": "#### 3.7.1 Métricas de Preservación de Vecindarios, linea 461",
+      "texto_original": "¿Por qué $k = 3$?",
+      "clasificacion": "NATIVA",
+      "notebooks_consultados": [
+        "PDFs_Tesis_Armonia",
+        "PDFs_Tesis_ChordSpace_Math"
+      ],
+      "consulta_enviada": "¿Por qué $k = 3$?\n\nREQUISITO OBLIGATORIO DE CITACIÓN:\n- Responde citando ÚNICAMENTE las FUENTES ORIGINALES (papers, libros, capítulos) que consultaste\n- NO cites \"NotebookLM\" como fuente\n- Incluye para CADA fuente mencionada:\n  * Autor(es) completo(s)\n  * Título completo\n  * Año de publicación\n  * Páginas específicas (si aplica)\n  * Editorial o Journal\n\nFORMATO DE CADA CITA:\nAutor, A. (Año). Título del trabajo. Editorial/Journal. Páginas: X-Y.\n\nEJEMPLO:\nSethares, W. A. (2005). Tuning, Timbre, Spectrum, Scale (2nd ed.). Springer. Páginas: 45-67.\nPlomp, R., & Levelt, W. J. M. (1965). Tonal consonance and critical bandwidth. The Journal of the Acoustical Society of America, 38(4), 548-560.\n\nIMPORTANTE: Si respondes con información de múltiples fuentes, lista TODAS las referencias al final de tu respuesta.",
+      "respuesta_notebooklm": "[PENDIENTE: Consultar manualmente]",
+      "fuentes_originales": []
+    },
+    {
+      "id": "RESP-054",
+      "tipo": "pregunta_nativa",
+      "ubicacion": "#### 3.7.1 Métricas de Preservación de Vecindarios, linea 461",
+      "texto_original": "¿Es sensible la evaluación a este parámetro?",
+      "clasificacion": "NATIVA",
+      "notebooks_consultados": [
+        "PDFs_Tesis_Armonia",
+        "PDFs_Tesis_ChordSpace_Math"
+      ],
+      "consulta_enviada": "¿Es sensible la evaluación a este parámetro?\n\nREQUISITO OBLIGATORIO DE CITACIÓN:\n- Responde citando ÚNICAMENTE las FUENTES ORIGINALES (papers, libros, capítulos) que consultaste\n- NO cites \"NotebookLM\" como fuente\n- Incluye para CADA fuente mencionada:\n  * Autor(es) completo(s)\n  * Título completo\n  * Año de publicación\n  * Páginas específicas (si aplica)\n  * Editorial o Journal\n\nFORMATO DE CADA CITA:\nAutor, A. (Año). Título del trabajo. Editorial/Journal. Páginas: X-Y.\n\nEJEMPLO:\nSethares, W. A. (2005). Tuning, Timbre, Spectrum, Scale (2nd ed.). Springer. Páginas: 45-67.\nPlomp, R., & Levelt, W. J. M. (1965). Tonal consonance and critical bandwidth. The Journal of the Acoustical Society of America, 38(4), 548-560.\n\nIMPORTANTE: Si respondes con información de múltiples fuentes, lista TODAS las referencias al final de tu respuesta.",
+      "respuesta_notebooklm": "[PENDIENTE: Consultar manualmente]",
+      "fuentes_originales": []
+    },
+    {
+      "id": "RESP-055",
+      "tipo": "pregunta_nativa",
+      "ubicacion": "#### 3.7.1 Métricas de Preservación de Vecindarios, linea 462",
+      "texto_original": "¿Trustworthiness y continuity son redundantes o complementarios?",
+      "clasificacion": "NATIVA",
+      "notebooks_consultados": [
+        "PDFs_Tesis_Armonia",
+        "PDFs_Tesis_ChordSpace_Math"
+      ],
+      "consulta_enviada": "¿Trustworthiness y continuity son redundantes o complementarios?\n\nREQUISITO OBLIGATORIO DE CITACIÓN:\n- Responde citando ÚNICAMENTE las FUENTES ORIGINALES (papers, libros, capítulos) que consultaste\n- NO cites \"NotebookLM\" como fuente\n- Incluye para CADA fuente mencionada:\n  * Autor(es) completo(s)\n  * Título completo\n  * Año de publicación\n  * Páginas específicas (si aplica)\n  * Editorial o Journal\n\nFORMATO DE CADA CITA:\nAutor, A. (Año). Título del trabajo. Editorial/Journal. Páginas: X-Y.\n\nEJEMPLO:\nSethares, W. A. (2005). Tuning, Timbre, Spectrum, Scale (2nd ed.). Springer. Páginas: 45-67.\nPlomp, R., & Levelt, W. J. M. (1965). Tonal consonance and critical bandwidth. The Journal of the Acoustical Society of America, 38(4), 548-560.\n\nIMPORTANTE: Si respondes con información de múltiples fuentes, lista TODAS las referencias al final de tu respuesta.",
+      "respuesta_notebooklm": "[PENDIENTE: Consultar manualmente]",
+      "fuentes_originales": []
+    },
+    {
+      "id": "RESP-056",
+      "tipo": "comentario_santimath",
+      "ubicacion": "#### 3.8.4 Decisiones Críticas de Diseño, linea 537",
+      "texto_original": "Es que el intervalo cero para nosotors es la distanci octava porque como no hay unsisono, entonces la primera posiscion del vector correpsonde al tipo de intervalo de 2m segnda menor, es decir 1 semitono, y la posiicion 12 del vector indice 11 pues correposnde a la distacia 12 semitono es edecir octava aun asi peela con FORTE? bueno y eso es grave? lo podemos justificar de alguna manera? que dicen las rerenrencias?",
+      "clasificacion": "TIPO_A",
+      "notebooks_consultados": [
+        "PDFs_Tesis_Armonia",
+        "PDFs_Tesis_ChordSpace_Math"
+      ],
+      "consulta_enviada": "Es que el intervalo cero para nosotors es la distanci octava porque como no hay unsisono, entonces la primera posiscion del vector correpsonde al tipo de intervalo de 2m segnda menor, es decir 1 semitono, y la posiicion 12 del vector indice 11 pues correposnde a la distacia 12 semitono es edecir octava aun asi peela con FORTE? bueno y eso es grave? lo podemos justificar de alguna manera? que dicen las rerenrencias?\n\nREQUISITO OBLIGATORIO DE CITACIÓN:\n- Responde citando ÚNICAMENTE las FUENTES ORIGINALES (papers, libros, capítulos) que consultaste\n- NO cites \"NotebookLM\" como fuente\n- Incluye para CADA fuente mencionada:\n  * Autor(es) completo(s)\n  * Título completo\n  * Año de publicación\n  * Páginas específicas (si aplica)\n  * Editorial o Journal\n\nFORMATO DE CADA CITA:\nAutor, A. (Año). Título del trabajo. Editorial/Journal. Páginas: X-Y.\n\nEJEMPLO:\nSethares, W. A. (2005). Tuning, Timbre, Spectrum, Scale (2nd ed.). Springer. Páginas: 45-67.\nPlomp, R., & Levelt, W. J. M. (1965). Tonal consonance and critical bandwidth. The Journal of the Acoustical Society of America, 38(4), 548-560.\n\nIMPORTANTE: Si respondes con información de múltiples fuentes, lista TODAS las referencias al final de tu respuesta.",
+      "respuesta_notebooklm": "[PENDIENTE: Consultar manualmente]",
+      "fuentes_originales": []
+    },
+    {
+      "id": "RESP-057",
+      "tipo": "pregunta_nativa",
+      "ubicacion": "#### 3.8.5 Amenazas a la Validez, linea 544",
+      "texto_original": "Correlación entre propuestas: ¿propuestas similares (e.g., simplex y simplex_sqrt) inflan artificialmente el número de \"buenos\" escenarios?",
+      "clasificacion": "NATIVA",
+      "notebooks_consultados": [
+        "PDFs_Tesis_Armonia",
+        "PDFs_Tesis_ChordSpace_Math"
+      ],
+      "consulta_enviada": "Correlación entre propuestas: ¿propuestas similares (e.g., simplex y simplex_sqrt) inflan artificialmente el número de \"buenos\" escenarios?\n\nREQUISITO OBLIGATORIO DE CITACIÓN:\n- Responde citando ÚNICAMENTE las FUENTES ORIGINALES (papers, libros, capítulos) que consultaste\n- NO cites \"NotebookLM\" como fuente\n- Incluye para CADA fuente mencionada:\n  * Autor(es) completo(s)\n  * Título completo\n  * Año de publicación\n  * Páginas específicas (si aplica)\n  * Editorial o Journal\n\nFORMATO DE CADA CITA:\nAutor, A. (Año). Título del trabajo. Editorial/Journal. Páginas: X-Y.\n\nEJEMPLO:\nSethares, W. A. (2005). Tuning, Timbre, Spectrum, Scale (2nd ed.). Springer. Páginas: 45-67.\nPlomp, R., & Levelt, W. J. M. (1965). Tonal consonance and critical bandwidth. The Journal of the Acoustical Society of America, 38(4), 548-560.\n\nIMPORTANTE: Si respondes con información de múltiples fuentes, lista TODAS las referencias al final de tu respuesta.",
+      "respuesta_notebooklm": "[PENDIENTE: Consultar manualmente]",
+      "fuentes_originales": []
+    },
+    {
+      "id": "RESP-058",
+      "tipo": "pregunta_nativa",
+      "ubicacion": "### Ronda 2: Evaluación de Hipótesis (Hypothesis-Generation Framework), linea 593",
+      "texto_original": "| Falsificabilidad | 3 | Parcial: ¿qué resultado la descarta?",
+      "clasificacion": "NATIVA",
+      "notebooks_consultados": [
+        "PDFs_Tesis_Armonia",
+        "PDFs_Tesis_ChordSpace_Math"
+      ],
+      "consulta_enviada": "| Falsificabilidad | 3 | Parcial: ¿qué resultado la descarta?\n\nREQUISITO OBLIGATORIO DE CITACIÓN:\n- Responde citando ÚNICAMENTE las FUENTES ORIGINALES (papers, libros, capítulos) que consultaste\n- NO cites \"NotebookLM\" como fuente\n- Incluye para CADA fuente mencionada:\n  * Autor(es) completo(s)\n  * Título completo\n  * Año de publicación\n  * Páginas específicas (si aplica)\n  * Editorial o Journal\n\nFORMATO DE CADA CITA:\nAutor, A. (Año). Título del trabajo. Editorial/Journal. Páginas: X-Y.\n\nEJEMPLO:\nSethares, W. A. (2005). Tuning, Timbre, Spectrum, Scale (2nd ed.). Springer. Páginas: 45-67.\nPlomp, R., & Levelt, W. J. M. (1965). Tonal consonance and critical bandwidth. The Journal of the Acoustical Society of America, 38(4), 548-560.\n\nIMPORTANTE: Si respondes con información de múltiples fuentes, lista TODAS las referencias al final de tu respuesta.",
+      "respuesta_notebooklm": "[PENDIENTE: Consultar manualmente]",
+      "fuentes_originales": []
+    }
+  ]
+}

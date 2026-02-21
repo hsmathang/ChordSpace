@@ -1,0 +1,167 @@
+[
+  {
+    "id": "RESP-001",
+    "notebook_id": "cf0745ab-abf7-4b86-a5cf-48b192f603be",
+    "query": "¿Puede el lector, solo leyendo esta introducción, entender qué va a leer y por qué en ese orden? Requisito: Citar fuentes originales."
+  },
+  {
+    "id": "RESP-002",
+    "notebook_id": "cf0745ab-abf7-4b86-a5cf-48b192f603be",
+    "query": "¿Queda claro que el capítulo NO es un manual de software sino la descripción de un modelo matemático con su realización computacional? Requisito: Citar fuentes originales."
+  },
+  {
+    "id": "RESP-003",
+    "notebook_id": "cf0745ab-abf7-4b86-a5cf-48b192f603be",
+    "query": "¿Es necesario definir el Espacio de Notas MIDI como todo {0,...,127} o basta con el subrango usado experimentalmente en un contexto de modelado matemático musical? Requisito: Citar fuentes originales."
+  },
+  {
+    "id": "RESP-004",
+    "notebook_id": "cf0745ab-abf7-4b86-a5cf-48b192f603be",
+    "query": "¿Cómo justificar la elección del sistema de afinación 12-TET frente a afinaciones alternativas en un modelo computacional de acordes? Buscar argumentos de simplicidad computacional vs limitación expresiva. Requisito: Citar fuentes originales."
+  },
+  {
+    "id": "RESP-005",
+    "notebook_id": "8dedc0d4-9af1-482a-b779-e9733609414a",
+    "query": "¿Cómo modelar matemáticamente el crecimiento del espacio de acordes (combinatoria) en función de parámetros como cardinalidad, rango y tipo de representación (estructural vs absoluta)? Buscar referencias sobre explosión combinatoria en teoría de conjuntos de clases de altura (PC-sets)."
+  },
+  {
+    "id": "RESP-006",
+    "notebook_id": "cf0745ab-abf7-4b86-a5cf-48b192f603be",
+    "query": "¿Se justifica exigir que un acorde sea una tupla estrictamente creciente (sin unísonos) en modelos de representación musical? ¿Qué implicaciones tiene admitir unísonos en el cálculo de rugosidad o disonancia?"
+  },
+  {
+    "id": "RESP-007",
+    "notebook_id": "8dedc0d4-9af1-482a-b779-e9733609414a",
+    "query": "Definición formal de 'Voicing' en matemáticas aplicadas a la música y su distinción respecto a 'Acorde' o 'PC-set'. Buscar referencias que traten el orden de las notas (registro) como discriminador de identidad del objeto acorde."
+  },
+  {
+    "id": "RESP-008",
+    "notebook_id": "8dedc0d4-9af1-482a-b779-e9733609414a",
+    "query": "¿La restricción de ordenamiento estricto ($n_1 < n_2 < ...$) en la definición de acorde implica que permutaciones (voicings) se consideran el mismo objeto o objetos distintos? ¿Cómo maneja la literatura matemática esta distinción?"
+  },
+  {
+    "id": "RESP-009",
+    "notebook_id": "8dedc0d4-9af1-482a-b779-e9733609414a",
+    "query": "Argumentos para justificar la falta de invariancia por transposición en un modelo de representación de acordes basado en rugosidad psicoacústica. ¿Por qué es deseable que la transposición cambie las propiedades del objeto en este contexto?"
+  },
+  {
+    "id": "RESP-010",
+    "notebook_id": "8dedc0d4-9af1-482a-b779-e9733609414a",
+    "query": "Explica positivamente qué noción de identidad de acorde se utiliza cuando se rechaza la equivalencia de PC-sets (Forte). ¿Qué propiedades se preservan y cuáles se discriminan? Buscar justificaciones teóricas para representaciones sensibles al registro y a la disposición (spacing)."
+  },
+  {
+    "id": "RESP-011",
+    "notebook_id": "8dedc0d4-9af1-482a-b779-e9733609414a",
+    "query": "Justificación para usar un vector de características de 12 bins (distinguiendo intervalos complementarios) en lugar de los 6 bins de la clase de intervalos (IC vector) de Forte. ¿Qué ventaja tiene no colapsar complementarios en términos de discriminación armónica?"
+  },
+  {
+    "id": "RESP-012",
+    "notebook_id": "8dedc0d4-9af1-482a-b779-e9733609414a",
+    "query": "Comparar la representación de acordes de 12 dimensiones (sin colapsar complementarios) con el Tonal Interval Space (TIS) y representaciones de 6 dimensiones (IC vector). ¿En qué aspectos perceptuales, específicamente de rugosidad, destaca la representación expandida? Buscar evidencias en curvas de Sethares."
+  },
+  {
+    "id": "RESP-013",
+    "notebook_id": "cf0745ab-abf7-4b86-a5cf-48b192f603be",
+    "query": "¿Cuál es la implicación algebraica y geométrica de NO colapsar intervalos complementarios (12 bins vs 6 bins) en la representación de acordes? ¿Cómo afecta esto a la simetría y dimensión del espacio resultante?"
+  },
+  {
+    "id": "RESP-014",
+    "notebook_id": "8dedc0d4-9af1-482a-b779-e9733609414a",
+    "query": "Proporciona una justificación formal para mantener la distinción entre intervalos complementarios (e.g., 3ra menor vs 6ta mayor) en un modelo de exploración de acordes, a pesar de la redundancia teórica en PC-sets."
+  },
+  {
+    "id": "RESP-015",
+    "notebook_id": "27d02df9-0405-4ae0-b1d5-58675f73cc49",
+    "query": "¿Qué relación conceptual explícita existe entre la 'similitud sonora' de acordes y la 'rugosidad' (roughness) psicoacústica? ¿Por qué la rugosidad funciona como proxy de disimilitud o distancia en el espacio perceptual?"
+  },
+  {
+    "id": "RESP-016",
+    "notebook_id": "27d02df9-0405-4ae0-b1d5-58675f73cc49",
+    "query": "Definir concisamente 'Banda Crítica Auditiva' y 'Disonancia Sensorial' (Plomp & Levelt) y explicar su relación causal con la percepción de rugosidad en acordes. Proveer definiciones estándar para un capítulo de metodología."
+  },
+  {
+    "id": "RESP-017",
+    "notebook_id": "27d02df9-0405-4ae0-b1d5-58675f73cc49",
+    "query": "¿El uso de tonos sintéticos (modelados matemáticamente con espectro armónico ideal) interfiere o apoya la validez del modelo de rugosidad de Sethares en comparación con el uso de grabaciones acústicas reales? ¿Qué dice la literatura sobre la simplificación de timbres en modelos de armonía?"
+  },
+  {
+    "id": "RESP-018",
+    "notebook_id": "27d02df9-0405-4ae0-b1d5-58675f73cc49",
+    "query": "Comparar el modelo de rugosidad de Sethares (1993) con modelos alternativos como Vassilakis o Hutchinson-Knopoff. ¿Por qué Sethares se ha convertido en un estándar ('el' modelo) o sigue siendo solo una opción entre varias? Pros y contras."
+  },
+  {
+    "id": "RESP-019",
+    "notebook_id": "27d02df9-0405-4ae0-b1d5-58675f73cc49",
+    "query": "Argumentos para justificar la elección del algoritmo de Sethares para calcular disonancia en un trabajo de tesis, frente a otras opciones. ¿Es su tractabilidad computacional, su validación empírica, o su adopción generalizada?"
+  },
+  {
+    "id": "RESP-020",
+    "notebook_id": "27d02df9-0405-4ae0-b1d5-58675f73cc49",
+    "query": "Proveer una descripción técnica de la curva de disonancia de Sethares (campana asimétrica) y cómo se relaciona con el fenómeno fisiológico auditivo de la membrana basilar y las bandas críticas. Diferenciar este enfoque fisiológico de enfoques puramente teóricos musicalmente."
+  },
+  {
+    "id": "RESP-021",
+    "notebook_id": "27d02df9-0405-4ae0-b1d5-58675f73cc49",
+    "query": "¿Cuál es la fuente exacta y el procedimiento de derivación de los valores numéricos de los parámetros ($S_1, S_2, C_1, C_2...$) en la ecuación de disonancia de Sethares? Confirmar si provienen de ajuste de curvas a datos de Plomp-Levelt (1965)."
+  },
+  {
+    "id": "RESP-022",
+    "notebook_id": "27d02df9-0405-4ae0-b1d5-58675f73cc49",
+    "query": "¿Existe literatura sobre la sensibilidad del modelo de Sethares a variaciones leves en sus parámetros? ¿Qué tanto cambia el ranking de disonancia si se modifican $C_1, C_2$ o las tasas de decaimiento?"
+  },
+  {
+    "id": "RESP-023",
+    "notebook_id": "27d02df9-0405-4ae0-b1d5-58675f73cc49",
+    "query": "Definición matemática estándar de 'Espectro Armónico' en procesamiento de señales y acústica. ¿Cómo se formaliza la serie de armónicos $f_k = k \\cdot f_0$ y cómo se diferencia de un espectro inarmónico?"
+  },
+  {
+    "id": "RESP-024",
+    "notebook_id": "27d02df9-0405-4ae0-b1d5-58675f73cc49",
+    "query": "Busca referencias que expliquen y fundamenten por qué la rugosidad psicoacústica depende de las frecuencias absolutas (registro) y no solo de la relación de intervalos. ¿Por qué una tercera menor grave es más rugosa que una aguda?"
+  },
+  {
+    "id": "RESP-025",
+    "notebook_id": "27d02df9-0405-4ae0-b1d5-58675f73cc49",
+    "query": "Validez del modelo de decaimiento exponencial ($\\delta^{k-1}$) para las amplitudes de los parciales en instrumentos armónicos (cuerdas, vientos). ¿Es una aproximación estándar razonable en psicoacústica computacional?"
+  },
+  {
+    "id": "RESP-026",
+    "notebook_id": "27d02df9-0405-4ae0-b1d5-58675f73cc49",
+    "query": "Impacto del número de armónicos computados ($H$) en la precisión del cálculo de rugosidad de Sethares. ¿Existe un punto de convergencia donde añadir más armónicos (e.g., $H=10$ vs $H=6$) no altera significativamente la percepción de disonancia?"
+  },
+  {
+    "id": "RESP-027",
+    "notebook_id": "27d02df9-0405-4ae0-b1d5-58675f73cc49",
+    "query": "Diseño experimental para evaluar la sensibilidad del modelo de rugosidad al número de armónicos ($H$). ¿Qué métrica de error o divergencia se debería usar para comparar curvas de disonancia generadas con diferente $H$?"
+  },
+  {
+    "id": "RESP-028",
+    "notebook_id": "27d02df9-0405-4ae0-b1d5-58675f73cc49",
+    "query": "Investigación sobre la percepción de 'intervalos internos' en acordes de más de 3 notas. ¿Contribuyen los intervalos internos (entre voces medias) de igual manera a la rugosidad total que los intervalos con el bajo o la soprano?"
+  },
+  {
+    "id": "RESP-029",
+    "notebook_id": "27d02df9-0405-4ae0-b1d5-58675f73cc49",
+    "query": "¿Es suficiente la validación de modelos de rugosidad usando pares de tonos (díadas) para garantizar su corrección en acordes complejos (tríadas, tetrádas)? ¿Existen efectos no lineales o de enmascaramiento en acordes densos que el modelo aditivo de Sethares no capture?"
+  },
+  {
+    "id": "RESP-030",
+    "notebook_id": "27d02df9-0405-4ae0-b1d5-58675f73cc49",
+    "query": "¿Existen bases de datos o estudios experimentales que proporcionen un 'ground truth' de disonancia percibida para acordes de 3 o más notas (tríadas, tetrádas)? Búsqueda de datasets de percepción psicoacústica de acordes."
+  },
+  {
+    "id": "RESP-031",
+    "notebook_id": "27d02df9-0405-4ae0-b1d5-58675f73cc49",
+    "query": "¿En qué unidades se expresa el valor de rugosidad calculado por el modelo de Sethares? ¿Es una magnitud adimensional, relativa, o tiene una interpretación física directa? ¿Cómo se normaliza típicamente?"
+  },
+  {
+    "id": "RESP-032",
+    "notebook_id": "14fa63f0-279b-4348-b50e-5d350542b25b",
+    "query": "Discusión teórica: ¿La normalización de vectores de características en MIR (Music Information Retrieval) destruye información relevante sobre la magnitud o intensidad perceptuales? ¿Cuándo es preferible preservar la magnitud absoluta frente a la forma de la distribución?"
+  },
+  {
+    "id": "RESP-033",
+    "notebook_id": "14fa63f0-279b-4348-b50e-5d350542b25b",
+    "query": "¿Depende la estrategia de normalización de datos óptima de la tarea de análisis musical específica (e.g., clasificación de acordes vs. medición de similitud)? Buscar argumentos sobre la dependencia del contexto en el preprocesamiento de datos musicales."
+  }
+]

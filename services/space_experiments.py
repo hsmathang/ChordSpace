@@ -114,6 +114,7 @@ class ExperimentService:
             deterministic=config.execution.deterministic,
             jobs=config.reduction.n_jobs,
             mds_n_init=config.reduction.n_init,
+            metric_params=config.roughness.metric_params,
             cpu_count=None # Auto-detect
         )
         timing_log.append(("run_pipeline", time.perf_counter() - t0))

@@ -1,0 +1,226 @@
+\chapter{Metodología}
+\label{ch:metodologia_chordspace}
+
+Este capítulo formaliza el flujo metodológico implementado en el repositorio \texttt{ChordSpace} para (i) generar poblaciones de acordes bajo restricciones controladas, (ii) medir características psicoacústicas (rugosidad) en función de la interacción espectral entre notas, (iii) construir representaciones vectoriales comparables entre acordes, (iv) definir disimilitudes y (v) reducir dimensionalidad a 2D para exploración visual e identificación de sustitutos.
+
+\section{Definición del objeto de estudio: el acorde como objeto computacional}
+\label{sec:objeto_acorde}
+
+\subsection{Definición matemática mínima}
+Sea un acorde una $m$-tupla estrictamente creciente de notas MIDI absolutas
+\[
+\mathbf{n}=(n_1,\dots,n_m),\qquad 0\le n_1<\cdots<n_m\le 127.
+\]
+El orden por altura es parte de la definición (captura registro/voicing). En el repositorio, esta convención aparece explícitamente en la generación combinatoria basada en combinaciones ordenadas por valor MIDI (\texttt{services/combinatorial\_generator.py:generate\_combinatorial\_chords}).
+
+Definimos las \emph{pitch classes} (PC) como $pc_i \equiv n_i \bmod 12$, y el vector de intervalos adyacentes
+\[
+\boldsymbol{\Delta}=(\Delta_1,\dots,\Delta_{m-1}),\qquad \Delta_i=n_{i+1}-n_i\in\mathbb{N}.
+\]
+En el pipeline, $\boldsymbol{\Delta}$ corresponde a la columna \texttt{interval} y alimenta la representación interna \texttt{pre\_process.Acorde.intervals} (vía \texttt{pre\_process.ChordAdapter.from\_csv\_row}).
+
+La conversión estándar MIDI$\rightarrow$frecuencia (12-TET) usada en la generación es
+\[
+f(n)=440\cdot 2^{\frac{n-69}{12}}\,,
+\]
+implementada en \texttt{services/combinatorial\_generator.py:\_midi\_to\_freq}. Cuando la población contiene \texttt{frequencies}, el modelo de rugosidad usa dichas frecuencias para conservar registro absoluto (\texttt{pre\_process.ModeloSetharesVec.calcular}).
+
+\subsection{Identidad del acorde (sin equivalencias tipo Forte)}
+El repositorio no asume equivalencias fuertes tipo Set Theory (por ejemplo, “clase de conjunto” invariante a transposición e inversión). En su lugar, el acorde se trata como un objeto con identidad sensible a:
+\begin{itemize}
+  \item \textbf{Reordenación (voicing/inversiones musicales)}: cambia $\mathbf{n}$ y, por tanto, cambia el objeto (aun si las PC coinciden).
+  \item \textbf{Cambio de octava/registro}: cambia $\mathbf{n}$ y las frecuencias $f(n)$, afectando la interacción de parciales (batidos).
+  \item \textbf{Transposición absoluta}: cambia $\mathbf{n}$ y su codificación; en la población generada, el identificador estable se calcula como un hash de la secuencia absoluta \texttt{notes\_abs} (\texttt{services/combinatorial\_generator.py:\_stable\_id}).
+\end{itemize}
+Esto permite que dos acordes con mismas PC pero distinto registro tengan distinta representación y distinta rugosidad.
+
+\subsection{Acorde como contenedor de datos (implementación)}
+Operacionalmente, un acorde viaja como \emph{registro} (diccionario/filas de \texttt{pandas}) con campos compatibles con la tabla \texttt{chords} (ChordCodex) y con el pipeline de experimentos. La generación combinatoria produce, entre otros, los campos \texttt{notes\_abs\_json}, \texttt{frequencies}, \texttt{interval}, \texttt{notes}, \texttt{code}, \texttt{bass}, \texttt{span\_semitones} y \texttt{id} (\texttt{services/combinatorial\_generator.py:\_process\_chord\_record}).
+
+\section{Generación del espacio de búsqueda y filtrado}
+\label{sec:generacion_espacio}
+
+\subsection{Universo discreto de alturas}
+El usuario define:
+\begin{itemize}
+  \item un alfabeto de PC $A\subseteq\mathbb{Z}_{12}$,
+  \item un rango de octavas MIDI $[o_{\min},o_{\max}]$,
+  \item un conjunto de cardinalidades $\mathcal{K}\subseteq\mathbb{N}$.
+\end{itemize}
+El generador construye el universo MIDI
+\[
+U=\{\,12\cdot(o+1)+pc\mid o\in[o_{\min},o_{\max}],\ pc\in A\,\}\cap[0,127],
+\]
+y enumera para cada $k\in\mathcal{K}$ todas las combinaciones $\binom{|U|}{k}$ (ver \texttt{services/combinatorial\_generator.py:generate\_combinatorial\_chords}).
+
+\subsection{Modo estructural}
+Existe un modo alternativo \texttt{structural\_mode} que colapsa transposiciones internas al conservar únicamente el patrón de offsets
+\[
+\mathbf{s}=(0, n_2-n_1,\dots,n_k-n_1),
+\]
+usando un catálogo de formas (una fila por patrón) (\texttt{services/combinatorial\_generator.py}).
+Este modo no reduce el costo de enumeración (aún recorre combinaciones), pero sí reduce el tamaño final almacenado.
+
+\subsection{Filtros}
+Tras generar, se aplican filtros en memoria (\texttt{services/population\_filter.py:filter\_dataframe}) que imponen restricciones adicionales, por ejemplo:
+\begin{itemize}
+  \item cardinalidad permitida (\texttt{ChordFilters.cardinalities}),
+  \item span total en semitonos (\texttt{span\_min}, \texttt{span\_max}),
+  \item intervalo interno máximo (\texttt{max\_internal\_interval}),
+  \item inclusión/exclusión de PC (\texttt{include\_pitch\_classes}, \texttt{exclude\_pitch\_classes} sobre \texttt{notes\_abs\_json}),
+  \item patrones interválicos exactos/subsecuencia/valores (\texttt{interval\_mode} y relacionados),
+  \item códigos exactos (\texttt{codes}).
+\end{itemize}
+
+\subsection{Interfaz (parámetros controlados por el usuario)}
+La GUI actual (Tkinter) permite definir alfabeto, octavas, cardinalidades, modo estructural y filtros, y luego ejecutar el pipeline de análisis (\texttt{ui/launcher/views/app\_new.py} y \texttt{ui/launcher/controller.py}). La población seleccionada se serializa a JSONL y se usa como entrada del experimento (\texttt{ExperimentController.write\_population\_json}).
+
+\section{Modelo psicoacústico: rugosidad (Sethares)}
+\label{sec:rugosidad}
+
+\subsection{Hipótesis de agregación}
+Se adopta la hipótesis operacional (implementada) de que la rugosidad total del acorde se agrega a partir de contribuciones \emph{par-a-par} entre notas y, a su vez, entre parciales armónicos de cada nota:
+\begin{itemize}
+  \item para un acorde con $m$ notas hay $P=\binom{m}{2}$ pares de notas;
+  \item para cada par de notas se evalúa interacción entre $H$ armónicos de cada una (matriz $H\times H$).
+\end{itemize}
+Esto está implementado en la variante vectorizada \texttt{pre\_process.ModeloSetharesVec} (alias canónico \texttt{ModeloSethares} al final de \texttt{pre\_process.py}).
+
+\subsection{Definición de disonancia entre dos sinusoides}
+Para dos parciales con frecuencias $f_a,f_b>0$ y amplitudes $A_a,A_b\ge 0$, se usa la forma tipo Sethares/Plomp--Levelt:
+\[
+d(f_a,f_b)=A_aA_b\left(C_1e^{A_1 s\Delta f}+C_2e^{A_2 s\Delta f}\right),
+\qquad
+s=\frac{D^{*}}{S_1\min(f_a,f_b)+S_2},
+\qquad
+\Delta f=|f_b-f_a|.
+\]
+En el código, esta expresión aparece en \texttt{pre\_process.ModeloSetharesVec.\_pair\_total} con constantes globales (\texttt{config.py}: \texttt{SETHARES\_D\_STAR}, \texttt{SETHARES\_S1}, \texttt{SETHARES\_S2}, \texttt{SETHARES\_C1}, \texttt{SETHARES\_C2}, \texttt{SETHARES\_A1}, \texttt{SETHARES\_A2}).
+
+\subsection{Armónicos y decaimiento}
+Sea $H$ el número de armónicos (\texttt{SETHARES\_N\_HARMONICS}) y $\delta\in(0,1)$ un factor de decaimiento (\texttt{SETHARES\_DECAY}). Para cada nota fundamental $f$ se generan armónicos $f\cdot k$ con amplitud $A_k=\delta^{k-1}$, $k=1,\dots,H$ (\texttt{pre\_process.ModeloSetharesVec.\_get\_harmonic\_arrays}).
+
+La rugosidad entre dos notas de fundamentales $(f_i,f_j)$ se calcula como:
+\[
+R(f_i,f_j)=\sum_{p=1}^{H}\sum_{q=1}^{H} d(f_i p, f_j q).
+\]
+
+\subsection{Vector de rugosidad por clase interválica}
+Cada acorde se representa por un histograma real no negativo $\mathbf{x}\in\mathbb{R}_{\ge 0}^{12}$ (12 bins) donde cada bin acumula la rugosidad de los pares de notas cuya distancia (en semitonos) pertenece a esa clase módulo 12. En el código:
+\begin{itemize}
+  \item el intervalo entre notas se computa como $(\texttt{semitonos\_rel}[j]-\texttt{semitonos\_rel}[i])\bmod 12$;
+  \item el índice de bin sigue la convención UI: $0\mapsto 11$ y $1..11\mapsto 0..10$ (\texttt{pre\_process.interval\_to\_ui\_bin} y \texttt{tools/proposals\_pipeline/population.py:compute\_interval\_counts});
+  \item la acumulación se hace en \texttt{pre\_process.ModeloSetharesVec.calcular}.
+\end{itemize}
+Además, se reporta un escalar \texttt{total\_roughness} como suma de contribuciones par-a-par.
+
+\subsection{Validación del modelo Sethares en el repositorio}
+La herramienta \texttt{tools/compare\_sethares.py} permite comparar la implementación del repositorio con una implementación canónica controlada (curva de dídas por intervalo) y exportar CSV/PNG. Adicionalmente, existen pruebas automatizadas relacionadas con Sethares en \texttt{tests/test\_sethares\_*}.
+
+\section{Normalizaciones (propuestas) y métricas de distancia}
+\label{sec:distancias}
+
+\subsection{Normalizaciones}
+Dado que $\mathbf{x}$ escala con el número de pares y con la densidad interválica, se implementan varias propuestas de preprocesamiento (\texttt{tools/compare\_proposals.py:PREPROCESSORS}) que producen:
+\begin{itemize}
+  \item una matriz $X$ (escala “original” ajustada), y
+  \item una versión normalizada al simplex (por fila) para métricas probabilísticas.
+\end{itemize}
+
+Ejemplos (definidos en \texttt{tools/compare\_proposals.py}):
+\begin{itemize}
+  \item \texttt{simplex}: $X=\mathbf{x}$, \ $\tilde{\mathbf{x}}=\mathbf{x}/\|\mathbf{x}\|_1$.
+  \item \texttt{simplex\_sqrt}: $\tilde{\mathbf{x}}=\sqrt{\mathbf{x}}/\|\sqrt{\mathbf{x}}\|_1$.
+  \item \texttt{simplex\_smooth}: suavizado gaussiano circular + normalización (parámetro $\sigma=0.75$).
+  \item \texttt{perclass\_alpha}: divide cada bin por $m_k^\alpha$ donde $m_k$ es la multiplicidad del intervalo (usa \texttt{counts}).
+  \item \texttt{global\_pairs}: divide por el número total de pares $P$.
+  \item \texttt{divide\_mminus1}: heurística que penaliza duplicidades por clase.
+  \item \texttt{identity}: control (sin ajuste).
+\end{itemize}
+
+\subsection{Métricas}
+Para cada escenario (propuesta $\times$ métrica), se calcula una matriz de disimilitudes a partir de \texttt{pdist} (vector condensado) (\texttt{tools/compare\_proposals.py:metric\_distance}). Las métricas usadas en la GUI/pipeline incluyen:
+\begin{itemize}
+  \item \textbf{Coseno}: $d(\mathbf{u},\mathbf{v})=1-\frac{\langle \mathbf{u},\mathbf{v}\rangle}{\|\mathbf{u}\|_2\|\mathbf{v}\|_2}$.
+  \item \textbf{Euclidiana}: $d(\mathbf{u},\mathbf{v})=\|\mathbf{u}-\mathbf{v}\|_2$.
+  \item \textbf{Jensen--Shannon}: sobre distribuciones normalizadas $\tilde{\mathbf{x}}$.
+  \item \textbf{Hellinger}: sobre distribuciones normalizadas.
+\end{itemize}
+
+\section{Reducción dimensional (MDS/UMAP y alternativas)}
+\label{sec:reduccion_dimensional}
+
+Sea $N$ el tamaño de la población. Para cada escenario se computa una disimilitud precomputada $D\in\mathbb{R}^{N\times N}$ (internamente se almacena primero como vector condensado). Luego se obtiene un embedding $Y\in\mathbb{R}^{N\times 2}$ con un método de reducción.
+
+\subsection{MDS (SMACOF, métrico, disimilitud precomputada)}
+El pipeline usa \texttt{sklearn.manifold.MDS} con \texttt{metric=True} y \texttt{dissimilarity="precomputed"} (\texttt{tools/proposals\_pipeline/metrics.py:compute\_embeddings}). En términos generales, MDS busca minimizar una función de stress al aproximar distancias originales con distancias en 2D.
+
+Hiperparámetros relevantes (en el código):
+\begin{itemize}
+  \item \texttt{n\_init} (GUI fija 4 en \texttt{ui/launcher/views/app\_new.py}),
+  \item \texttt{random\_state} (semilla si el modo es determinista),
+  \item \texttt{n\_jobs} (paralelismo).
+\end{itemize}
+
+\subsection{UMAP (distancias precomputadas)}
+UMAP se ejecuta con \texttt{metric="precomputed"} e inicialización \texttt{spectral} (\texttt{tools/proposals\_pipeline/metrics.py:compute\_embeddings}). El número de vecinos se ajusta automáticamente como $n\_neighbors=\min(15,N-1)$ (con cota inferior 2) y se fija \texttt{n\_epochs=200}.
+
+\subsection{Evaluación de calidad del embedding}
+El repositorio calcula métricas de calidad por embedding, incluyendo \texttt{trustworthiness}, \texttt{continuity}, \texttt{knn\_recall}, correlación de ranking, stress (Kruskal), métricas de Shepard (pendiente/$R^2$), y métricas de cluster/separabilidad por cardinalidad (\texttt{tools/proposals\_pipeline/metrics.py:summarise\_embedding\_metrics} y \texttt{metrics.py}).
+
+\section{Visualización, exploración y sustitución armónica}
+\label{sec:visualizacion}
+
+\subsection{Reporte HTML}
+El artefacto principal de salida es un reporte HTML con secciones (scatter, heatmap, Shepard, tabla, metadata) generado por \texttt{services/space\_visualization.py:VisualizationService.generate\_report\_full} y el renderer \texttt{tools/reporting/render\_report\_html}. El reporte agrega:
+\begin{itemize}
+  \item embeddings 2D por reducción y escenario,
+  \item tablas de métricas agregadas (por seed),
+  \item payloads auxiliares (por ejemplo, matrices condensadas para heatmaps),
+  \item audio opcional (frecuencias por acorde) para reproducción en navegador.
+\end{itemize}
+
+\subsection{Sustituciones (vecinos cercanos)}
+Como aplicación, el sistema calcula vecinos cercanos (\emph{k-NN}) para sugerir sustitutos armónicos. En el payload de visualización se incluyen mapas de vecinos por diferentes perfiles (\texttt{visualisations/proposals.py}), típicamente restringidos a la misma cardinalidad (decisión de diseño del MVP).
+
+\section{Validación, verificación y reproducibilidad}
+\label{sec:validacion}
+
+\subsection{Pruebas automatizadas y contratos}
+El repositorio contiene pruebas de humo del pipeline, pruebas del modelo Sethares y contratos del sistema de reporte (\texttt{tests/}). Esto funciona como evidencia de consistencia interna (no como “validez perceptual” del modelo).
+
+\subsection{Reproducibilidad}
+El modo determinista fija semillas (\texttt{services/domain.py:ExecutionConfig}) y los resultados se exportan (métricas, reporte HTML) en un directorio \texttt{outputs/} elegido por el usuario desde la GUI.
+
+\section{Complejidad computacional y límites prácticos}
+\label{sec:complejidad}
+
+La complejidad dominante del pipeline no está en el cálculo de $\mathbf{x}\in\mathbb{R}^{12}$, sino en:
+\begin{itemize}
+  \item la enumeración combinatoria (crece como $\binom{|U|}{k}$),
+  \item la construcción de distancias par-a-par (crece como $O(N^2)$ en memoria/tiempo),
+  \item y el uso de reductores sobre disimilitudes precomputadas (que heredan el costo $O(N^2)$).
+\end{itemize}
+El análisis detallado (Big‑O y memoria) se entrega como documento aparte en \texttt{notas/02\_complejidad\_y\_escala.md}.
+
+\section{Figuras (fuentes Mermaid)}
+\label{sec:figuras_mermaid}
+
+\begin{figure}[ht]
+\centering
+\fbox{\parbox{0.92\textwidth}{
+\textbf{Diagrama de arquitectura.} Fuente: \texttt{diagramas/01\_arquitectura.mmd}.\\
+Exportar a PNG/SVG con Mermaid (p.\,ej. mermaid.live) para incluir en la tesis.
+}}
+\caption{Arquitectura del pipeline implementado en ChordSpace.}
+\end{figure}
+
+\begin{figure}[ht]
+\centering
+\fbox{\parbox{0.92\textwidth}{
+\textbf{Diagrama de flujo del pipeline.} Fuente: \texttt{diagramas/02\_pipeline.mmd}.\\
+Exportar a PNG/SVG con Mermaid para incluir en la tesis.
+}}
+\caption{Flujo de datos: población $\rightarrow$ rugosidad $\rightarrow$ distancias $\rightarrow$ reducción $\rightarrow$ reporte.}
+\end{figure}
+

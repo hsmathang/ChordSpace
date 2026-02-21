@@ -1322,7 +1322,8 @@
         const rootData = window.HEATMAP_DATA || {};
         const meta = rootData.metadata || {};
         const files = rootData.files || {};
-        const labels = Array.isArray(meta.labels) ? meta.labels : [];
+        const axisLabels = Array.isArray(meta.axis_labels) ? meta.axis_labels : [];
+        const labels = axisLabels.length ? axisLabels : (Array.isArray(meta.labels) ? meta.labels : []);
         if (!labels.length) return;
 
         const header = card.querySelector('.card-header strong');
@@ -1387,6 +1388,35 @@
           if (!Number.isFinite(matrixSize) || matrixSize <= 0) {
             return;
           }
+          const initialTrace = Array.isArray(heatmapContainer.data)
+            ? heatmapContainer.data.find(trace => trace && trace.type === 'heatmap')
+            : null;
+
+          function computeCondensedRange(values) {
+            let maxVal = 0;
+            if (Array.isArray(values)) {
+              for (let i = 0; i < values.length; i++) {
+                const v = Number(values[i]);
+                if (!Number.isFinite(v)) continue;
+                if (v > maxVal) maxVal = v;
+              }
+            }
+            if (!Number.isFinite(maxVal) || maxVal <= 0) {
+              maxVal = 1;
+            }
+            return { min: 0, max: maxVal };
+          }
+
+          const fallbackRange = computeCondensedRange(condensed);
+          const parsedZMin = Number(initialTrace && initialTrace.zmin);
+          const parsedZMax = Number(initialTrace && initialTrace.zmax);
+          const fixedZMin = Number.isFinite(parsedZMin) ? parsedZMin : fallbackRange.min;
+          let fixedZMax = Number.isFinite(parsedZMax) ? parsedZMax : fallbackRange.max;
+          if (!Number.isFinite(fixedZMax) || fixedZMax <= fixedZMin) {
+            fixedZMax = fixedZMin + 1;
+          }
+          const heatmapColorscale =
+            (initialTrace && initialTrace.colorscale) ? initialTrace.colorscale : 'Turbo';
 
           function getDistance(idx1, idx2) {
             if (!Number.isFinite(idx1) || !Number.isFinite(idx2)) return NaN;
@@ -1431,9 +1461,6 @@
               if (Number.isFinite(value)) {
                 return value;
               }
-            }
-            if (typeof pointIdx === 'number') {
-              return pointIdx;
             }
             return null;
           }
@@ -1566,9 +1593,26 @@
               n: getCardinality(i),
             }));
 
-            items.sort((a, b) => a.n - b.n);
+            items.sort((a, b) => {
+              const dn = a.n - b.n;
+              if (dn !== 0) return dn;
+              const dl = String(a.label || '').localeCompare(String(b.label || ''), 'es');
+              if (dl !== 0) return dl;
+              return a.originalIndex - b.originalIndex;
+            });
             const size = items.length;
-            const axesLabels = items.map(x => x.label);
+            const baseLabels = items.map(x => String(x.label || '?'));
+            const labelCounts = new Map();
+            baseLabels.forEach(lbl => {
+              labelCounts.set(lbl, (labelCounts.get(lbl) || 0) + 1);
+            });
+            const axesLabels = items.map((x, idx) => {
+              const base = baseLabels[idx];
+              if ((labelCounts.get(base) || 0) > 1) {
+                return `${base} | id:${x.originalIndex}`;
+              }
+              return base;
+            });
             const z = new Array(size);
             const text = new Array(size);
 
@@ -1598,7 +1642,9 @@
               z: z,
               x: items.map((_, i) => i),
               y: items.map((_, i) => i),
-              colorscale: 'Turbo',
+              colorscale: heatmapColorscale,
+              zmin: fixedZMin,
+              zmax: fixedZMax,
               colorbar: { title: 'Distancia' },
               hoverongaps: false,
               text: text,
@@ -1700,6 +1746,7 @@
             this.masterGain = null;
             this.currentNodes = [];
             this.sampleRate = (config && config.sampleRate) || 44100;
+            this._timers = [];
         }
 
         _ensureContext() {
@@ -1724,6 +1771,12 @@
             try { node.stop(); } catch (e) {}
             });
             this.currentNodes = [];
+            if (this._timers && this._timers.length) {
+                this._timers.forEach(timerId => {
+                    try { clearTimeout(timerId); } catch (e) {}
+                });
+                this._timers = [];
+            }
         }
 
         playChord(freqs, options = {}) {
@@ -1772,11 +1825,21 @@
             const duration = options.durationSec || 1.0;
             const attack = (options.attackMs || 15) / 1000;
             const release = (options.releaseMs || 150) / 1000;
+            const onStep = typeof options.onStep === 'function' ? options.onStep : null;
+            const onDone = typeof options.onDone === 'function' ? options.onDone : null;
+            const startTime = this.context.currentTime;
             let t = this.context.currentTime;
 
             const nodes = [];
-            chordList.forEach(item => {
+            chordList.forEach((item, idx) => {
             const freqs = item.freqs || [];
+            if (onStep) {
+                const delayMs = Math.max(0, Math.round((t - startTime) * 1000));
+                const timerId = setTimeout(() => {
+                    try { onStep(item, idx); } catch (e) {}
+                }, delayMs);
+                this._timers.push(timerId);
+            }
             if (!freqs.length) {
                 t += duration + gap;
                 return;
@@ -1804,6 +1867,13 @@
             });
 
             this.currentNodes = nodes;
+            if (onDone) {
+                const doneDelayMs = Math.max(0, Math.round((t - startTime + release) * 1000));
+                const doneTimerId = setTimeout(() => {
+                    try { onDone(); } catch (e) {}
+                }, doneDelayMs);
+                this._timers.push(doneTimerId);
+            }
         }
     }
 
@@ -1831,6 +1901,7 @@
         let currentQueue = [];      // [{ id, freqs, label }, ...]
         let lastClickedId = null;
         let lastSelectionIds = [];
+        let playbackActive = false;
 
         function escapeHtml(str) {
             return String(str || "")
@@ -1924,6 +1995,19 @@
             currentQueue = queue;
         }
 
+        function clearPlaybackHighlight() {
+            applyGlobalIdHighlight(scatter, null);
+        }
+
+        function setPlaybackHighlight(globalId) {
+            if (!Number.isFinite(globalId)) {
+                clearPlaybackHighlight();
+                return;
+            }
+            const active = new Set([Number(globalId)]);
+            applyGlobalIdHighlight(scatter, active, 0.08);
+        }
+
         // Scatter events
 
         scatter.on('plotly_click', ev => {
@@ -1967,6 +2051,12 @@
 
         if (modeSelect) {
             modeSelect.addEventListener('change', () => {
+            if (playbackActive) {
+                engine.stop();
+                playbackActive = false;
+                if (btnStop) btnStop.disabled = true;
+                clearPlaybackHighlight();
+            }
             rebuildQueue();
             });
         }
@@ -1979,17 +2069,33 @@
             if (!currentQueue.length) return;
             }
             engine.stop();
+            clearPlaybackHighlight();
+            playbackActive = true;
             engine.playSequence(currentQueue, {
             durationSec: 1.0,
             gapSec: 0.15,
             attackMs: 15,
             releaseMs: 150,
+            onStep: (item) => {
+                if (item && Number.isFinite(Number(item.id))) {
+                    setPlaybackHighlight(Number(item.id));
+                } else {
+                    clearPlaybackHighlight();
+                }
+            },
+            onDone: () => {
+                playbackActive = false;
+                clearPlaybackHighlight();
+                if (btnStop) btnStop.disabled = true;
+            },
             });
             if (btnStop) btnStop.disabled = false;
         });
 
         btnStop.addEventListener('click', () => {
             engine.stop();
+            playbackActive = false;
+            clearPlaybackHighlight();
             if (btnStop) btnStop.disabled = true;
         });
 

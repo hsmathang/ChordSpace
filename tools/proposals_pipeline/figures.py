@@ -370,6 +370,11 @@ def build_heatmap_figure(
     dist_sorted = dist_matrix[indices_sorted][:, indices_sorted]
     upper_mask = np.triu(np.ones_like(dist_sorted, dtype=bool))
     masked = np.where(upper_mask, dist_sorted, np.nan)
+    finite_vals = np.asarray(dist_sorted, dtype=float)
+    finite_vals = finite_vals[np.isfinite(finite_vals)]
+    zmax = float(np.max(finite_vals)) if finite_vals.size else 1.0
+    if zmax <= 0.0:
+        zmax = 1.0
 
     def _label(entry: ChordEntry) -> str:
         acorde = getattr(entry, "acorde", None)
@@ -399,6 +404,8 @@ def build_heatmap_figure(
             x=list(range(len(labels))),
             y=list(range(len(labels))),
             colorscale="Turbo",
+            zmin=0.0,
+            zmax=zmax,
             colorbar=dict(title="Distancia"),
             hoverongaps=False,
             text=hover_data,

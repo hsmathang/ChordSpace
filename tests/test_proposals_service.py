@@ -72,6 +72,18 @@ def test_render_visualisations_allows_custom_embedding(sample_population_df):
     assert len(visual_payload["entries"]) == len(sample_population_df)
 
 
+def test_compute_metrics_with_structural_roughness(sample_population_df):
+    service = ProposalsComparisonService()
+    service.prepare_population("", "", dataframe=sample_population_df)
+
+    metrics = service.compute_metrics("identity", "structural_roughness")
+
+    assert metrics["metric"] == "structural_roughness"
+    assert isinstance(metrics["distances"], list)
+    assert len(metrics["distances"]) == 1
+    assert metrics["distances"][0] >= 0.0
+
+
 def test_population_loader_resolves_query_alias(monkeypatch, sample_population_df):
     captured = []
 

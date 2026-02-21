@@ -1,0 +1,254 @@
+[
+  {
+    "id": "Q-001",
+    "notebook_id": "cf0745ab-abf7-4b86-a5cf-48b192f603be",
+    "query": "¿Puede el lector, solo leyendo esta introducción, entender qué va a leer y por qué en ese orden?\n\nREQUISITO OBLIGATORIO DE CITACIÓN:\n- Responde citando ÚNICAMENTE las FUENTES ORIGINALES.\n- FORMATO: Autor, A. (Año). Título. Editorial. Páginas.",
+    "original_section": "3.0 Introducción al capítulo y flujo metodológico"
+  },
+  {
+    "id": "Q-002",
+    "notebook_id": "cf0745ab-abf7-4b86-a5cf-48b192f603be",
+    "query": "¿Queda claro que el capítulo NO es un manual de software sino la descripción de un modelo matemático con su realización computacional?\n\nREQUISITO OBLIGATORIO DE CITACIÓN:\n- Responde citando ÚNICAMENTE las FUENTES ORIGINALES.\n- FORMATO: Autor, A. (Año). Título. Editorial. Páginas.",
+    "original_section": "3.0 Introducción al capítulo y flujo metodológico"
+  },
+  {
+    "id": "Q-003",
+    "notebook_id": "cf0745ab-abf7-4b86-a5cf-48b192f603be",
+    "query": "¿Es necesario definir $\\mathcal{N}$ como todo $\\{0,...,127\\}$ o basta con el subrango usado experimentalmente?\n\nREQUISITO OBLIGATORIO DE CITACIÓN:\n- Responde citando ÚNICAMENTE las FUENTES ORIGINALES.\n- FORMATO: Autor, A. (Año). Título. Editorial. Páginas.",
+    "original_section": "# 3.1.1 Espacio de Notas y Sistema de Referencia"
+  },
+  {
+    "id": "Q-004",
+    "notebook_id": "cf0745ab-abf7-4b86-a5cf-48b192f603be",
+    "query": "¿Cómo justificar la elección de 12-TET frente a un lector que podría preguntar por afinaciones alternativas?\n\nREQUISITO OBLIGATORIO DE CITACIÓN:\n- Responde citando ÚNICAMENTE las FUENTES ORIGINALES.\n- FORMATO: Autor, A. (Año). Título. Editorial. Páginas.",
+    "original_section": "# 3.1.1 Espacio de Notas y Sistema de Referencia"
+  },
+  {
+    "id": "Q-005",
+    "notebook_id": "27d02df9-0405-4ae0-b1d5-58675f73cc49",
+    "query": "¿Se justifica exigir $n_1 < \\cdots < n_m$ (estrictamente creciente) o podrían admitirse unísonos? (Not de santimath: exclente pregunta esto nos difenrecia de muchos otros enfoques de representacion porque para nosotros no estamos permtiendo unisonos asumimos rugosidad nula hay que njustificarlo).\n\nREQUISITO OBLIGATORIO DE CITACIÓN:\n- Responde citando ÚNICAMENTE las FUENTES ORIGINALES.\n- FORMATO: Autor, A. (Año). Título. Editorial. Páginas.",
+    "original_section": "# 3.1.2 Formalización del Acorde"
+  },
+  {
+    "id": "Q-006",
+    "notebook_id": "8dedc0d4-9af1-482a-b779-e9733609414a",
+    "query": "¿La restricción de ordenamiento implica que dos voicings con las mismas notas en distinto orden son el mismo acorde?\n\nREQUISITO OBLIGATORIO DE CITACIÓN:\n- Responde citando ÚNICAMENTE las FUENTES ORIGINALES.\n- FORMATO: Autor, A. (Año). Título. Editorial. Páginas.",
+    "original_section": "# 3.1.2 Formalización del Acorde"
+  },
+  {
+    "id": "Q-007",
+    "notebook_id": "cf0745ab-abf7-4b86-a5cf-48b192f603be",
+    "query": "¿Cómo responder a un evaluador que objete la falta de invariancia por transposición?\n\nREQUISITO OBLIGATORIO DE CITACIÓN:\n- Responde citando ÚNICAMENTE las FUENTES ORIGINALES.\n- FORMATO: Autor, A. (Año). Título. Editorial. Páginas.",
+    "original_section": "# 3.1.3 Decisión de Identidad: Distinción frente a la Teoría de PC-sets"
+  },
+  {
+    "id": "Q-008",
+    "notebook_id": "8dedc0d4-9af1-482a-b779-e9733609414a",
+    "query": "Explica positivamente qué noción de identidad de acorde se utiliza cuando se rechaza la equivalencia de PC-sets (Forte). ¿Qué propiedades se preservan y cuáles se discriminan?\n\nREQUISITO OBLIGATORIO DE CITACIÓN:\n- Responde citando ÚNICAMENTE las FUENTES ORIGINALES.\n- FORMATO: Autor, A. (Año). Título. Editorial. Páginas.",
+    "original_section": "# 3.1.3 Decisión de Identidad: Distinción frente a la Teoría de PC-sets"
+  },
+  {
+    "id": "Q-009",
+    "notebook_id": "27d02df9-0405-4ae0-b1d5-58675f73cc49",
+    "query": "Justificación para usar 12 bins (intervalos complementarios) en lugar de 6 bins (IC vector) en la representación de acordes. Relación con la rugosidad psicoacústica.\n\nREQUISITO OBLIGATORIO DE CITACIÓN:\n- Responde citando ÚNICAMENTE las FUENTES ORIGINALES.\n- FORMATO: Autor, A. (Año). Título. Editorial. Páginas.",
+    "original_section": "# 3.1.4 Vector de Conteo de Clases de Intervalo (12 bins)"
+  },
+  {
+    "id": "Q-010",
+    "notebook_id": "8dedc0d4-9af1-482a-b779-e9733609414a",
+    "query": "¿Por qué 12 bins y no 6 (como en Forte) o 13 (incluyendo unísono separado de octava)? ( Nota de santimath, excelente pregunta. Notebooklm deberia aydaurnos a repsonder con refernecias acertadas.)\n\nREQUISITO OBLIGATORIO DE CITACIÓN:\n- Responde citando ÚNICAMENTE las FUENTES ORIGINALES.\n- FORMATO: Autor, A. (Año). Título. Editorial. Páginas.",
+    "original_section": "# 3.1.4 Vector de Conteo de Clases de Intervalo (12 bins)"
+  },
+  {
+    "id": "Q-011",
+    "notebook_id": "8dedc0d4-9af1-482a-b779-e9733609414a",
+    "query": "¿Cuál es la implicación algebraica de NO colapsar complementarios? (El espacio de representación tiene mayor dimensión pero mayor poder discriminativo).\n\nREQUISITO OBLIGATORIO DE CITACIÓN:\n- Responde citando ÚNICAMENTE las FUENTES ORIGINALES.\n- FORMATO: Autor, A. (Año). Título. Editorial. Páginas.",
+    "original_section": "# 3.1.4 Vector de Conteo de Clases de Intervalo (12 bins)"
+  },
+  {
+    "id": "Q-012",
+    "notebook_id": "27d02df9-0405-4ae0-b1d5-58675f73cc49",
+    "query": "Definir concisamente 'Banda Crítica Auditiva' y 'Disonancia Sensorial' y su relación con la rugosidad en acordes.\n\nREQUISITO OBLIGATORIO DE CITACIÓN:\n- Responde citando ÚNICAMENTE las FUENTES ORIGINALES.\n- FORMATO: Autor, A. (Año). Título. Editorial. Páginas.",
+    "original_section": "# 3.2.1 Fundamentos del Modelo de Plomp-Levelt y Sethares"
+  },
+  {
+    "id": "Q-013",
+    "notebook_id": "27d02df9-0405-4ae0-b1d5-58675f73cc49",
+    "query": "¿Hasta qué punto la parametrización de Sethares es \"el\" modelo o \"un\" modelo posible? (Es \"un\" modelo; existen alternativas como Vassilakis, Hutchinson-Knopoff).\n\nREQUISITO OBLIGATORIO DE CITACIÓN:\n- Responde citando ÚNICAMENTE las FUENTES ORIGINALES.\n- FORMATO: Autor, A. (Año). Título. Editorial. Páginas.",
+    "original_section": "# 3.2.1 Fundamentos del Modelo de Plomp-Levelt y Sethares"
+  },
+  {
+    "id": "Q-014",
+    "notebook_id": "27d02df9-0405-4ae0-b1d5-58675f73cc49",
+    "query": "¿Cómo se justifica la elección de Sethares sobre otras parametrizaciones?\n\nREQUISITO OBLIGATORIO DE CITACIÓN:\n- Responde citando ÚNICAMENTE las FUENTES ORIGINALES.\n- FORMATO: Autor, A. (Año). Título. Editorial. Páginas.",
+    "original_section": "# 3.2.1 Fundamentos del Modelo de Plomp-Levelt y Sethares"
+  },
+  {
+    "id": "Q-015",
+    "notebook_id": "27d02df9-0405-4ae0-b1d5-58675f73cc49",
+    "query": "¿De dónde vienen estos valores numéricos? (Ajuste empírico de Sethares a los datos de Plomp-Levelt).\n\nREQUISITO OBLIGATORIO DE CITACIÓN:\n- Responde citando ÚNICAMENTE las FUENTES ORIGINALES.\n- FORMATO: Autor, A. (Año). Título. Editorial. Páginas.",
+    "original_section": "# 3.2.2 La Función de Disonancia entre Parciales"
+  },
+  {
+    "id": "Q-016",
+    "notebook_id": "27d02df9-0405-4ae0-b1d5-58675f73cc49",
+    "query": "¿Cuál es la sensibilidad del modelo a variaciones en estos parámetros? (Señalar que el repositorio permite sobreescritura; discutir en §3.8 Supuestos).\n\nREQUISITO OBLIGATORIO DE CITACIÓN:\n- Responde citando ÚNICAMENTE las FUENTES ORIGINALES.\n- FORMATO: Autor, A. (Año). Título. Editorial. Páginas.",
+    "original_section": "# 3.2.2 La Función de Disonancia entre Parciales"
+  },
+  {
+    "id": "Q-017",
+    "notebook_id": "27d02df9-0405-4ae0-b1d5-58675f73cc49",
+    "query": "¿Es el supuesto de espectro armónico con decaimiento exponencial razonable? (Razonable para instrumentos de cuerda/viento; no para percusión o espectros inarmónicos).\n\nREQUISITO OBLIGATORIO DE CITACIÓN:\n- Responde citando ÚNICAMENTE las FUENTES ORIGINALES.\n- FORMATO: Autor, A. (Año). Título. Editorial. Páginas.",
+    "original_section": "# 3.2.3 Extensión a Tonos Complejos: Modelo de Parciales Armónicos"
+  },
+  {
+    "id": "Q-018",
+    "notebook_id": "27d02df9-0405-4ae0-b1d5-58675f73cc49",
+    "query": "¿Cómo afecta $H=6$ a la resolución del modelo? ¿Sería diferente con $H=10$?\n\nREQUISITO OBLIGATORIO DE CITACIÓN:\n- Responde citando ÚNICAMENTE las FUENTES ORIGINALES.\n- FORMATO: Autor, A. (Año). Título. Editorial. Páginas.",
+    "original_section": "# 3.2.3 Extensión a Tonos Complejos: Modelo de Parciales Armónicos"
+  },
+  {
+    "id": "Q-019",
+    "notebook_id": "27d02df9-0405-4ae0-b1d5-58675f73cc49",
+    "query": "¿Es suficiente validar con díadas? ¿Cómo se verifica que la extensión a acordes de mayor cardinalidad es correcta?\n\nREQUISITO OBLIGATORIO DE CITACIÓN:\n- Responde citando ÚNICAMENTE las FUENTES ORIGINALES.\n- FORMATO: Autor, A. (Año). Título. Editorial. Páginas.",
+    "original_section": "# 3.2.5 Validación Interna del Componente de Rugosidad"
+  },
+  {
+    "id": "Q-020",
+    "notebook_id": "27d02df9-0405-4ae0-b1d5-58675f73cc49",
+    "query": "¿Existe un \"ground truth\" perceptual contra el cual validar para tríadas o cuatríadas?\n\nREQUISITO OBLIGATORIO DE CITACIÓN:\n- Responde citando ÚNICAMENTE las FUENTES ORIGINALES.\n- FORMATO: Autor, A. (Año). Título. Editorial. Páginas.",
+    "original_section": "# 3.2.5 Validación Interna del Componente de Rugosidad"
+  },
+  {
+    "id": "Q-021",
+    "notebook_id": "14fa63f0-279b-4348-b50e-5d350542b25b",
+    "query": "¿La normalización destruye información relevante? ¿Cuál?\n\nREQUISITO OBLIGATORIO DE CITACIÓN:\n- Responde citando ÚNICAMENTE las FUENTES ORIGINALES.\n- FORMATO: Autor, A. (Año). Título. Editorial. Páginas.",
+    "original_section": "# 3.3.1 El Problema de la Comparabilidad"
+  },
+  {
+    "id": "Q-022",
+    "notebook_id": "14fa63f0-279b-4348-b50e-5d350542b25b",
+    "query": "¿Es posible que la mejor normalización dependa de la pregunta que se quiere responder?\n\nREQUISITO OBLIGATORIO DE CITACIÓN:\n- Responde citando ÚNICAMENTE las FUENTES ORIGINALES.\n- FORMATO: Autor, A. (Año). Título. Editorial. Páginas.",
+    "original_section": "# 3.3.1 El Problema de la Comparabilidad"
+  },
+  {
+    "id": "Q-023",
+    "notebook_id": "27d02df9-0405-4ae0-b1d5-58675f73cc49",
+    "query": "¿El suavizado gaussiano tiene justificación perceptual o es una heurística?\n\nREQUISITO OBLIGATORIO DE CITACIÓN:\n- Responde citando ÚNICAMENTE las FUENTES ORIGINALES.\n- FORMATO: Autor, A. (Año). Título. Editorial. Páginas.",
+    "original_section": "# 3.3.2 Catálogo de Propuestas Evaluadas"
+  },
+  {
+    "id": "Q-024",
+    "notebook_id": "27d02df9-0405-4ae0-b1d5-58675f73cc49",
+    "query": "¿Hay riesgo de sobreajuste al evaluar tantas propuestas? (Discutir en §3.8 corrección por comparaciones múltiples).\n\nREQUISITO OBLIGATORIO DE CITACIÓN:\n- Responde citando ÚNICAMENTE las FUENTES ORIGINALES.\n- FORMATO: Autor, A. (Año). Título. Editorial. Páginas.",
+    "original_section": "# 3.3.2 Catálogo de Propuestas Evaluadas"
+  },
+  {
+    "id": "Q-025",
+    "notebook_id": "27d02df9-0405-4ae0-b1d5-58675f73cc49",
+    "query": "¿Tiene sentido usar la distancia euclidiana sobre vectores de rugosidad cruda (`identity`)? (Sí, pero dominarán las diferencias de magnitud, no de forma).\n\nREQUISITO OBLIGATORIO DE CITACIÓN:\n- Responde citando ÚNICAMENTE las FUENTES ORIGINALES.\n- FORMATO: Autor, A. (Año). Título. Editorial. Páginas.",
+    "original_section": "# 3.4.1 Métricas Vectoriales"
+  },
+  {
+    "id": "Q-026",
+    "notebook_id": "14fa63f0-279b-4348-b50e-5d350542b25b",
+    "query": "¿Cuándo preferir JSD vs Hellinger? (JSD es más discriminante para distribuciones con soporte diferente; Hellinger es más robusta a zeros numéricos). ( Nota de santimath: hay que ver como safar de eso repaidamente oy decir que basicmaente nos quedamos con cosenos eucliddan y quiza otra y explicar que pasa con las otras pero brevemente no dejar que se vuelva un hoyo de pregnutas eso hayq ue cerrar el asunto de las metricas muy bien dejarlo zanjado para que no hayan muchas preguntas)\n\nREQUISITO OBLIGATORIO DE CITACIÓN:\n- Responde citando ÚNICAMENTE las FUENTES ORIGINALES.\n- FORMATO: Autor, A. (Año). Título. Editorial. Páginas.",
+    "original_section": "# 3.4.2 Métricas de Distribuciones de Probabilidad"
+  },
+  {
+    "id": "Q-027",
+    "notebook_id": "14fa63f0-279b-4348-b50e-5d350542b25b",
+    "query": "¿El uso de $\\log_2$ vs $\\ln$ en JSD afecta la métrica? (Solo escala; la propiedad métrica de $\\sqrt{\\text{JSD}}$ se mantiene).\n\nREQUISITO OBLIGATORIO DE CITACIÓN:\n- Responde citando ÚNICAMENTE las FUENTES ORIGINALES.\n- FORMATO: Autor, A. (Año). Título. Editorial. Páginas.",
+    "original_section": "# 3.4.2 Métricas de Distribuciones de Probabilidad"
+  },
+  {
+    "id": "Q-028",
+    "notebook_id": "14fa63f0-279b-4348-b50e-5d350542b25b",
+    "query": "¿La elección de $\\rho$ induce una topología diferente sobre $\\mathcal{A}$? ¿Cómo verificarlo?\n\nREQUISITO OBLIGATORIO DE CITACIÓN:\n- Responde citando ÚNICAMENTE las FUENTES ORIGINALES.\n- FORMATO: Autor, A. (Año). Título. Editorial. Páginas.",
+    "original_section": "# 3.4.3 Construcción de la Matriz de Distancias $D$"
+  },
+  {
+    "id": "Q-029",
+    "notebook_id": "43913228-e430-45cb-9489-c3b27904f02c",
+    "query": "¿Es la matriz $D$ definida positiva / semidefinida? (Relevante para MDS clásico; no necesariamente para SMACOF).\n\nREQUISITO OBLIGATORIO DE CITACIÓN:\n- Responde citando ÚNICAMENTE las FUENTES ORIGINALES.\n- FORMATO: Autor, A. (Año). Título. Editorial. Páginas.",
+    "original_section": "# 3.4.3 Construcción de la Matriz de Distancias $D$"
+  },
+  {
+    "id": "Q-030",
+    "notebook_id": "43913228-e430-45cb-9489-c3b27904f02c",
+    "query": "¿Por qué MDS métrico y no no-métrico? (Métrico preserva magnitudes, no solo rangos; apropiado cuando la escala de $\\rho$ es informativa).\n\nREQUISITO OBLIGATORIO DE CITACIÓN:\n- Responde citando ÚNICAMENTE las FUENTES ORIGINALES.\n- FORMATO: Autor, A. (Año). Título. Editorial. Páginas.",
+    "original_section": "# 3.5.1 Formulación como Problema de Optimización (MDS)"
+  },
+  {
+    "id": "Q-031",
+    "notebook_id": "43913228-e430-45cb-9489-c3b27904f02c",
+    "query": "¿Es el stress una medida suficiente o necesitamos métricas complementarias?\n\nREQUISITO OBLIGATORIO DE CITACIÓN:\n- Responde citando ÚNICAMENTE las FUENTES ORIGINALES.\n- FORMATO: Autor, A. (Año). Título. Editorial. Páginas.",
+    "original_section": "# 3.5.1 Formulación como Problema de Optimización (MDS)"
+  },
+  {
+    "id": "Q-032",
+    "notebook_id": "43913228-e430-45cb-9489-c3b27904f02c",
+    "query": "¿Los embeddings de diferentes métodos son directamente comparables?\n\nREQUISITO OBLIGATORIO DE CITACIÓN:\n- Responde citando ÚNICAMENTE las FUENTES ORIGINALES.\n- FORMATO: Autor, A. (Año). Título. Editorial. Páginas.",
+    "original_section": "# 3.5.2 Métodos Complementarios: UMAP, t-SNE, ISOMAP"
+  },
+  {
+    "id": "Q-033",
+    "notebook_id": "43913228-e430-45cb-9489-c3b27904f02c",
+    "query": "¿Cómo interpretar un embedding UMAP donde las distancias globales no son significativas?\n\nREQUISITO OBLIGATORIO DE CITACIÓN:\n- Responde citando ÚNICAMENTE las FUENTES ORIGINALES.\n- FORMATO: Autor, A. (Año). Título. Editorial. Páginas.",
+    "original_section": "# 3.5.2 Métodos Complementarios: UMAP, t-SNE, ISOMAP"
+  },
+  {
+    "id": "Q-034",
+    "notebook_id": "14fa63f0-279b-4348-b50e-5d350542b25b",
+    "query": "¿Las preguntas son falsificables? ¿Qué resultado descartaría la hipótesis?\n\nREQUISITO OBLIGATORIO DE CITACIÓN:\n- Responde citando ÚNICAMENTE las FUENTES ORIGINALES.\n- FORMATO: Autor, A. (Año). Título. Editorial. Páginas.",
+    "original_section": "# 3.6.1 Preguntas Experimentales"
+  },
+  {
+    "id": "Q-035",
+    "notebook_id": "14fa63f0-279b-4348-b50e-5d350542b25b",
+    "query": "¿Hay combinaciones inválidas? Sí: métricas de distribución (js, hellinger) con normalización `identity` requieren normalización L1 previa (documentar cómo el pipeline lo maneja).\n\nREQUISITO OBLIGATORIO DE CITACIÓN:\n- Responde citando ÚNICAMENTE las FUENTES ORIGINALES.\n- FORMATO: Autor, A. (Año). Título. Editorial. Páginas.",
+    "original_section": "# 3.6.2 Factores Controlables y sus Niveles"
+  },
+  {
+    "id": "Q-036",
+    "notebook_id": "14fa63f0-279b-4348-b50e-5d350542b25b",
+    "query": "¿Es necesario corregir por comparaciones múltiples al comparar 200 escenarios?\n\nREQUISITO OBLIGATORIO DE CITACIÓN:\n- Responde citando ÚNICAMENTE las FUENTES ORIGINALES.\n- FORMATO: Autor, A. (Año). Título. Editorial. Páginas.",
+    "original_section": "# 3.6.2 Factores Controlables y sus Niveles"
+  },
+  {
+    "id": "Q-037",
+    "notebook_id": "14fa63f0-279b-4348-b50e-5d350542b25b",
+    "query": "¿Los experimentos implementados cubren suficientemente los objetivos de la tesis?\n\nREQUISITO OBLIGATORIO DE CITACIÓN:\n- Responde citando ÚNICAMENTE las FUENTES ORIGINALES.\n- FORMATO: Autor, A. (Año). Título. Editorial. Páginas.",
+    "original_section": "# 3.6.4 Experimentos de Referencia Implementados"
+  },
+  {
+    "id": "Q-038",
+    "notebook_id": "14fa63f0-279b-4348-b50e-5d350542b25b",
+    "query": "¿Hay gaps experimentales? (El Exp1–Exp6 planteado originalmente no está implementado como tal; documentar honestamente).\n\nREQUISITO OBLIGATORIO DE CITACIÓN:\n- Responde citando ÚNICAMENTE las FUENTES ORIGINALES.\n- FORMATO: Autor, A. (Año). Título. Editorial. Páginas.",
+    "original_section": "# 3.6.4 Experimentos de Referencia Implementados"
+  },
+  {
+    "id": "Q-039",
+    "notebook_id": "43913228-e430-45cb-9489-c3b27904f02c",
+    "query": "¿Por qué $k = 3$? ¿Es sensible la evaluación a este parámetro? (Discutir en §3.8).\n\nREQUISITO OBLIGATORIO DE CITACIÓN:\n- Responde citando ÚNICAMENTE las FUENTES ORIGINALES.\n- FORMATO: Autor, A. (Año). Título. Editorial. Páginas.",
+    "original_section": "# 3.7.1 Métricas de Preservación de Vecindarios"
+  },
+  {
+    "id": "Q-040",
+    "notebook_id": "43913228-e430-45cb-9489-c3b27904f02c",
+    "query": "¿Trustworthiness y continuity son redundantes o complementarios?\n\nREQUISITO OBLIGATORIO DE CITACIÓN:\n- Responde citando ÚNICAMENTE las FUENTES ORIGINALES.\n- FORMATO: Autor, A. (Año). Título. Editorial. Páginas.",
+    "original_section": "# 3.7.1 Métricas de Preservación de Vecindarios"
+  },
+  {
+    "id": "Q-041",
+    "notebook_id": "cf0745ab-abf7-4b86-a5cf-48b192f603be",
+    "query": "Discute las decisiones críticas de diseño mencionadas en la sección 3.8.4, especificando alternativas descartadas y justificaciones.\n\nREQUISITO OBLIGATORIO DE CITACIÓN:\n- Responde citando ÚNICAMENTE las FUENTES ORIGINALES.\n- FORMATO: Autor, A. (Año). Título. Editorial. Páginas.",
+    "original_section": "# 3.8.4 Decisiones Críticas de Diseño"
+  },
+  {
+    "id": "Q-042",
+    "notebook_id": "27d02df9-0405-4ae0-b1d5-58675f73cc49",
+    "query": "¿La rugosidad de Sethares realmente captura \"similitud sonora\"? Es un proxy, no una medida directa.( Nota de santimath: hay mcuhas refernecia para jsutificar estas cosas)\n\nREQUISITO OBLIGATORIO DE CITACIÓN:\n- Responde citando ÚNICAMENTE las FUENTES ORIGINALES.\n- FORMATO: Autor, A. (Año). Título. Editorial. Páginas.",
+    "original_section": "# 3.8.5 Amenazas a la Validez"
+  }
+]

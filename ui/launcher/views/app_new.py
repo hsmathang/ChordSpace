@@ -7,10 +7,11 @@ and execute the experiment runner using the ExperimentController.
 
 from __future__ import annotations
 
+import json
 import queue
 import threading
 import tkinter as tk
-from tkinter import filedialog, messagebox
+from tkinter import filedialog, messagebox, simpledialog
 from tkinter import ttk
 from tkinter.scrolledtext import ScrolledText
 from typing import Any, Dict, List, Optional, Tuple
@@ -39,6 +40,7 @@ from ui.launcher.widgets import ScrollableFrame
 # Constants
 CHECK_MARK = "\u2713"
 PREVIEW_ROW_LIMIT = 5000
+CUSTOM_POPULATION_PRESETS_PATH = Path("outputs") / "gui_presets" / "population_presets.json"
 
 class ExperimentLauncher(tk.Tk):
     def __init__(self) -> None:
@@ -129,6 +131,9 @@ class ExperimentLauncher(tk.Tk):
 
         self.compare_seeds_var = tk.StringVar(value="42")
         self.compare_include_identity_var = tk.BooleanVar(value=False)
+        self.vl_weight_vl_var = tk.StringVar(value="0.55")
+        self.vl_weight_q5_var = tk.StringVar(value="0.25")
+        self.vl_weight_js_var = tk.StringVar(value="0.20")
 
     def _init_filter_vars(self) -> None:
         self.filter_enable_var = tk.BooleanVar(value=True)
@@ -151,6 +156,7 @@ class ExperimentLauncher(tk.Tk):
             "Contiene alguna": "contains_any",
             "Subconjunto de": "subset_of",
         }
+        self.filter_pc_mode_inverse_map = {v: k for k, v in self.filter_pc_mode_map.items()}
         self.filter_pc_mode_var = tk.StringVar(value=self.filter_pc_mode_labels[0])
         self.filter_interval_mode_labels = ["Exacto", "Subestructura", "Cualquier valor"]
         self.filter_interval_mode_map = {
@@ -158,6 +164,7 @@ class ExperimentLauncher(tk.Tk):
             "Subestructura": "subseq",
             "Cualquier valor": "any_value",
         }
+        self.filter_interval_mode_inverse_map = {v: k for k, v in self.filter_interval_mode_map.items()}
         self.filter_interval_mode_var = tk.StringVar(value=self.filter_interval_mode_labels[0])
         self.filter_mode_var = tk.StringVar(value="A")
 
@@ -166,13 +173,185 @@ class ExperimentLauncher(tk.Tk):
              var.trace_add("write", lambda *_: self._mark_population_dirty())
 
     def _init_combinatorial_vars(self) -> None:
+        self._builtin_population_presets = self._default_population_presets()
+        self.population_presets = dict(self._builtin_population_presets)
+        self.population_presets.update(self._load_custom_population_presets())
+
         self.generation_mode_var = tk.StringVar(value="combinatorial")
-        self.population_preset_var = tk.StringVar(value="diadas_estructurales_octava3")
+        default_preset = "diadas_estructurales_octava3"
+        if default_preset not in self.population_presets:
+            default_preset = "manual"
+        self.population_preset_var = tk.StringVar(value=default_preset)
         self.combinatorial_alphabet_var = tk.StringVar(value="0,2,4,5,7,9,11")
         self.combinatorial_octave_min_var = tk.StringVar(value="3")
         self.combinatorial_octave_max_var = tk.StringVar(value="3")
         self.combinatorial_cardinalities_var = tk.StringVar(value="2")
         self.structural_mode_var = tk.BooleanVar(value=True)
+
+    def _default_population_presets(self) -> Dict[str, Dict[str, Any]]:
+        chromatic = list(range(12))
+        diatonic_c = [0, 2, 4, 5, 7, 9, 11]
+        return {
+            "diadas_estructurales_octava3": {
+                "description": "Dyadas estructurales diatónicas en octava 3 (preset histórico).",
+                "locked": True,
+                "combinatorial": {
+                    "alphabet": diatonic_c,
+                    "octave_min": 3,
+                    "octave_max": 3,
+                    "cardinalities": [2],
+                    "structural_mode": True,
+                },
+                "filters": {
+                    "enabled": True,
+                    "cardinalities": [2],
+                    "span_min": None,
+                    "span_max": None,
+                    "max_internal_interval": 12,
+                    "include_pitch_classes": [],
+                    "exclude_pitch_classes": [],
+                    "pc_mode": "contains_all",
+                    "interval_mode": "exact",
+                    "interval_patterns": [],
+                    "scale_expand": False,
+                },
+            },
+            "validacion_bowling_octava4_2_3_4": {
+                "description": "Dominio cromático de una octava para dyads/triads/tetrads (aprox. Bowling).",
+                "locked": True,
+                "combinatorial": {
+                    "alphabet": chromatic,
+                    "octave_min": 4,
+                    "octave_max": 4,
+                    "cardinalities": [2, 3, 4],
+                    "structural_mode": False,
+                },
+                "filters": {
+                    "enabled": True,
+                    "cardinalities": [2, 3, 4],
+                    "span_min": None,
+                    "span_max": None,
+                    "max_internal_interval": 12,
+                    "include_pitch_classes": chromatic,
+                    "exclude_pitch_classes": [],
+                    "pc_mode": "subset_of",
+                    "interval_mode": "exact",
+                    "interval_patterns": [],
+                    "scale_expand": False,
+                },
+            },
+            "validacion_bach_sintetica_3_4_voces": {
+                "description": "Superpoblación barroca sintética (rango SATB aproximado, 3-4 voces).",
+                "locked": True,
+                "combinatorial": {
+                    "alphabet": chromatic,
+                    "octave_min": 3,
+                    "octave_max": 5,
+                    "cardinalities": [3, 4],
+                    "structural_mode": False,
+                },
+                "filters": {
+                    "enabled": True,
+                    "cardinalities": [3, 4],
+                    "span_min": None,
+                    "span_max": 24,
+                    "max_internal_interval": 12,
+                    "include_pitch_classes": [],
+                    "exclude_pitch_classes": [],
+                    "pc_mode": "contains_all",
+                    "interval_mode": "exact",
+                    "interval_patterns": [],
+                    "scale_expand": False,
+                },
+            },
+            "validacion_ruido_control_3_4_voces": {
+                "description": "Control uniforme en mismo rango/cardinalidad que Bach.",
+                "locked": True,
+                "combinatorial": {
+                    "alphabet": chromatic,
+                    "octave_min": 3,
+                    "octave_max": 5,
+                    "cardinalities": [3, 4],
+                    "structural_mode": False,
+                },
+                "filters": {
+                    "enabled": True,
+                    "cardinalities": [3, 4],
+                    "span_min": None,
+                    "span_max": None,
+                    "max_internal_interval": None,
+                    "include_pitch_classes": [],
+                    "exclude_pitch_classes": [],
+                    "pc_mode": "contains_all",
+                    "interval_mode": "exact",
+                    "interval_patterns": [],
+                    "scale_expand": False,
+                },
+            },
+            "validacion_extremos_clusters_4_8": {
+                "description": "Acordes extremos densos para contraste (clusters/poliacordes).",
+                "locked": True,
+                "combinatorial": {
+                    "alphabet": chromatic,
+                    "octave_min": 3,
+                    "octave_max": 5,
+                    "cardinalities": [4, 5, 6, 7, 8],
+                    "structural_mode": False,
+                },
+                "filters": {
+                    "enabled": True,
+                    "cardinalities": [4, 5, 6],
+                    "span_min": None,
+                    "span_max": 12,
+                    "max_internal_interval": 2,
+                    "include_pitch_classes": [],
+                    "exclude_pitch_classes": [],
+                    "pc_mode": "contains_all",
+                    "interval_mode": "exact",
+                    "interval_patterns": [],
+                    "scale_expand": False,
+                },
+            },
+        }
+
+    def _load_custom_population_presets(self) -> Dict[str, Dict[str, Any]]:
+        path = CUSTOM_POPULATION_PRESETS_PATH
+        if not path.exists():
+            return {}
+        try:
+            payload = json.loads(path.read_text(encoding="utf-8"))
+        except Exception:
+            return {}
+
+        raw = payload.get("presets") if isinstance(payload, dict) else None
+        if not isinstance(raw, dict):
+            return {}
+
+        cleaned: Dict[str, Dict[str, Any]] = {}
+        for name, preset in raw.items():
+            if not isinstance(name, str) or not isinstance(preset, dict):
+                continue
+            key = name.strip()
+            if not key or key.lower() == "manual" or key in self._builtin_population_presets:
+                continue
+            item = dict(preset)
+            item["locked"] = False
+            cleaned[key] = item
+        return cleaned
+
+    def _save_custom_population_presets(self) -> None:
+        custom = {
+            name: preset
+            for name, preset in self.population_presets.items()
+            if name not in self._builtin_population_presets
+        }
+        path = CUSTOM_POPULATION_PRESETS_PATH
+        path.parent.mkdir(parents=True, exist_ok=True)
+        payload = {"version": 1, "presets": custom}
+        path.write_text(json.dumps(payload, indent=2, ensure_ascii=False), encoding="utf-8")
+
+    def _available_population_presets(self) -> list[str]:
+        return ["manual"] + sorted(self.population_presets.keys())
 
     def _init_report_sections(self) -> None:
         self.section_vars: dict[str, tk.BooleanVar] = {
@@ -355,6 +534,7 @@ class ExperimentLauncher(tk.Tk):
         out_entry = ttk.Entry(frame, textvariable=self.output_var, width=58)
         out_entry.grid(row=0, column=1, sticky="we", padx=(4, 4), pady=(4, 0))
         ttk.Button(frame, text="Examinar…", command=self._choose_output_dir).grid(row=0, column=2, sticky="e", pady=(4, 0))
+        ttk.Button(frame, text="Nueva carpeta", command=self._set_new_output_dir).grid(row=0, column=3, sticky="e", pady=(4, 0))
 
         ttk.Label(frame, text="Consulta base (opcional):").grid(row=1, column=0, sticky="w", pady=(6, 0))
         base_values = ["<Ninguna>"] + sorted(self.query_registry.keys())
@@ -400,26 +580,39 @@ class ExperimentLauncher(tk.Tk):
         frame.grid(row=0, column=0, sticky="nwe", pady=(0, 8))
         frame.columnconfigure(1, weight=1)
         ttk.Label(frame, text="Modo:").grid(row=0, column=0, sticky="w", padx=5, pady=5)
-        preset_values = ["manual", "diadas_estructurales_octava3"]
-        self.population_preset_combo = ttk.Combobox(frame, textvariable=self.population_preset_var, values=preset_values, state="readonly")
+        self.population_preset_combo = ttk.Combobox(
+            frame,
+            textvariable=self.population_preset_var,
+            values=self._available_population_presets(),
+            state="readonly",
+        )
         self.population_preset_combo.grid(row=0, column=1, sticky="w", padx=5, pady=5)
         self.population_preset_combo.bind("<<ComboboxSelected>>", lambda *_: self._apply_population_preset(self.population_preset_var.get()))
-        ttk.Label(frame, text="Alfabeto (PCs, 0-11):").grid(row=1, column=0, sticky="w", padx=5, pady=5)
+
+        preset_actions = ttk.Frame(frame)
+        preset_actions.grid(row=1, column=0, columnspan=2, sticky="w", padx=5, pady=(0, 4))
+        self.save_preset_button = ttk.Button(preset_actions, text="Guardar preset", command=self._on_save_population_preset)
+        self.save_preset_button.pack(side=tk.LEFT)
+        self.delete_preset_button = ttk.Button(preset_actions, text="Eliminar preset", command=self._on_delete_population_preset)
+        self.delete_preset_button.pack(side=tk.LEFT, padx=(6, 0))
+
+        ttk.Label(frame, text="Alfabeto (PCs, 0-11):").grid(row=2, column=0, sticky="w", padx=5, pady=5)
         self.comb_alpha_entry = ttk.Entry(frame, textvariable=self.combinatorial_alphabet_var)
-        self.comb_alpha_entry.grid(row=1, column=1, sticky="we", padx=5, pady=5)
-        ttk.Label(frame, text="Rango de Octavas (min-max):").grid(row=2, column=0, sticky="w", padx=5, pady=5)
+        self.comb_alpha_entry.grid(row=2, column=1, sticky="we", padx=5, pady=5)
+        ttk.Label(frame, text="Rango de Octavas (min-max):").grid(row=3, column=0, sticky="w", padx=5, pady=5)
         octave_frame = ttk.Frame(frame)
-        octave_frame.grid(row=2, column=1, sticky="w", padx=5, pady=5)
+        octave_frame.grid(row=3, column=1, sticky="w", padx=5, pady=5)
         self.comb_oct_min_entry = ttk.Entry(octave_frame, textvariable=self.combinatorial_octave_min_var, width=5)
         self.comb_oct_min_entry.pack(side=tk.LEFT)
         ttk.Label(octave_frame, text="-").pack(side=tk.LEFT, padx=5)
         self.comb_oct_max_entry = ttk.Entry(octave_frame, textvariable=self.combinatorial_octave_max_var, width=5)
         self.comb_oct_max_entry.pack(side=tk.LEFT)
-        ttk.Label(frame, text="Cardinalidades (e.g., 3,4):").grid(row=3, column=0, sticky="w", padx=5, pady=5)
+        ttk.Label(frame, text="Cardinalidades (e.g., 3,4):").grid(row=4, column=0, sticky="w", padx=5, pady=5)
         self.comb_card_entry = ttk.Entry(frame, textvariable=self.combinatorial_cardinalities_var)
-        self.comb_card_entry.grid(row=3, column=1, sticky="we", padx=5, pady=5)
+        self.comb_card_entry.grid(row=4, column=1, sticky="we", padx=5, pady=5)
         self.structural_check = ttk.Checkbutton(frame, text="Modo Estructural (primera nota es DO)", variable=self.structural_mode_var)
-        self.structural_check.grid(row=4, column=0, columnspan=2, sticky="w", padx=5, pady=5)
+        self.structural_check.grid(row=5, column=0, columnspan=2, sticky="w", padx=5, pady=5)
+        self._refresh_population_preset_combo(selected=self.population_preset_var.get())
         self._apply_population_preset(self.population_preset_var.get())
 
     def _build_filter_frame(self, parent: ttk.Frame, row: int) -> None:
@@ -504,6 +697,19 @@ class ExperimentLauncher(tk.Tk):
             label_text = f"{title} ({name})"
             ttk.Checkbutton(metric_frame, text=label_text, variable=self.metric_vars[name]).grid(row=idx, column=0, sticky="w", padx=6, pady=3)
         metric_frame.columnconfigure(0, weight=1)
+        voice_frame = ttk.LabelFrame(params, text="Pesos de voiceleading_quintas")
+        voice_frame.grid(row=1, column=0, columnspan=2, sticky="we", pady=(0, 8))
+        ttk.Label(voice_frame, text="w_vl (movimiento de voces):").grid(row=0, column=0, sticky="w", padx=6, pady=(6, 2))
+        ttk.Entry(voice_frame, textvariable=self.vl_weight_vl_var, width=10).grid(row=0, column=1, sticky="w", padx=(0, 12), pady=(6, 2))
+        ttk.Label(voice_frame, text="w_q5 (círculo de quintas):").grid(row=0, column=2, sticky="w", padx=6, pady=(6, 2))
+        ttk.Entry(voice_frame, textvariable=self.vl_weight_q5_var, width=10).grid(row=0, column=3, sticky="w", padx=(0, 12), pady=(6, 2))
+        ttk.Label(voice_frame, text="w_js (perfil rugoso):").grid(row=0, column=4, sticky="w", padx=6, pady=(6, 2))
+        ttk.Entry(voice_frame, textvariable=self.vl_weight_js_var, width=10).grid(row=0, column=5, sticky="w", padx=(0, 6), pady=(6, 2))
+        ttk.Label(
+            voice_frame,
+            text="Los pesos se normalizan automáticamente (solo afecta a la métrica voiceleading_quintas).",
+            foreground="#666",
+        ).grid(row=1, column=0, columnspan=6, sticky="w", padx=6, pady=(0, 6))
         seed_row = ttk.Frame(params)
         seed_row.grid(row=2, column=0, columnspan=2, sticky="w")
         ttk.Label(seed_row, text="Seeds:").pack(side=tk.LEFT)
@@ -529,10 +735,22 @@ class ExperimentLauncher(tk.Tk):
         run_metadata = self._build_population_metadata(df_selected, population_json)
 
         pop_config = PopulationConfig(source_type="file", file_path=population_json, metadata=run_metadata)
+        try:
+            metric_params = self._build_metric_params()
+        except ValueError as exc:
+            messagebox.showerror("Parámetros inválidos", str(exc))
+            return
+        run_metadata["experiment"] = {
+            "proposals": self._selected_proposals() or ["identity"],
+            "metrics": self._selected_metrics() or ["euclidean"],
+            "metric_params": metric_params,
+        }
+
         rough_config = RoughnessConfig(
             proposals=self._selected_proposals() or ["identity"],
             metrics=self._selected_metrics() or ["euclidean"],
-            disable_baseline=not self.compare_include_identity_var.get()
+            disable_baseline=not self.compare_include_identity_var.get(),
+            metric_params=metric_params,
         )
         red_config = ReductionConfig(
             methods=self._selected_reductions() or ["MDS"],
@@ -541,10 +759,34 @@ class ExperimentLauncher(tk.Tk):
         )
         seeds_str = self.compare_seeds_var.get().strip()
         seeds = [int(s) for s in seeds_str.split(",") if s.strip()] if seeds_str else [42]
+        output_dir_text = self.output_var.get().strip()
+        if not output_dir_text:
+            output_dir = self.controller.get_default_output_dir().resolve()
+            self.output_var.set(str(output_dir))
+        else:
+            output_dir = Path(output_dir_text).expanduser().resolve()
+
+        existing_artifacts = [
+            output_dir / "report.html",
+            output_dir / "metrics.csv",
+            output_dir / "metrics.json",
+            output_dir / "heatmaps",
+        ]
+        if any(path.exists() for path in existing_artifacts):
+            artifact_list = "\n".join(f"- {path.name}" for path in existing_artifacts if path.exists())
+            confirm_overwrite = messagebox.askyesno(
+                "Artefactos existentes",
+                "La carpeta de salida ya contiene artefactos:\n"
+                f"{artifact_list}\n\n"
+                "Si continuas, se sobrescribiran. Deseas continuar?"
+            )
+            if not confirm_overwrite:
+                return
+
         exec_config = ExecutionConfig(
             seeds=seeds,
             deterministic=(self.exec_mode_var.get() == "Determinista (semilla fija)"),
-            output_dir=str(Path(self.output_var.get().strip()).resolve())
+            output_dir=str(output_dir)
         )
         vis_config = VisualizationConfig(
             sections=self._sections_arg().split(",") if self._sections_arg() != "all" else ["all"],
@@ -671,23 +913,14 @@ class ExperimentLauncher(tk.Tk):
         max_int = self.filter_max_internal_interval_var.get().strip()
         filters.max_internal_interval = int(max_int) if max_int else None
 
-        def _parse_int_list(text: str) -> list[int]:
-            return [int(x) for x in text.split(",") if x.strip().isdigit()]
-
-        include_pcs = _parse_int_list(self.filter_include_pcs_var.get())
-        exclude_pcs = _parse_int_list(self.filter_exclude_pcs_var.get())
+        include_pcs = self._parse_int_list(self.filter_include_pcs_var.get())
+        exclude_pcs = self._parse_int_list(self.filter_exclude_pcs_var.get())
         filters.include_pitch_classes = include_pcs or None
         filters.exclude_pitch_classes = exclude_pcs or None
         filters.include_pc_mode = self.filter_pc_mode_map.get(self.filter_pc_mode_var.get())
 
         # Patrones de intervalos
-        patterns: list[list[int]] = []
-        raw_patterns = self.filter_interval_var.get().strip()
-        if raw_patterns:
-            for part in raw_patterns.split(";"):
-                vals = [int(x) for x in part.split(",") if x.strip().isdigit()]
-                if vals:
-                    patterns.append(vals)
+        patterns = self._parse_interval_patterns(self.filter_interval_var.get().strip())
 
         interval_mode = self.filter_interval_mode_map.get(self.filter_interval_mode_var.get())
         filters.interval_mode = interval_mode
@@ -720,30 +953,116 @@ class ExperimentLauncher(tk.Tk):
         filters_label_parts: list[str] = []
 
         if self.filter_enable_var.get():
-             # ... Populate filters metadata ...
-             filters_label_parts.append("Filtros activos") # Simplified for brevity
+            filters_label_parts.append("Filtros activos")
+            cards = [n for n, var in self.filter_cardinality_vars.items() if var.get()]
+            if cards:
+                filters_detail["cardinalities"] = cards
+            span_min = self.filter_span_min_var.get().strip()
+            span_max = self.filter_span_max_var.get().strip()
+            if span_min or span_max:
+                filters_detail["span"] = {
+                    "min": int(span_min) if span_min else None,
+                    "max": int(span_max) if span_max else None,
+                }
+            max_int = self.filter_max_internal_interval_var.get().strip()
+            if max_int:
+                filters_detail["max_internal_interval"] = int(max_int)
+            include_pcs = self._parse_int_list(self.filter_include_pcs_var.get())
+            if include_pcs:
+                filters_detail["include_pitch_classes"] = include_pcs
+            exclude_pcs = self._parse_int_list(self.filter_exclude_pcs_var.get())
+            if exclude_pcs:
+                filters_detail["exclude_pitch_classes"] = exclude_pcs
+            patterns = self._parse_interval_patterns(self.filter_interval_var.get())
+            if patterns:
+                filters_detail["interval_patterns"] = patterns
+            filters_detail["interval_mode"] = self.filter_interval_mode_map.get(self.filter_interval_mode_var.get())
+            filters_detail["pc_mode"] = self.filter_pc_mode_map.get(self.filter_pc_mode_var.get())
+            filters_detail["scale_expand"] = bool(self.filter_scale_expand_var.get())
 
         descriptor["filters"] = {"label": " | ".join(filters_label_parts), "detail": filters_detail}
 
         generation_mode = self.generation_mode_var.get()
         if generation_mode == "combinatorial":
             descriptor["mode"] = "combinatorial"
+            preset_name = self.population_preset_var.get().strip()
+            preset_cfg = self.population_presets.get(preset_name) if preset_name else None
             descriptor["combinatorial"] = {
                 "alphabet": self._parse_int_list(self.combinatorial_alphabet_var.get()),
                 "cardinalities": self._parse_int_list(self.combinatorial_cardinalities_var.get()),
-                "octave_min": self.combinatorial_octave_min_var.get(),
-                "octave_max": self.combinatorial_octave_max_var.get(),
+                "octave_min": self._safe_int(self.combinatorial_octave_min_var.get()),
+                "octave_max": self._safe_int(self.combinatorial_octave_max_var.get()),
+                "structural_mode": bool(self.structural_mode_var.get()),
+                "preset_name": preset_name or None,
+                "preset_description": (preset_cfg or {}).get("description"),
             }
 
         return {"selection": selection, "population": {"descriptors": [descriptor]}}
 
+    def _safe_int(self, value: Any) -> Optional[int]:
+        text = str(value).strip()
+        if not text:
+            return None
+        try:
+            return int(text)
+        except Exception:
+            return None
+
+    def _parse_float(self, value: str, field_name: str) -> float:
+        text = str(value).strip()
+        if not text:
+            raise ValueError(f"Falta valor para {field_name}.")
+        normalized = text.replace(",", ".")
+        try:
+            return float(normalized)
+        except ValueError as exc:
+            raise ValueError(f"Valor inválido para {field_name}: {value}") from exc
+
+    def _build_metric_params(self) -> Dict[str, Dict[str, float]]:
+        w_vl = self._parse_float(self.vl_weight_vl_var.get(), "w_vl")
+        w_q5 = self._parse_float(self.vl_weight_q5_var.get(), "w_q5")
+        w_js = self._parse_float(self.vl_weight_js_var.get(), "w_js")
+        if w_vl < 0 or w_q5 < 0 or w_js < 0:
+            raise ValueError("Los pesos de voiceleading_quintas deben ser no negativos.")
+        if (w_vl + w_q5 + w_js) <= 0:
+            raise ValueError("La suma de pesos de voiceleading_quintas debe ser mayor a 0.")
+        return {
+            "voiceleading_quintas": {
+                "w_vl": float(w_vl),
+                "w_q5": float(w_q5),
+                "w_js": float(w_js),
+            }
+        }
+
     def _parse_int_list(self, value: str) -> list[int]:
         nums: list[int] = []
         for token in re.split(r"[^\d-]+", value.strip()):
-            if not token: continue
-            try: nums.append(int(token))
-            except ValueError: continue
+            if not token:
+                continue
+            try:
+                nums.append(int(token))
+            except ValueError:
+                continue
         return nums
+
+    def _parse_interval_patterns(self, raw_value: str) -> list[list[int]]:
+        patterns: list[list[int]] = []
+        text = (raw_value or "").strip()
+        if not text:
+            return patterns
+        for part in text.split(";"):
+            vals = self._parse_int_list(part)
+            if vals:
+                patterns.append(vals)
+        return patterns
+
+    def _format_interval_patterns(self, patterns: list[list[int]]) -> str:
+        chunks: list[str] = []
+        for pat in patterns:
+            if not pat:
+                continue
+            chunks.append(",".join(str(int(v)) for v in pat))
+        return ";".join(chunks)
 
     def _mark_population_dirty(self) -> None:
         self.controller.temporal_population_df = None
@@ -890,21 +1209,158 @@ class ExperimentLauncher(tk.Tk):
         selected = filedialog.askdirectory(initialdir=initial, title="Selecciona carpeta de salida")
         if selected: self.output_var.set(selected)
 
+    def _set_new_output_dir(self) -> None:
+        self.output_var.set(str(self.controller.get_default_output_dir()))
+
+    def _refresh_population_preset_combo(self, selected: Optional[str] = None) -> None:
+        values = self._available_population_presets()
+        combo = getattr(self, "population_preset_combo", None)
+        if combo is not None:
+            combo.configure(values=values)
+        target = (selected or self.population_preset_var.get() or "manual").strip()
+        if target not in values:
+            target = "manual"
+        self.population_preset_var.set(target)
+        self._update_population_preset_buttons()
+
+    def _update_population_preset_buttons(self) -> None:
+        preset_name = self.population_preset_var.get().strip()
+        cfg = self.population_presets.get(preset_name, {})
+        locked = bool(cfg.get("locked", False))
+        if hasattr(self, "delete_preset_button"):
+            state = tk.DISABLED if (preset_name == "manual" or locked) else tk.NORMAL
+            self.delete_preset_button.configure(state=state)
+
+    def _collect_current_population_preset(self) -> Dict[str, Any]:
+        preset_name = self.population_preset_var.get().strip()
+        previous = self.population_presets.get(preset_name, {}) if preset_name else {}
+        patterns = self._parse_interval_patterns(self.filter_interval_var.get())
+        return {
+            "description": previous.get("description", ""),
+            "locked": False,
+            "combinatorial": {
+                "alphabet": self._parse_int_list(self.combinatorial_alphabet_var.get()),
+                "octave_min": self._safe_int(self.combinatorial_octave_min_var.get()),
+                "octave_max": self._safe_int(self.combinatorial_octave_max_var.get()),
+                "cardinalities": self._parse_int_list(self.combinatorial_cardinalities_var.get()),
+                "structural_mode": bool(self.structural_mode_var.get()),
+            },
+            "filters": {
+                "enabled": bool(self.filter_enable_var.get()),
+                "cardinalities": [n for n, var in self.filter_cardinality_vars.items() if var.get()],
+                "span_min": self._safe_int(self.filter_span_min_var.get()),
+                "span_max": self._safe_int(self.filter_span_max_var.get()),
+                "max_internal_interval": self._safe_int(self.filter_max_internal_interval_var.get()),
+                "include_pitch_classes": self._parse_int_list(self.filter_include_pcs_var.get()),
+                "exclude_pitch_classes": self._parse_int_list(self.filter_exclude_pcs_var.get()),
+                "pc_mode": self.filter_pc_mode_map.get(self.filter_pc_mode_var.get()),
+                "interval_mode": self.filter_interval_mode_map.get(self.filter_interval_mode_var.get()),
+                "interval_patterns": patterns,
+                "scale_expand": bool(self.filter_scale_expand_var.get()),
+            },
+        }
+
+    def _on_save_population_preset(self) -> None:
+        current = self.population_preset_var.get().strip()
+        initial_name = "" if current == "manual" else current
+        name = simpledialog.askstring("Guardar preset", "Nombre del preset:", initialvalue=initial_name)
+        if name is None:
+            return
+        name = name.strip()
+        if not name:
+            messagebox.showwarning("Preset", "Debes ingresar un nombre.")
+            return
+        if name.lower() == "manual":
+            messagebox.showwarning("Preset", "El nombre 'manual' está reservado.")
+            return
+
+        existing = self.population_presets.get(name)
+        if existing and existing.get("locked"):
+            messagebox.showwarning("Preset", "Ese nombre corresponde a un preset fijo del sistema.")
+            return
+        if existing and not messagebox.askyesno("Sobrescribir preset", f"El preset '{name}' ya existe. ¿Deseas sobrescribirlo?"):
+            return
+
+        payload = self._collect_current_population_preset()
+        description = simpledialog.askstring(
+            "Descripción del preset",
+            "Descripción breve (opcional):",
+            initialvalue=payload.get("description") or "",
+        )
+        if description is not None:
+            payload["description"] = description.strip()
+
+        self.population_presets[name] = payload
+        self._save_custom_population_presets()
+        self._refresh_population_preset_combo(selected=name)
+        self._append_pop_log(f"[preset] Guardado: {name}\n")
+
+    def _on_delete_population_preset(self) -> None:
+        name = self.population_preset_var.get().strip()
+        if not name or name == "manual":
+            messagebox.showwarning("Preset", "Selecciona un preset guardado para eliminar.")
+            return
+        cfg = self.population_presets.get(name)
+        if not cfg:
+            return
+        if cfg.get("locked"):
+            messagebox.showwarning("Preset", "Los presets del sistema no se pueden eliminar.")
+            return
+        if not messagebox.askyesno("Eliminar preset", f"¿Eliminar el preset '{name}'?"):
+            return
+        self.population_presets.pop(name, None)
+        self._save_custom_population_presets()
+        self._refresh_population_preset_combo(selected="manual")
+        self._append_pop_log(f"[preset] Eliminado: {name}\n")
+
     def _apply_population_preset(self, name: str) -> None:
-        preset = (name or "").strip().lower()
-        if preset == "diadas_estructurales_octava3":
-            self.combinatorial_alphabet_var.set("0,2,4,5,7,9,11")
-            self.combinatorial_octave_min_var.set("3")
-            self.combinatorial_octave_max_var.set("3")
-            self.combinatorial_cardinalities_var.set("2")
-            self.structural_mode_var.set(True)
-            self.filter_enable_var.set(True)
-            for n, var in self.filter_cardinality_vars.items(): var.set(n == 2)
-            self.filter_max_internal_interval_var.set("12")
-            self._set_preset_locked(True)
-            self._mark_population_dirty()
-        else:
+        preset_name = (name or "").strip()
+        if not preset_name or preset_name.lower() == "manual":
+            self.population_preset_var.set("manual")
             self._set_preset_locked(False)
+            self._update_population_preset_buttons()
+            self._mark_population_dirty()
+            return
+
+        preset = self.population_presets.get(preset_name)
+        if not preset:
+            self.population_preset_var.set("manual")
+            self._set_preset_locked(False)
+            self._update_population_preset_buttons()
+            self._mark_population_dirty()
+            return
+
+        combo = preset.get("combinatorial") or {}
+        self.combinatorial_alphabet_var.set(",".join(str(v) for v in combo.get("alphabet", [])))
+        self.combinatorial_octave_min_var.set(str(combo.get("octave_min", "")))
+        self.combinatorial_octave_max_var.set(str(combo.get("octave_max", "")))
+        self.combinatorial_cardinalities_var.set(",".join(str(v) for v in combo.get("cardinalities", [])))
+        self.structural_mode_var.set(bool(combo.get("structural_mode", False)))
+
+        filt = preset.get("filters") or {}
+        self.filter_enable_var.set(bool(filt.get("enabled", True)))
+        selected_cards = set(int(v) for v in (filt.get("cardinalities") or []))
+        for n, var in self.filter_cardinality_vars.items():
+            var.set(n in selected_cards)
+        self.filter_span_min_var.set("" if filt.get("span_min") is None else str(filt.get("span_min")))
+        self.filter_span_max_var.set("" if filt.get("span_max") is None else str(filt.get("span_max")))
+        self.filter_max_internal_interval_var.set(
+            "" if filt.get("max_internal_interval") is None else str(filt.get("max_internal_interval"))
+        )
+        self.filter_include_pcs_var.set(",".join(str(v) for v in (filt.get("include_pitch_classes") or [])))
+        self.filter_exclude_pcs_var.set(",".join(str(v) for v in (filt.get("exclude_pitch_classes") or [])))
+        pc_mode = str(filt.get("pc_mode") or "contains_all")
+        self.filter_pc_mode_var.set(self.filter_pc_mode_inverse_map.get(pc_mode, self.filter_pc_mode_labels[0]))
+        interval_mode = str(filt.get("interval_mode") or "exact")
+        self.filter_interval_mode_var.set(
+            self.filter_interval_mode_inverse_map.get(interval_mode, self.filter_interval_mode_labels[0])
+        )
+        self.filter_interval_var.set(self._format_interval_patterns(filt.get("interval_patterns") or []))
+        self.filter_scale_expand_var.set(bool(filt.get("scale_expand", False)))
+
+        self._set_preset_locked(bool(preset.get("locked", False)))
+        self._update_population_preset_buttons()
+        self._mark_population_dirty()
 
     def _preset_lock_widgets(self) -> list[tk.Widget]:
         return [getattr(self, "comb_alpha_entry", None), getattr(self, "comb_oct_min_entry", None),
