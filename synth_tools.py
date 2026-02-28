@@ -103,14 +103,21 @@ except ModuleNotFoundError:  # pragma: no cover - fallback si el paquete no expo
 try:
     from chordcodex.model import QueryExecutor  # type: ignore
 except ModuleNotFoundError:  # pragma: no cover
-    import psycopg2  # type: ignore
-    from psycopg2.extras import RealDictCursor  # type: ignore
 
     class QueryExecutor:  # type: ignore
+        """Fallback liviano: importa psycopg2 solo al ejecutar consultas."""
         def __init__(self, **config: Any):
             self.config = config
 
         def as_pandas(self, query: str, params: Optional[Sequence[Any]] = None) -> pd.DataFrame:
+            try:
+                import psycopg2  # type: ignore
+                from psycopg2.extras import RealDictCursor  # type: ignore
+            except ModuleNotFoundError:
+                raise ModuleNotFoundError(
+                    "psycopg2 no está instalado. Instálalo con "
+                    "'pip install psycopg2-binary' si necesitas acceso a la DB."
+                ) from None
             params = params or ()
             with psycopg2.connect(**self.config) as conn:
                 with conn.cursor(cursor_factory=RealDictCursor) as cursor:

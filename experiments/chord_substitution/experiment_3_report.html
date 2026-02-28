@@ -1,0 +1,191 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Experimento 3 &mdash; EB: Axiomas + Auditoria M4</title>
+<script src="https://cdn.plot.ly/plotly-2.27.0.min.js"></script>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Fira+Code:wght@400;500&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.css">
+<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.js"></script>
+<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/contrib/auto-render.min.js"
+    onload="renderMathInElement(document.body, {delimiters: [{left: '$$', right: '$$', display: true}, {left: '$', right: '$', display: false}]});"></script>
+<style>
+:root { --bg:#0d1117; --sf:#161b22; --bd:#30363d; --tx:#e6edf3; --tm:#8b949e;
+         --ac:#58a6ff; --gn:#3fb950; --or:#d29922; --rd:#f85149; --pr:#bc8cff; }
+*{ margin:0; padding:0; box-sizing:border-box; }
+body{ font-family:'Inter',sans-serif; background:var(--bg); color:var(--tx); line-height:1.7; padding:2rem; }
+.c{ max-width:1100px; margin:0 auto; }
+h1{ font-size:1.7rem; font-weight:700; background:linear-gradient(135deg,var(--ac),var(--gn));
+     -webkit-background-clip:text; -webkit-text-fill-color:transparent; margin-bottom:.3rem; }
+.sub{ color:var(--tm); font-size:.9rem; margin-bottom:2rem; }
+h2{ font-size:1.2rem; font-weight:600; color:var(--ac); border-bottom:1px solid var(--bd);
+     padding-bottom:.4rem; margin:2.5rem 0 1rem; }
+h3{ font-size:1rem; font-weight:600; color:var(--gn); margin:1.5rem 0 .5rem; }
+p,li{ font-size:.9rem; }
+.cd{ background:var(--sf); border:1px solid var(--bd); border-radius:10px; padding:1.2rem; margin:1rem 0; }
+.th{ border-left:3px solid var(--gn); padding:.8rem 1rem; background:rgba(63,185,80,.06);
+      border-radius:0 8px 8px 0; margin:1rem 0; }
+.th-l{ color:var(--gn); font-weight:700; font-size:.8rem; text-transform:uppercase; letter-spacing:.05em; }
+.rp{ border-left:3px solid var(--rd); padding:.8rem 1rem; background:rgba(248,81,73,.06);
+      border-radius:0 8px 8px 0; margin:1rem 0; }
+.rp-l{ color:var(--rd); font-weight:700; font-size:.8rem; text-transform:uppercase; letter-spacing:.05em; }
+.ins{ border-left:3px solid var(--or); padding:.8rem 1rem; background:rgba(210,153,34,.06);
+       border-radius:0 8px 8px 0; margin:1rem 0; }
+.ins-l{ color:var(--or); font-weight:700; font-size:.8rem; text-transform:uppercase; letter-spacing:.05em; }
+.bg{ display:inline-block; padding:.1rem .5rem; border-radius:12px; font-size:.7rem; font-weight:600; margin-right:.4rem; }
+.bg-g{ background:rgba(63,185,80,.15); color:var(--gn); }
+.bg-b{ background:rgba(88,166,255,.15); color:var(--ac); }
+table{ width:100%; border-collapse:collapse; font-size:.82rem; margin:.8rem 0; }
+th{ background:var(--sf); color:var(--ac); font-weight:600; padding:.5rem .6rem; text-align:left;
+     border-bottom:2px solid var(--bd); }
+td{ padding:.35rem .6rem; border-bottom:1px solid var(--bd); }
+td.num{ font-family:'Fira Code',monospace; font-size:.77rem; }
+tr:hover{ background:rgba(88,166,255,.04); }
+.ch{ border-radius:10px; overflow:hidden; margin:1.2rem 0; }
+.scr{ max-height:350px; overflow-y:auto; }
+.metrics{ display:grid; grid-template-columns:repeat(4,1fr); gap:1rem; margin:1rem 0; }
+.mc{ background:var(--sf); border:1px solid var(--bd); border-radius:10px; padding:.8rem; text-align:center; }
+.mv{ font-size:1.5rem; font-weight:700; font-family:'Fira Code',monospace; }
+.ml{ color:var(--tm); font-size:.75rem; margin-top:.2rem; }
+.tools{ background:var(--sf); border:1px solid var(--bd); border-radius:10px; padding:1rem; margin:1rem 0; }
+.tools code{ color:var(--ac); font-family:'Fira Code',monospace; font-size:.8rem; }
+.tools .src{ color:var(--tm); font-size:.75rem; }
+.ft{ margin-top:2.5rem; padding-top:.8rem; border-top:1px solid var(--bd);
+      color:var(--tm); font-size:.75rem; text-align:center; }
+</style>
+</head>
+<body>
+<div class="c">
+
+<h1>Experimento 3: Expansion Biyectiva &mdash; Axiomas + Auditoria M4</h1>
+<p class="sub">
+    Validacion empirica de $d_{\text{EB}}$ sobre el cociente estratificado $\mathcal{C}/\sim$
+    <br><span class="bg bg-g">MIDI continuo (R) &middot; 156 acordes &middot; 50,000 triples</span>
+</p>
+
+<h2>Herramientas Utilizadas</h2>
+<div class="tools">
+<table>
+<tr><td><code>d_EB()</code></td><td class="src">DISCUSION_RIGUROSA &sect;7.1</td><td>Expansion biyectiva sobre MIDI continuo ($\mathbb{R}/12\mathbb{Z}$)</td></tr>
+<tr><td><code>step_circular_pure(x,y)</code></td><td class="src">&mdash;</td><td>$\min(|x\bmod 12 - y\bmod 12|, 12-\cdots)$ &mdash; metrica en $\mathbb{R}/12\mathbb{Z}$</td></tr>
+<tr><td><code>linear_sum_assignment()</code></td><td class="src">scipy.optimize</td><td>Algoritmo Hungaro para matching optimo</td></tr>
+<tr><td><code>generate_corpus()</code></td><td class="src">common.py (replica services/combinatorial_generator.py)</td><td>13 tipos &times; 12 raices, MIDI floats, sin unisonos</td></tr>
+</table>
+</div>
+
+<h2>1. Definicion Formal de $d_{\text{EB}}$</h2>
+<div class="cd">
+<p>Sea $K = \max(|\text{supp}(A)|, |\text{supp}(B)|)$ donde $\text{supp}$ usa tolerancia $\epsilon = 10^{-6}$ st para comparar floats.</p>
+$$d_{\text{EB}}(A,B) = \min_{A' \in E_K(A),\, B' \in E_K(B)} \min_{\sigma \in S_K} \frac{1}{K} \sum_{i=1}^K \text{step}(A'_i, B'_{\sigma(i)})$$
+<p>$\text{step}(x,y) = \min(|x \bmod 12 - y \bmod 12|, 12 - |\cdots|)$ opera sobre valores MIDI <strong>continuos</strong> ($\mathbb{R}$).</p>
+</div>
+
+<h2>2. Verificacion de Axiomas</h2>
+<div class="metrics">
+<div class="mc"><div class="mv" style="color:var(--gn);">&#x2713;</div><div class="ml">M1: $d \geq 0$</div></div>
+<div class="mc"><div class="mv" style="color:var(--gn);">&#x2713;</div><div class="ml">M3: $d(A,B) = d(B,A)$</div></div>
+<div class="mc"><div class="mv" style="color:var(--gn);">&#x2713;</div><div class="ml">E0: $d(A, A \cup \{a\}) = 0$<br>Lim suave: $d \sim t/K$</div></div>
+<div class="mc"><div class="mv" style="color:var(--or);">&#x26A0;</div><div class="ml">M4: 0.6280% violaciones<br>Max: 0.5000</div></div>
+</div>
+
+<h2>3. Auditoria M4</h2>
+<div class="metrics">
+<div class="mc"><div class="mv" style="color:var(--ac);">50,000</div><div class="ml">Triples auditados</div></div>
+<div class="mc"><div class="mv" style="color:var(--or);">942</div><div class="ml">Violaciones</div></div>
+<div class="mc"><div class="mv" style="color:var(--or);">0.5000</div><div class="ml">Max violacion</div></div>
+<div class="mc"><div class="mv" style="color:var(--or);">0.2256</div><div class="ml">Promedio</div></div>
+</div>
+
+<div class="ins"><p class="ins-l">M4: Conjetura operacional</p><p>Se encontraron 942 violaciones (0.6280%). Conforme a la DISCUSION_RIGUROSA, $d_{\text{EB}}$ se documenta como <strong>disimilitud / cuasi-metrica empirica</strong>. UMAP tolera esta situacion via <code>metric=precomputed</code>.</p></div>
+
+<h3>Top violaciones</h3><div class="scr"><table><thead><tr><th>A</th><th>B</th><th>C</th><th>d(A,B)</th><th>d(B,C)</th><th>d(A,C)</th><th>Violacion</th></tr></thead><tbody><tr><td>Gaug</td><td>Eminmaj7</td><td>Dsus2</td>
+        <td class="num">0.2500</td><td class="num">1.2500</td>
+        <td class="num">2.0000</td><td class="num" style="color:var(--rd)">0.500000</td></tr><tr><td>Absus2</td><td>Bbdom7</td><td>Dsus2</td>
+        <td class="num">0.7500</td><td class="num">0.7500</td>
+        <td class="num">2.0000</td><td class="num" style="color:var(--rd)">0.500000</td></tr><tr><td>Amaj7</td><td>Caug</td><td>Dsus4</td>
+        <td class="num">0.5000</td><td class="num">1.0000</td>
+        <td class="num">2.0000</td><td class="num" style="color:var(--rd)">0.500000</td></tr><tr><td>Csus2</td><td>Ddom7</td><td>Gbsus2</td>
+        <td class="num">0.7500</td><td class="num">0.7500</td>
+        <td class="num">2.0000</td><td class="num" style="color:var(--rd)">0.500000</td></tr><tr><td>Gmaj7</td><td>Csus4</td><td>Gbaug</td>
+        <td class="num">1.0000</td><td class="num">0.5000</td>
+        <td class="num">2.0000</td><td class="num" style="color:var(--rd)">0.500000</td></tr><tr><td>Ebaug7</td><td>Fminmaj7</td><td>Abaug</td>
+        <td class="num">0.2500</td><td class="num">1.0000</td>
+        <td class="num">1.7500</td><td class="num" style="color:var(--rd)">0.500000</td></tr><tr><td>Gbsus2</td><td>Gaug</td><td>Abhdim7</td>
+        <td class="num">0.7500</td><td class="num">0.7500</td>
+        <td class="num">2.0000</td><td class="num" style="color:var(--rd)">0.500000</td></tr><tr><td>Daug</td><td>Ebminmaj7</td><td>Bmin7</td>
+        <td class="num">0.2500</td><td class="num">0.5000</td>
+        <td class="num">1.2500</td><td class="num" style="color:var(--rd)">0.500000</td></tr><tr><td>Csus4</td><td>Ghdim7</td><td>Bbaug</td>
+        <td class="num">0.7500</td><td class="num">0.7500</td>
+        <td class="num">2.0000</td><td class="num" style="color:var(--rd)">0.500000</td></tr><tr><td>Dminmaj7</td><td>Aaug</td><td>Bbhdim7</td>
+        <td class="num">0.2500</td><td class="num">0.7500</td>
+        <td class="num">1.5000</td><td class="num" style="color:var(--rd)">0.500000</td></tr><tr><td>Gbsus4</td><td>Csus4</td><td>Dbhdim7</td>
+        <td class="num">0.7500</td><td class="num">0.7500</td>
+        <td class="num">2.0000</td><td class="num" style="color:var(--rd)">0.500000</td></tr><tr><td>Daug</td><td>Bmin7</td><td>Ebminmaj7</td>
+        <td class="num">0.5000</td><td class="num">0.2500</td>
+        <td class="num">1.2500</td><td class="num" style="color:var(--rd)">0.500000</td></tr><tr><td>Gdim</td><td>Ebaug7</td><td>Dbsus2</td>
+        <td class="num">0.7500</td><td class="num">0.7500</td>
+        <td class="num">2.0000</td><td class="num" style="color:var(--rd)">0.500000</td></tr><tr><td>Bbaug</td><td>Bmin7</td><td>Gbmaj7</td>
+        <td class="num">0.5000</td><td class="num">0.5000</td>
+        <td class="num">1.5000</td><td class="num" style="color:var(--rd)">0.500000</td></tr><tr><td>Ebdim7</td><td>Gbdim</td><td>Cdim</td>
+        <td class="num">0.7500</td><td class="num">0.7500</td>
+        <td class="num">2.0000</td><td class="num" style="color:var(--rd)">0.500000</td></tr><tr><td>Abmaj7</td><td>Gbsus2</td><td>Ebaug</td>
+        <td class="num">1.0000</td><td class="num">0.5000</td>
+        <td class="num">2.0000</td><td class="num" style="color:var(--rd)">0.500000</td></tr><tr><td>Dmaj</td><td>Abmaj</td><td>Ddom7</td>
+        <td class="num">1.0000</td><td class="num">0.5000</td>
+        <td class="num">2.0000</td><td class="num" style="color:var(--rd)">0.500000</td></tr><tr><td>Daug</td><td>Gminmaj7</td><td>Chdim7</td>
+        <td class="num">0.2500</td><td class="num">0.7500</td>
+        <td class="num">1.5000</td><td class="num" style="color:var(--rd)">0.500000</td></tr><tr><td>Daug</td><td>Ebminmaj7</td><td>Bminmaj7</td>
+        <td class="num">0.2500</td><td class="num">0.2500</td>
+        <td class="num">1.0000</td><td class="num" style="color:var(--rd)">0.500000</td></tr><tr><td>Gaug</td><td>Dbsus4</td><td>Abhdim7</td>
+        <td class="num">0.7500</td><td class="num">0.7500</td>
+        <td class="num">2.0000</td><td class="num" style="color:var(--rd)">0.500000</td></tr></tbody></table></div>
+
+<h2>4. EB vs Hungaro en Frontera de Whitney</h2>
+<div class="ch" id="bndChart"></div>
+<div class="cd"><table>
+<thead><tr><th>$t$ (st)</th><th>$d_{\text{EB}}$ (converge)</th><th>$d_{\text{Hung}}$ (plateau)</th></tr></thead>
+<tbody><tr><td>6.00000</td>
+        <td class="num" style="color:var(--gn)">0.2500000000</td>
+        <td class="num" style="color:var(--rd)">0.250000</td></tr><tr><td>3.00000</td>
+        <td class="num" style="color:var(--gn)">0.5000000000</td>
+        <td class="num" style="color:var(--rd)">0.250000</td></tr><tr><td>1.00000</td>
+        <td class="num" style="color:var(--gn)">0.2500000000</td>
+        <td class="num" style="color:var(--rd)">0.250000</td></tr><tr><td>0.50000</td>
+        <td class="num" style="color:var(--gn)">0.1250000000</td>
+        <td class="num" style="color:var(--rd)">0.250000</td></tr><tr><td>0.10000</td>
+        <td class="num" style="color:var(--gn)">0.0250000000</td>
+        <td class="num" style="color:var(--rd)">0.250000</td></tr><tr><td>0.01000</td>
+        <td class="num" style="color:var(--gn)">0.0025000000</td>
+        <td class="num" style="color:var(--rd)">0.250000</td></tr><tr><td>0.00100</td>
+        <td class="num" style="color:var(--gn)">0.0002500000</td>
+        <td class="num" style="color:var(--rd)">0.250000</td></tr><tr><td>0.00010</td>
+        <td class="num" style="color:var(--gn)">0.0000250000</td>
+        <td class="num" style="color:var(--rd)">0.250000</td></tr><tr><td>0.00001</td>
+        <td class="num" style="color:var(--gn)">0.0000025000</td>
+        <td class="num" style="color:var(--rd)">0.250000</td></tr></tbody></table></div>
+
+<h2>5. Distribucion de $d_{\text{EB}}$ en el Corpus</h2>
+<div class="ch" id="histChart"></div>
+
+<h2>6. Conclusion</h2>
+<div class="th">
+<p class="th-l">Resultado</p>
+<p>$d_{\text{EB}}$ satisface M1, M3 y E0 (convergencia suave $\sim t/K$ en MIDI continuo). M4 tiene 942 violaciones (0.6280%). La disimilitud es viable para UMAP con <code>metric='precomputed'</code> y aceptable para MDS no metrico.</p>
+</div>
+
+<div class="ft">Generado: 2026-02-22 22:59 &middot; ChordSpace &middot;
+<code>experiments/chord_substitution/run_experiment_3.py</code></div>
+</div>
+<script>
+const L={paper_bgcolor:'#0d1117',plot_bgcolor:'#161b22',font:{family:'Inter',color:'#e6edf3',size:13},
+  xaxis:{gridcolor:'#30363d',zerolinecolor:'#30363d'},yaxis:{gridcolor:'#30363d',zerolinecolor:'#30363d'},
+  legend:{bgcolor:'rgba(22,27,34,0.9)',bordercolor:'#30363d',borderwidth:1},margin:{l:65,r:30,t:45,b:50}};
+Plotly.newPlot('bndChart',[
+  {x:[6.0, 3.0, 1.0, 0.5, 0.1, 0.01, 0.001, 0.0001, 1e-05],y:[0.25, 0.5, 0.25, 0.125, 0.02499999999999858, 0.002500000000001279, 0.0002500000000011937, 2.5000000000829914e-05, 2.500000000793534e-06],name:'d_EB',line:{color:'#3fb950',width:3},mode:'lines+markers',marker:{size:5}},
+  {x:[6.0, 3.0, 1.0, 0.5, 0.1, 0.01, 0.001, 0.0001, 1e-05],y:[0.25, 0.25, 0.25, 0.25, 0.25, 0.25, 0.25, 0.25, 0.25],name:'d_Hung',line:{color:'#f85149',width:3},mode:'lines+markers',marker:{size:5}},
+  {x:[6.0,1e-05],y:[0,0],name:'Whitney (d=0)',line:{color:'#d29922',width:1.5,dash:'dot'},mode:'lines'},
+],{...L,title:{text:'EB converge a 0, Hungaro no',font:{size:15}},xaxis:{...L.xaxis,title:'t (st)',type:'log'},yaxis:{...L.yaxis,title:'Distancia'}});
+Plotly.newPlot('histChart',[{x:[0.025, 0.07500000000000001, 0.125, 0.17500000000000002, 0.225, 0.275, 0.32500000000000007, 0.375, 0.42500000000000004, 0.475, 0.525, 0.5750000000000001, 0.625, 0.675, 0.7250000000000001, 0.775, 0.8250000000000001, 0.875, 0.925, 0.9750000000000001, 1.025, 1.0750000000000002, 1.125, 1.1750000000000003, 1.225, 1.275, 1.3250000000000002, 1.375, 1.4250000000000003, 1.475, 1.525, 1.5750000000000002, 1.625, 1.6750000000000003, 1.725, 1.775, 1.8250000000000002, 1.875, 1.9250000000000003, 1.975],y:[42, 0, 0, 0, 0, 300, 168, 0, 0, 0, 948, 0, 0, 432, 0, 1992, 0, 0, 0, 0, 3474, 0, 0, 0, 0, 2244, 480, 0, 0, 0, 1038, 0, 0, 432, 0, 204, 0, 0, 0, 336],type:'bar',marker:{color:'#58a6ff',opacity:.8},name:'d_EB'}],
+  {...L,title:{text:'Distribucion de d_EB en corpus (156 acordes)',font:{size:15}},xaxis:{...L.xaxis,title:'d_EB'},yaxis:{...L.yaxis,title:'Frecuencia'},bargap:0.05});
+</script>
+</body></html>

@@ -1,0 +1,59 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Diagrama Metodológico - Capítulo 3</title>
+    <style>
+        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; padding: 40px; background-color: #f8f9fa; }
+        .mermaid-container { background: white; padding: 30px; border-radius: 8px; box-shadow: 0 4px 15px rgba(0,0,0,0.1); max-width: 1000px; margin: 0 auto; }
+        h2 { text-align: center; color: #333; }
+        p.info { text-align: center; color: #666; font-size: 0.9em; margin-bottom: 30px; }
+    </style>
+</head>
+<body>
+
+    <h2>Flujo Metodológico y Modelado Matemático</h2>
+    <p class="info">Acorde Computacional y Espacio de Representación (Doble clic en los bloques para hacer zoom si es necesario)</p>
+
+    <div class="mermaid-container">
+        <pre class="mermaid">
+flowchart TD
+    %% Estilos basados en artículos académicos
+    classDef proceso fill:#e1f5fe,stroke:#0288d1,stroke-width:2px,color:#000000;
+    classDef data fill:#ffffff,stroke:#388e3c,stroke-width:2px,color:#000000;
+    classDef eval fill:#fff3e0,stroke:#f57c00,stroke-width:2px,color:#000000;
+    
+    subgraph S1 [1. Espacio de Entrada]
+        A["Población de Acordes (N)\nTuplas MIDI n ∈ N^m\n(12-TET)"]:::data
+    end
+
+    subgraph S2 [2. Extracción de Características Psicoacústicas]
+        B("Modelo Perceptual\n(Plomp-Levelt / Sethares 1993)"):::proceso
+        C["Firma Psicoacústica: Vector Φ_raw ∈ R^12\n(Rugosidad por Clase de Intervalo)"]:::data
+        D("Normalización y Transformación\n(ej. Proyección al Simplex Δ^11)"):::proceso
+        
+        A --> B --> C --> D
+    end
+
+    subgraph S3 [3. Geometría y Reducción Dimensional]
+        E["Matriz de Disimilitudes D\n(Métricas: Euclidiana, Cosine, JSD, Hellinger)"]:::proceso
+        F["Reducción Dimensional (Ψ)\n(MDS con algoritmo SMACOF, UMAP, t-SNE)"]:::proceso
+        G["Embedding 2D\n(Coordenadas Topológicas Continuas)"]:::data
+        
+        D --> E --> F --> G
+    end
+
+    subgraph S4 [4. Evaluación Cuantitativa]
+        H("Métricas de Preservación y Estructura\n(Trustworthiness, Continuity, Stress, Silhouette)"):::eval
+        G --> H
+    end
+        </pre>
+    </div>
+
+    <script type="module">
+        import mermaid from 'https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.esm.min.mjs';
+        mermaid.initialize({ startOnLoad: true, theme: 'default', securityLevel: 'loose' });
+    </script>
+</body>
+</html>

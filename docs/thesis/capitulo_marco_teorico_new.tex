@@ -1,0 +1,52 @@
+\chapter{Marco Teórico y Estado del Arte}
+\label{chap:marco_teorico}
+
+\section{Fundamentos Acústicos y Perceptivos del Sonido Musical}
+\label{sec:fundamentos_acusticos}
+
+\subsection{Física Acústica y Descomposición Espectral}
+Para modelar rigurosamente un sonido complejo desde una perspectiva psicoacústica y matemática, consideramos la señal acústica como una función $F(t)$ que representa la variación de presión en el tiempo. Si asumimos que $F(t)$ es una función periódica (o cuasi-periódica en su estado estacionario) con periodo $T$ y frecuencia fundamental $f = 1/T$, esta pertenece al espacio de funciones de cuadrado integrable y admite una descomposición ortogonal mediante la Serie de Fourier \cite{Cook_2009}. Matemáticamente, la señal se expande como una combinación lineal de funciones base sinusoidales:
+\begin{equation}
+    F(t) = \frac{a_0}{2} + \sum_{n=1}^\infty \left[ a_n \cos(2n\pi f t) + b_n \sin(2n\pi f t) \right]
+\end{equation}
+
+El concepto perceptivo de \textbf{timbre} se correlaciona directamente con la distribución de la energía en este espectro de Fourier vectorial. Aunque cada componente sinusoidal posee una fase (codificada en $a_n$ y $b_n$), el audífono periférico humano es primariamente sensible a la magnitud discreta, expresado como el dominio de amplitudes $v_i = \sqrt{a_i^2 + b_i^2}$. El timbre queda formalmente definido por una función envolvente espectral continua $\zeta: \mathbb{R} \to \mathbb{R}^+$ que acota las excitaciones $v_i = \zeta(f_i)$.
+
+\subsection{Fisiología de la Cóclea y el Ancho de Banda Crítico (ERB)}
+El sistema auditivo no restringe su comportamiento a una transformación pasiva; impulsado por las propiedades geomecánicas tisulares de la membrana basilar, la cóclea responde de manera tonotópica y asimétrica. A partir de este principio orgánico se formaliza el concepto de \textbf{Ancho de Banda Crítico} (\textit{Critical Bandwidth} o ERB). Si dos frecuencias de estímulos inciden dentro de la tolerancia de este mismo ancho, sus patrones de excitación espacial en la membrana colisionan sustancialmente, desbordando el mecanismo de resolución de las neuronas ganglionares.
+
+\subsection{Batimientos, Rugosidad y la Curva Acústica del 25\%}
+Cuando dos ondas puras próximas divergen a una oscilación estricta $\Delta f = |f_1 - f_2|$, su latido modulador induce interferencia. A tasas neurales veloces ($>20$ Hz), la superposición engendra irritabilidad neurológica, conjeturada primigeniamente por Helmholtz y demostrada por Plomp y Levelt como \textbf{Rugosidad} (\textit{Roughness}) \cite{plomp1965tonal}. La distorsión escalar de disonancia sensorial $D$ traza una fosa fenomenológica cúspide cuando la divergencia incide precisamente alrededor del $25\%$ del ancho de banda crítico local de esa región frecuencial \cite{Sethares2005}.
+
+Para abstraer el modelo matemáticamente, repudiamos inexorablemente la \textbf{disonancia musical} (heurística y estocástica impuesta por condicionamientos top-down y gramáticas estilísticas), operando con rigor inmaculado sobre la \textbf{disonancia sensorial absoluta}, de naturaleza isomorfa y bio-geográfica universal (bottom-up).
+
+\section{El Modelo Computacional de Rugosidad}
+\label{sec:modelo_computacional_rugosidad}
+
+\subsection{Parametrización Analítica de Sethares}
+William A. Sethares propuso la formulación de una función disonante continua paramétrica $d$ emulando el comportamiento experimental coclear. El decaimiento se deduce como una diferencia estricta de exponenciales:
+\begin{equation}
+    d(f_1, f_2, v_1, v_2) = v_{12} \left[ e^{-a \cdot s \cdot (f_2 - f_1)} - e^{-b \cdot s \cdot (f_2 - f_1)} \right]
+\end{equation}
+Tras minimización del error cuadrático medio contra Plomp y Levelt, los coeficientes infieren los dominios $a=3.5$ y $b=5.75$. El empotrado afín emplea contracción de hiper-frecuencia $s = x^* / (0.021f_1 + 19)$ asintótica para sostener homogeneidad en el registro, y modela perceptualmente el enmascaramiento auditivo utilizando la métrica de ponderación por el ínfimo de interrelación espectral: $v_{12} = \min(v_1, v_2)$.
+
+\subsection{Extensión Matricial y Discusión del Estado del Arte}
+Para topologías masivas poli-acórdicas de espectros armónicos con decaimiento $\delta = 0.88$ (iterados hasta $H \ge 6$ armónicos por nota), la función de Sethares se ensambla iterativamente totalizando todas las interacciones de sus parciales atómicos en un funcional de matriz triangular superior sobre $\mathcal{F}$. Autores contemporáneos como Masina y Lo Presti o Cook integraron dimensiones abstractas heurísticas para la compacidad (harmonicidad basal) \cite{Masina2024} o tensiones categóricas. Sin embargo, para abstraer la analítica de adiciones "ad-hoc" interpretables, blindamos algorítmicamente la investigación al estrato físico basal inmaculado propuesto por Sethares.
+
+\section{Formalización Combinatoria y Computacional del Espacio}
+\label{sec:formalizacion_espacio}
+
+\subsection{El Espacio Discreto de Acordes y el Rechazo a los PC-Sets}
+Sea el espectro $P \subset \mathbb{R}$ parametrizado logarítmicamente. Un acorde es una tupla estricta ordenada $\mathcal{C} = (p_1, \dots, p_n) \in P^n$. Exiliamos definitivamente los modelos atonales teóricos de Pitches Class Sets del espacio modular circular $Z_{12}$, quebrantando la equivalencia de octava y transposición \cite{harrison2020}. La sensibilidad logarítmica de la función $s$ en el decaimiento de registro produce métricas densas fuertemente superpuestas y disonantes al transportar hacia los graves formaciones antes consonantes; forzando inequívocamente al modelado psicoacústico estricto a conservar representación absoluta para anular simulaciones irreales isomorfas entre disonancias extremales separadas por meros semitonos base transpuestos.
+
+\subsection{La Inyección Topológica a $\mathbb{R}^{12}$}
+Definimos el vector Directed Interval Class (\texttt{dic}), anclando la rugosidad a una inyección dimensional $\vec{v} \in \mathbb{R}^{12}$, segregado por la separación de altura de todas las proyecciones matriciales de sus parciales iterados. En rechazo al ICV (Interval Class Vector 6D) o al espacio OPTI asimilativo de Callender $\&$ Tymoczko, preservamos asimetría directiva: una interferencia menor y su opuesta recíproca (tercera mayor frente a sexta menor) disgregan series hiper-rugosas inarmónicas colaterales inmensamente disímiles acústicamente, que eludir y comprimir atrofia infaliblemente el entendimiento cognitivo geométrico del evento musical en la data.
+
+\subsection{El Modelado Deep Learning vs. Bottom-Up Causal}
+Las arquitecturas Transformers predictoras de caja negra (Chord2Vec), abstraen un \textit{embedding} sub-simbólico que deambula estadísticamente basándose en distribuciones de asincronía y co-ocurrencia estocástica (limitadas a sus \textit{datasets} clásicos/pop de entrenamiento). Cíclicamente, estas asunciones degradan cualquier valor isomorfo perceptual en mera probabilidad de "estar contiguos", desconectando irremediablemente la topología disonante rigurosa. El marco $\Delta^{11}$ recobra causalidad y universaliza determinismo fisiológico para evaluar cualquier red de transiciones algorítmica y abstracta no idiomática.
+
+\section{Reducción Dimensional y Disposición Topológica Global}
+\label{sec:reduccion_dimensional}
+Al sobrepasar el espacio en masa analítica escalar de intervenciones aditivas en el volumen dicromático $\mathbb{R}^{12}$, topologías relativas demandan distancias probabilísticas acotadas. Confinando coercitivamente el dominio hacia el Simplex Unitario Euclidiano Estándar $\Delta^{11}$ mitigamos la maldición explosiva de la densidad cardinal. La aplicación matemática transiciona de la nociva dependencia a la métrica $L^2$ y abona su robustez sobre integrales entrópicas asimétricas mediante la Divergencia de \textbf{Jensen-Shannon ($JSD$)} o paramétricamente a la distancia euclídea condicional de \textbf{Hellinger} en hiper-esferas categóricas.
+
+Para condensar este espacio métrico de similitud composicional hacia representaciones bi-dimensionales geodésicas observacionales tangibles en análisis ulterior, la metodología empleará el Escalamiento Multidimensional rígidamente (MDS parametrizado en optimización Mayorizante SMACOF para minimizar globalmente el Kruskal Stress), contraponiéndolo experimentalmente frente a embeddings difusos asintóticos como \textbf{UMAP}, buscando descifrar paralelamente el \textit{manifold} intrincado local de la red armónica preservando máxima \textit{Trustworthiness} fisiológica y continua.

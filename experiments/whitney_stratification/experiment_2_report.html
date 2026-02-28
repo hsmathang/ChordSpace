@@ -1,0 +1,411 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Experimento 2 &mdash; EB vs Hungaro en Frontera de Whitney</title>
+<script src="https://cdn.plot.ly/plotly-2.27.0.min.js"></script>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Fira+Code:wght@400;500&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.css">
+<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.js"></script>
+<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/contrib/auto-render.min.js"
+    onload="renderMathInElement(document.body, {delimiters: [{left: '$$', right: '$$', display: true}, {left: '$', right: '$', display: false}]});"></script>
+<style>
+:root { --bg:#0d1117; --sf:#161b22; --bd:#30363d; --tx:#e6edf3; --tm:#8b949e;
+         --ac:#58a6ff; --gn:#3fb950; --or:#d29922; --rd:#f85149; --pr:#bc8cff; }
+*{ margin:0; padding:0; box-sizing:border-box; }
+body{ font-family:'Inter',sans-serif; background:var(--bg); color:var(--tx); line-height:1.7; padding:2rem; }
+.c{ max-width:1100px; margin:0 auto; }
+h1{ font-size:1.7rem; font-weight:700; background:linear-gradient(135deg,var(--gn),var(--ac));
+     -webkit-background-clip:text; -webkit-text-fill-color:transparent; margin-bottom:.3rem; }
+.sub{ color:var(--tm); font-size:.9rem; margin-bottom:2rem; }
+h2{ font-size:1.2rem; font-weight:600; color:var(--ac); border-bottom:1px solid var(--bd);
+     padding-bottom:.4rem; margin:2.5rem 0 1rem; }
+h3{ font-size:1rem; font-weight:600; color:var(--gn); margin:1.5rem 0 .5rem; }
+p,li{ font-size:.9rem; }
+.cd{ background:var(--sf); border:1px solid var(--bd); border-radius:10px; padding:1.2rem; margin:1rem 0; }
+.th{ border-left:3px solid var(--gn); padding:.8rem 1rem; background:rgba(63,185,80,.06);
+      border-radius:0 8px 8px 0; margin:1rem 0; }
+.th-l{ color:var(--gn); font-weight:700; font-size:.8rem; text-transform:uppercase; letter-spacing:.05em; }
+.rp{ border-left:3px solid var(--rd); padding:.8rem 1rem; background:rgba(248,81,73,.06);
+      border-radius:0 8px 8px 0; margin:1rem 0; }
+.rp-l{ color:var(--rd); font-weight:700; font-size:.8rem; text-transform:uppercase; letter-spacing:.05em; }
+.ins{ border-left:3px solid var(--or); padding:.8rem 1rem; background:rgba(210,153,34,.06);
+       border-radius:0 8px 8px 0; margin:1rem 0; }
+.ins-l{ color:var(--or); font-weight:700; font-size:.8rem; text-transform:uppercase; letter-spacing:.05em; }
+.bg{ display:inline-block; padding:.1rem .5rem; border-radius:12px; font-size:.7rem; font-weight:600; margin-right:.4rem; }
+.bg-g{ background:rgba(63,185,80,.15); color:var(--gn); }
+.bg-r{ background:rgba(248,81,73,.15); color:var(--rd); }
+.bg-b{ background:rgba(88,166,255,.15); color:var(--ac); }
+table{ width:100%; border-collapse:collapse; font-size:.82rem; margin:.8rem 0; }
+th{ background:var(--sf); color:var(--ac); font-weight:600; padding:.5rem .6rem; text-align:left;
+     border-bottom:2px solid var(--bd); }
+td{ padding:.35rem .6rem; border-bottom:1px solid var(--bd); }
+td.num{ font-family:'Fira Code',monospace; font-size:.77rem; }
+tr:hover{ background:rgba(88,166,255,.04); }
+.ch{ border-radius:10px; overflow:hidden; margin:1.2rem 0; }
+.scr{ max-height:400px; overflow-y:auto; }
+.ft{ margin-top:2.5rem; padding-top:.8rem; border-top:1px solid var(--bd);
+      color:var(--tm); font-size:.75rem; text-align:center; }
+.tools{ background:var(--sf); border:1px solid var(--bd); border-radius:10px; padding:1rem; margin:1rem 0; }
+.tools code{ color:var(--ac); font-family:'Fira Code',monospace; font-size:.8rem; }
+.tools .src{ color:var(--tm); font-size:.75rem; }
+.comp{ display:grid; grid-template-columns:1fr 1fr; gap:1.2rem; margin:1rem 0; }
+.comp .cd{ margin:0; }
+</style>
+</head>
+<body>
+<div class="c">
+
+<h1>Experimento 2: EB vs Hungaro en la Frontera de Whitney</h1>
+<p class="sub">
+    Validacion del Axioma E0 (continuidad inter-estratos) para la Expansion Biyectiva
+    <br><span class="bg bg-g">EB: CONVERGE A 0 (E0 satisfecho)</span>
+    <span class="bg bg-r">HUNGARO: PLATEAU EN 0.25 (E0 violado)</span>
+</p>
+
+<h2>Herramientas Utilizadas</h2>
+<div class="tools">
+<table>
+<tr><td><code>d_EB()</code> (Expansion Biyectiva)</td><td class="src">DISCUSION_RIGUROSA &sect;7.1</td><td>Disimilitud sobre cociente $\mathcal{C}/\sim$, MIDI continuo ($\mathbb{R}$)</td></tr>
+<tr><td><code>step_continuous(x,y)</code></td><td class="src">metrics.py:_voice_step_cost</td><td>$\min(|x \bmod 12 - y \bmod 12|, 12 - \cdots) + 0.35 \cdot \text{registro}$</td></tr>
+<tr><td><code>step_circular_pure(x,y)</code></td><td class="src">&mdash;</td><td>$\min(|x \bmod 12 - y \bmod 12|, 12 - \cdots)$ &mdash; metrica pura en $\mathbb{R}/12\mathbb{Z}$</td></tr>
+<tr><td><code>_voice_leading_distance()</code></td><td class="src">metrics.py:190</td><td>Hungaro con gap $\gamma = 6.5$, normalizado por $1/(M\gamma)$</td></tr>
+<tr><td><code>_quintas_profile()</code></td><td class="src">metrics.py:129</td><td>Perfil suavizado del circulo de quintas, kernel $(1/4, 1/2, 1/4)$</td></tr>
+<tr><td><code>jensenshannon()</code></td><td class="src">scipy.spatial.distance</td><td>$\sqrt{\text{JSD}_2}$ sobre $\Phi_{\text{simplex}}$</td></tr>
+</table>
+<p style="color:var(--tm); font-size:.78rem; margin-top:.5rem;">Todas las funciones operan sobre MIDI continuo ($\mathbb{R}$). El parametro $t$ es un diferencial real, no entero.</p>
+</div>
+
+<h2>1. Configuracion</h2>
+<div class="cd">
+<p><strong>Acorde A</strong> $= (60.0, 64.0, 67.0)$ &mdash; Do mayor (C4-E4-G4).</p>
+<p><strong>Familia B(t)</strong> $= (60.0, 64.0, 67.0, 67.0 + t)$, $t \in \mathbb{R}^+$. Glissando continuo en el espacio log-frecuencia de Himpel.</p>
+<p><strong>Barrido:</strong> 49 valores, $t \in [0.00001, 6.0]$ semitonos.</p>
+</div>
+
+<h2>2. Resultado Principal: EB Converge, Hungaro No</h2>
+
+<div class="ch" id="mainChart"></div>
+
+<div class="comp">
+<div class="cd">
+<h3 style="color:var(--gn);">$d_{\text{EB}}$: Axioma E0 satisfecho</h3>
+<p>La Expansion Biyectiva encuentra una expansion de costo $\to 0$ porque duplica una nota de $A$ para igualar la cardinalidad, y el costo de emparejar $67.0 + t$ con $67.0$ es $\text{step}(67+t, 67) = t/K \to 0$.</p>
+$$\lim_{t \to 0^+} d_{\text{EB}}(A, B(t)) = 0 \quad \checkmark$$
+</div>
+<div class="cd">
+<h3 style="color:var(--rd);">$d_{\text{Hung}}$: Axioma E0 violado</h3>
+<p>El Hungaro exige matching biyectivo con gap padding. La voz huerfana siempre paga $\gamma$, sin importar cuan cerca este del unisono:</p>
+$$\lim_{t \to 0^+} d_{\text{Hung}}(A, B(t)) = \frac{\gamma}{4\gamma} = 0.25 \neq 0$$
+</div>
+</div>
+
+<h3>2.2 Zoom logaritmico: convergencia suave de EB</h3>
+<div class="ch" id="logChart"></div>
+
+<h3>2.3 Componentes de $d_{\mathbf{w}}$ (todas fallan)</h3>
+<div class="ch" id="compChart"></div>
+
+<div class="ins">
+<p class="ins-l">Las tres componentes de $d_{\mathbf{w}}$ tienen residuos no nulos</p>
+<p>$d_{\text{VL}} \to 0.25$ (Hungaro), $d_{\text{Q5}} \to 0.0871$ (conteo de notas), $d_{\text{JS}} \to 0.1473$ ($\binom{n}{2}$ pares). Total: $d_{\mathbf{w}} \to 0.1887 \neq 0$.</p>
+</div>
+
+<h2>3. Tabla de Datos</h2>
+<div class="scr"><table>
+<thead><tr><th>$t$ (st)</th><th>$d_{\text{EB}}$ (circular)</th><th>$d_{\text{EB}}$ (repo step)</th><th>$d_{\text{Hung}}$</th><th>$d_{\text{Q5}}$</th><th>$d_{\text{JSD}}$</th></tr></thead>
+<tbody><tr><td>6.000000</td>
+        <td class="num" style="color:var(--gn)">0.25000000</td>
+        <td class="num" style="color:var(--gn)">0.29739583</td>
+        <td class="num" style="color:var(--rd)">0.250000</td>
+        <td class="num">0.366025</td>
+        <td class="num">0.567892</td></tr><tr><td>5.500000</td>
+        <td class="num" style="color:var(--gn)">0.12500000</td>
+        <td class="num" style="color:var(--gn)">0.17057292</td>
+        <td class="num" style="color:var(--rd)">0.250000</td>
+        <td class="num">0.087095</td>
+        <td class="num">0.578429</td></tr><tr><td>5.000000</td>
+        <td class="num" style="color:var(--gn)">0.00000000</td>
+        <td class="num" style="color:var(--gn)">0.04375000</td>
+        <td class="num" style="color:var(--rd)">0.250000</td>
+        <td class="num">0.087095</td>
+        <td class="num">0.462590</td></tr><tr><td>4.500000</td>
+        <td class="num" style="color:var(--gn)">0.12500000</td>
+        <td class="num" style="color:var(--gn)">0.16692708</td>
+        <td class="num" style="color:var(--rd)">0.250000</td>
+        <td class="num">0.087095</td>
+        <td class="num">0.490558</td></tr><tr><td>4.000000</td>
+        <td class="num" style="color:var(--gn)">0.25000000</td>
+        <td class="num" style="color:var(--gn)">0.29010417</td>
+        <td class="num" style="color:var(--rd)">0.250000</td>
+        <td class="num">0.220690</td>
+        <td class="num">0.388925</td></tr><tr><td>3.500000</td>
+        <td class="num" style="color:var(--gn)">0.37500000</td>
+        <td class="num" style="color:var(--gn)">0.41328125</td>
+        <td class="num" style="color:var(--rd)">0.250000</td>
+        <td class="num">0.322616</td>
+        <td class="num">0.476841</td></tr><tr><td>3.000000</td>
+        <td class="num" style="color:var(--gn)">0.50000000</td>
+        <td class="num" style="color:var(--gn)">0.53645833</td>
+        <td class="num" style="color:var(--rd)">0.250000</td>
+        <td class="num">0.322616</td>
+        <td class="num">0.469573</td></tr><tr><td>2.500000</td>
+        <td class="num" style="color:var(--gn)">0.62500000</td>
+        <td class="num" style="color:var(--gn)">0.63411458</td>
+        <td class="num" style="color:var(--rd)">0.250000</td>
+        <td class="num">0.322616</td>
+        <td class="num">0.577275</td></tr><tr><td>2.000000</td>
+        <td class="num" style="color:var(--gn)">0.50000000</td>
+        <td class="num" style="color:var(--gn)">0.50729167</td>
+        <td class="num" style="color:var(--rd)">0.250000</td>
+        <td class="num">0.137153</td>
+        <td class="num">0.556551</td></tr><tr><td>1.500000</td>
+        <td class="num" style="color:var(--gn)">0.37500000</td>
+        <td class="num" style="color:var(--gn)">0.38046875</td>
+        <td class="num" style="color:var(--rd)">0.250000</td>
+        <td class="num">0.366025</td>
+        <td class="num">0.614667</td></tr><tr><td>1.000000</td>
+        <td class="num" style="color:var(--gn)">0.25000000</td>
+        <td class="num" style="color:var(--gn)">0.25364583</td>
+        <td class="num" style="color:var(--rd)">0.250000</td>
+        <td class="num">0.366025</td>
+        <td class="num">0.551295</td></tr><tr><td>0.900000</td>
+        <td class="num" style="color:var(--gn)">0.22500000</td>
+        <td class="num" style="color:var(--gn)">0.22828125</td>
+        <td class="num" style="color:var(--rd)">0.250000</td>
+        <td class="num">0.366025</td>
+        <td class="num">0.559960</td></tr><tr><td>0.800000</td>
+        <td class="num" style="color:var(--gn)">0.20000000</td>
+        <td class="num" style="color:var(--gn)">0.20291667</td>
+        <td class="num" style="color:var(--rd)">0.250000</td>
+        <td class="num">0.366025</td>
+        <td class="num">0.562448</td></tr><tr><td>0.700000</td>
+        <td class="num" style="color:var(--gn)">0.17500000</td>
+        <td class="num" style="color:var(--gn)">0.17755208</td>
+        <td class="num" style="color:var(--rd)">0.250000</td>
+        <td class="num">0.366025</td>
+        <td class="num">0.560962</td></tr><tr><td>0.600000</td>
+        <td class="num" style="color:var(--gn)">0.15000000</td>
+        <td class="num" style="color:var(--gn)">0.15218750</td>
+        <td class="num" style="color:var(--rd)">0.250000</td>
+        <td class="num">0.366025</td>
+        <td class="num">0.558154</td></tr><tr><td>0.500000</td>
+        <td class="num" style="color:var(--gn)">0.12500000</td>
+        <td class="num" style="color:var(--gn)">0.12682292</td>
+        <td class="num" style="color:var(--rd)">0.250000</td>
+        <td class="num">0.366025</td>
+        <td class="num">0.552501</td></tr><tr><td>0.400000</td>
+        <td class="num" style="color:var(--gn)">0.10000000</td>
+        <td class="num" style="color:var(--gn)">0.10145833</td>
+        <td class="num" style="color:var(--rd)">0.250000</td>
+        <td class="num">0.087095</td>
+        <td class="num">0.456470</td></tr><tr><td>0.300000</td>
+        <td class="num" style="color:var(--gn)">0.07500000</td>
+        <td class="num" style="color:var(--gn)">0.07609375</td>
+        <td class="num" style="color:var(--rd)">0.250000</td>
+        <td class="num">0.087095</td>
+        <td class="num">0.438656</td></tr><tr><td>0.200000</td>
+        <td class="num" style="color:var(--gn)">0.05000000</td>
+        <td class="num" style="color:var(--gn)">0.05072917</td>
+        <td class="num" style="color:var(--rd)">0.250000</td>
+        <td class="num">0.087095</td>
+        <td class="num">0.405591</td></tr><tr><td>0.100000</td>
+        <td class="num" style="color:var(--gn)">0.02500000</td>
+        <td class="num" style="color:var(--gn)">0.02536458</td>
+        <td class="num" style="color:var(--rd)">0.250000</td>
+        <td class="num">0.087095</td>
+        <td class="num">0.335843</td></tr><tr><td>0.090000</td>
+        <td class="num" style="color:var(--gn)">0.02250000</td>
+        <td class="num" style="color:var(--gn)">0.02282813</td>
+        <td class="num" style="color:var(--rd)">0.250000</td>
+        <td class="num">0.087095</td>
+        <td class="num">0.325229</td></tr><tr><td>0.080000</td>
+        <td class="num" style="color:var(--gn)">0.02000000</td>
+        <td class="num" style="color:var(--gn)">0.02029167</td>
+        <td class="num" style="color:var(--rd)">0.250000</td>
+        <td class="num">0.087095</td>
+        <td class="num">0.313633</td></tr><tr><td>0.070000</td>
+        <td class="num" style="color:var(--gn)">0.01750000</td>
+        <td class="num" style="color:var(--gn)">0.01775521</td>
+        <td class="num" style="color:var(--rd)">0.250000</td>
+        <td class="num">0.087095</td>
+        <td class="num">0.300885</td></tr><tr><td>0.060000</td>
+        <td class="num" style="color:var(--gn)">0.01500000</td>
+        <td class="num" style="color:var(--gn)">0.01521875</td>
+        <td class="num" style="color:var(--rd)">0.250000</td>
+        <td class="num">0.087095</td>
+        <td class="num">0.286768</td></tr><tr><td>0.050000</td>
+        <td class="num" style="color:var(--gn)">0.01250000</td>
+        <td class="num" style="color:var(--gn)">0.01268229</td>
+        <td class="num" style="color:var(--rd)">0.250000</td>
+        <td class="num">0.087095</td>
+        <td class="num">0.270993</td></tr><tr><td>0.040000</td>
+        <td class="num" style="color:var(--gn)">0.01000000</td>
+        <td class="num" style="color:var(--gn)">0.01014583</td>
+        <td class="num" style="color:var(--rd)">0.250000</td>
+        <td class="num">0.087095</td>
+        <td class="num">0.253163</td></tr><tr><td>0.030000</td>
+        <td class="num" style="color:var(--gn)">0.00750000</td>
+        <td class="num" style="color:var(--gn)">0.00760938</td>
+        <td class="num" style="color:var(--rd)">0.250000</td>
+        <td class="num">0.087095</td>
+        <td class="num">0.232695</td></tr><tr><td>0.020000</td>
+        <td class="num" style="color:var(--gn)">0.00500000</td>
+        <td class="num" style="color:var(--gn)">0.00507292</td>
+        <td class="num" style="color:var(--rd)">0.250000</td>
+        <td class="num">0.087095</td>
+        <td class="num">0.208680</td></tr><tr><td>0.010000</td>
+        <td class="num" style="color:var(--gn)">0.00250000</td>
+        <td class="num" style="color:var(--gn)">0.00253646</td>
+        <td class="num" style="color:var(--rd)">0.250000</td>
+        <td class="num">0.087095</td>
+        <td class="num">0.181201</td></tr><tr><td>0.009000</td>
+        <td class="num" style="color:var(--gn)">0.00225000</td>
+        <td class="num" style="color:var(--gn)">0.00228281</td>
+        <td class="num" style="color:var(--rd)">0.250000</td>
+        <td class="num">0.087095</td>
+        <td class="num">0.178159</td></tr><tr><td>0.008000</td>
+        <td class="num" style="color:var(--gn)">0.00200000</td>
+        <td class="num" style="color:var(--gn)">0.00202917</td>
+        <td class="num" style="color:var(--rd)">0.250000</td>
+        <td class="num">0.087095</td>
+        <td class="num">0.175051</td></tr><tr><td>0.007000</td>
+        <td class="num" style="color:var(--gn)">0.00175000</td>
+        <td class="num" style="color:var(--gn)">0.00177552</td>
+        <td class="num" style="color:var(--rd)">0.250000</td>
+        <td class="num">0.087095</td>
+        <td class="num">0.171872</td></tr><tr><td>0.006000</td>
+        <td class="num" style="color:var(--gn)">0.00150000</td>
+        <td class="num" style="color:var(--gn)">0.00152188</td>
+        <td class="num" style="color:var(--rd)">0.250000</td>
+        <td class="num">0.087095</td>
+        <td class="num">0.168620</td></tr><tr><td>0.005000</td>
+        <td class="num" style="color:var(--gn)">0.00125000</td>
+        <td class="num" style="color:var(--gn)">0.00126823</td>
+        <td class="num" style="color:var(--rd)">0.250000</td>
+        <td class="num">0.087095</td>
+        <td class="num">0.165290</td></tr><tr><td>0.004000</td>
+        <td class="num" style="color:var(--gn)">0.00100000</td>
+        <td class="num" style="color:var(--gn)">0.00101458</td>
+        <td class="num" style="color:var(--rd)">0.250000</td>
+        <td class="num">0.087095</td>
+        <td class="num">0.161876</td></tr><tr><td>0.003000</td>
+        <td class="num" style="color:var(--gn)">0.00075000</td>
+        <td class="num" style="color:var(--gn)">0.00076094</td>
+        <td class="num" style="color:var(--rd)">0.250000</td>
+        <td class="num">0.087095</td>
+        <td class="num">0.158372</td></tr><tr><td>0.002000</td>
+        <td class="num" style="color:var(--gn)">0.00050000</td>
+        <td class="num" style="color:var(--gn)">0.00050729</td>
+        <td class="num" style="color:var(--rd)">0.250000</td>
+        <td class="num">0.087095</td>
+        <td class="num">0.154774</td></tr><tr><td>0.001000</td>
+        <td class="num" style="color:var(--gn)">0.00025000</td>
+        <td class="num" style="color:var(--gn)">0.00025365</td>
+        <td class="num" style="color:var(--rd)">0.250000</td>
+        <td class="num">0.087095</td>
+        <td class="num">0.151073</td></tr><tr><td>0.000900</td>
+        <td class="num" style="color:var(--gn)">0.00022500</td>
+        <td class="num" style="color:var(--gn)">0.00022828</td>
+        <td class="num" style="color:var(--rd)">0.250000</td>
+        <td class="num">0.087095</td>
+        <td class="num">0.150697</td></tr><tr><td>0.000800</td>
+        <td class="num" style="color:var(--gn)">0.00020000</td>
+        <td class="num" style="color:var(--gn)">0.00020292</td>
+        <td class="num" style="color:var(--rd)">0.250000</td>
+        <td class="num">0.087095</td>
+        <td class="num">0.150320</td></tr><tr><td>0.000700</td>
+        <td class="num" style="color:var(--gn)">0.00017500</td>
+        <td class="num" style="color:var(--gn)">0.00017755</td>
+        <td class="num" style="color:var(--rd)">0.250000</td>
+        <td class="num">0.087095</td>
+        <td class="num">0.149942</td></tr><tr><td>0.000600</td>
+        <td class="num" style="color:var(--gn)">0.00015000</td>
+        <td class="num" style="color:var(--gn)">0.00015219</td>
+        <td class="num" style="color:var(--rd)">0.250000</td>
+        <td class="num">0.087095</td>
+        <td class="num">0.149562</td></tr><tr><td>0.000500</td>
+        <td class="num" style="color:var(--gn)">0.00012500</td>
+        <td class="num" style="color:var(--gn)">0.00012682</td>
+        <td class="num" style="color:var(--rd)">0.250000</td>
+        <td class="num">0.087095</td>
+        <td class="num">0.149182</td></tr><tr><td>0.000400</td>
+        <td class="num" style="color:var(--gn)">0.00010000</td>
+        <td class="num" style="color:var(--gn)">0.00010146</td>
+        <td class="num" style="color:var(--rd)">0.250000</td>
+        <td class="num">0.087095</td>
+        <td class="num">0.148800</td></tr><tr><td>0.000300</td>
+        <td class="num" style="color:var(--gn)">0.00007500</td>
+        <td class="num" style="color:var(--gn)">0.00007609</td>
+        <td class="num" style="color:var(--rd)">0.250000</td>
+        <td class="num">0.087095</td>
+        <td class="num">0.148418</td></tr><tr><td>0.000200</td>
+        <td class="num" style="color:var(--gn)">0.00005000</td>
+        <td class="num" style="color:var(--gn)">0.00005073</td>
+        <td class="num" style="color:var(--rd)">0.250000</td>
+        <td class="num">0.087095</td>
+        <td class="num">0.148034</td></tr><tr><td>0.000100</td>
+        <td class="num" style="color:var(--gn)">0.00002500</td>
+        <td class="num" style="color:var(--gn)">0.00002536</td>
+        <td class="num" style="color:var(--rd)">0.250000</td>
+        <td class="num">0.087095</td>
+        <td class="num">0.147648</td></tr><tr><td>0.000050</td>
+        <td class="num" style="color:var(--gn)">0.00001250</td>
+        <td class="num" style="color:var(--gn)">0.00001268</td>
+        <td class="num" style="color:var(--rd)">0.250000</td>
+        <td class="num">0.087095</td>
+        <td class="num">0.147455</td></tr><tr><td>0.000010</td>
+        <td class="num" style="color:var(--gn)">0.00000250</td>
+        <td class="num" style="color:var(--gn)">0.00000254</td>
+        <td class="num" style="color:var(--rd)">0.250000</td>
+        <td class="num">0.087095</td>
+        <td class="num">0.147301</td></tr></tbody>
+</table></div>
+
+<h2>4. Conclusion</h2>
+<div class="th">
+<p class="th-l">Resultado principal</p>
+<p>La <strong>Expansion Biyectiva</strong> es la primera implementacion computacional del repositorio que respeta la continuidad inter-estratos (E0) en el espacio estratificado de Himpel/Tymoczko. Converge suavemente a 0 en MIDI continuo ($\mathbb{R}$), validando la propiedad clave del cociente $\mathcal{C}/\sim$.</p>
+<p>El Hungaro queda descartado para comparaciones inter-estrato. La metrica compuesta $d_{\mathbf{w}}$ hereda la discontinuidad de sus tres componentes.</p>
+</div>
+
+<div class="ft">
+    Generado: 2026-02-22 22:54 &middot; ChordSpace &middot;
+    <code>experiments/whitney_stratification/run_experiment_2.py</code>
+</div>
+
+</div>
+<script>
+const t=[6.0, 5.5, 5.0, 4.5, 4.0, 3.5, 3.0, 2.5, 2.0, 1.5, 1.0, 0.9, 0.8, 0.7, 0.6, 0.5, 0.4, 0.3, 0.2, 0.1, 0.09, 0.08, 0.07, 0.06, 0.05, 0.04, 0.03, 0.02, 0.01, 0.009, 0.008, 0.007, 0.006, 0.005, 0.004, 0.003, 0.002, 0.001, 0.0009, 0.0008, 0.0007, 0.0006, 0.0005, 0.0004, 0.0003, 0.0002, 0.0001, 5e-05, 1e-05];
+const L={paper_bgcolor:'#0d1117',plot_bgcolor:'#161b22',font:{family:'Inter',color:'#e6edf3',size:13},
+  xaxis:{gridcolor:'#30363d',zerolinecolor:'#30363d'},yaxis:{gridcolor:'#30363d',zerolinecolor:'#30363d'},
+  legend:{bgcolor:'rgba(22,27,34,0.9)',bordercolor:'#30363d',borderwidth:1},margin:{l:65,r:30,t:45,b:50}};
+
+Plotly.newPlot('mainChart',[
+  {x:t,y:[0.25, 0.125, 0.0, 0.125, 0.25, 0.375, 0.5, 0.625, 0.5, 0.375, 0.25, 0.22500000000000142, 0.1999999999999993, 0.1750000000000007, 0.14999999999999858, 0.125, 0.10000000000000142, 0.07499999999999929, 0.05000000000000071, 0.02499999999999858, 0.022500000000000853, 0.019999999999999574, 0.017499999999998295, 0.015000000000000568, 0.01249999999999929, 0.010000000000001563, 0.007500000000000284, 0.004999999999999005, 0.002500000000001279, 0.0022500000000000853, 0.0019999999999988916, 0.0017500000000012506, 0.0015000000000000568, 0.0012499999999988631, 0.0010000000000012221, 0.0007500000000000284, 0.0004999999999988347, 0.0002500000000011937, 0.0002250000000003638, 0.00019999999999953388, 0.00017499999999870397, 0.00015000000000142677, 0.00012500000000059686, 9.999999999976694e-05, 7.499999999893703e-05, 5.000000000165983e-05, 2.5000000000829914e-05, 1.2500000000414957e-05, 2.500000000793534e-06],name:'d_EB (circular puro)',line:{color:'#3fb950',width:3}},
+  {x:t,y:[0.2973958333333333, 0.17057291666666666, 0.04375, 0.16692708333333334, 0.29010416666666666, 0.41328125, 0.5364583333333334, 0.6341145833333334, 0.5072916666666667, 0.38046875, 0.25364583333333335, 0.22828125000000143, 0.20291666666666594, 0.17755208333333405, 0.15218749999999856, 0.12682291666666667, 0.10145833333333477, 0.07609374999999928, 0.05072916666666739, 0.025364583333331893, 0.022828125000000865, 0.020291666666666233, 0.017755208333331603, 0.015218750000000577, 0.012682291666665946, 0.010145833333334919, 0.007609375000000289, 0.005072916666665658, 0.002536458333334631, 0.0022828125000000864, 0.002029166666665542, 0.0017755208333346021, 0.0015218750000000577, 0.0012682291666655133, 0.0010145833333345734, 0.0007609375000000288, 0.0005072916666654844, 0.0002536458333345445, 0.0002282812500003691, 0.00020291666666619375, 0.0001775520833320184, 0.00015218750000144758, 0.00012682291666727224, 0.00010145833333309687, 7.609374999892152e-05, 5.07291666683507e-05, 2.536458333417535e-05, 1.2682291667087675e-05, 2.53645833413844e-06],name:'d_EB (step repo)',line:{color:'#58a6ff',width:2.5}},
+  {x:t,y:[0.25, 0.25, 0.25, 0.25, 0.25, 0.25, 0.25, 0.25, 0.25, 0.25, 0.25, 0.25, 0.25, 0.25, 0.25, 0.25, 0.25, 0.25, 0.25, 0.25, 0.25, 0.25, 0.25, 0.25, 0.25, 0.25, 0.25, 0.25, 0.25, 0.25, 0.25, 0.25, 0.25, 0.25, 0.25, 0.25, 0.25, 0.25, 0.25, 0.25, 0.25, 0.25, 0.25, 0.25, 0.25, 0.25, 0.25, 0.25, 0.25],name:'d_Hung (Hungarian)',line:{color:'#f85149',width:3}},
+  {x:[t[0],t[t.length-1]],y:[0,0],name:'Whitney (d=0)',line:{color:'#d29922',width:1.5,dash:'dot'},mode:'lines'},
+],{...L,title:{text:'EB vs Hungaro: Convergencia en la Frontera de Whitney',font:{size:15}},
+  xaxis:{...L.xaxis,title:'t (semitonos)',autorange:'reversed'},
+  yaxis:{...L.yaxis,title:'Distancia'}});
+
+const tlog=t.filter(v=>v>0);
+Plotly.newPlot('logChart',[
+  {x:tlog,y:[0.25, 0.125, 0.0, 0.125, 0.25, 0.375, 0.5, 0.625, 0.5, 0.375, 0.25, 0.22500000000000142, 0.1999999999999993, 0.1750000000000007, 0.14999999999999858, 0.125, 0.10000000000000142, 0.07499999999999929, 0.05000000000000071, 0.02499999999999858, 0.022500000000000853, 0.019999999999999574, 0.017499999999998295, 0.015000000000000568, 0.01249999999999929, 0.010000000000001563, 0.007500000000000284, 0.004999999999999005, 0.002500000000001279, 0.0022500000000000853, 0.0019999999999988916, 0.0017500000000012506, 0.0015000000000000568, 0.0012499999999988631, 0.0010000000000012221, 0.0007500000000000284, 0.0004999999999988347, 0.0002500000000011937, 0.0002250000000003638, 0.00019999999999953388, 0.00017499999999870397, 0.00015000000000142677, 0.00012500000000059686, 9.999999999976694e-05, 7.499999999893703e-05, 5.000000000165983e-05, 2.5000000000829914e-05, 1.2500000000414957e-05, 2.500000000793534e-06].filter((_,i)=>t[i]>0),name:'d_EB (circular)',line:{color:'#3fb950',width:3},mode:'lines+markers',marker:{size:4}},
+  {x:tlog,y:[0.2973958333333333, 0.17057291666666666, 0.04375, 0.16692708333333334, 0.29010416666666666, 0.41328125, 0.5364583333333334, 0.6341145833333334, 0.5072916666666667, 0.38046875, 0.25364583333333335, 0.22828125000000143, 0.20291666666666594, 0.17755208333333405, 0.15218749999999856, 0.12682291666666667, 0.10145833333333477, 0.07609374999999928, 0.05072916666666739, 0.025364583333331893, 0.022828125000000865, 0.020291666666666233, 0.017755208333331603, 0.015218750000000577, 0.012682291666665946, 0.010145833333334919, 0.007609375000000289, 0.005072916666665658, 0.002536458333334631, 0.0022828125000000864, 0.002029166666665542, 0.0017755208333346021, 0.0015218750000000577, 0.0012682291666655133, 0.0010145833333345734, 0.0007609375000000288, 0.0005072916666654844, 0.0002536458333345445, 0.0002282812500003691, 0.00020291666666619375, 0.0001775520833320184, 0.00015218750000144758, 0.00012682291666727224, 0.00010145833333309687, 7.609374999892152e-05, 5.07291666683507e-05, 2.536458333417535e-05, 1.2682291667087675e-05, 2.53645833413844e-06].filter((_,i)=>t[i]>0),name:'d_EB (repo)',line:{color:'#58a6ff',width:2.5},mode:'lines+markers',marker:{size:4}},
+  {x:tlog,y:[0.25, 0.25, 0.25, 0.25, 0.25, 0.25, 0.25, 0.25, 0.25, 0.25, 0.25, 0.25, 0.25, 0.25, 0.25, 0.25, 0.25, 0.25, 0.25, 0.25, 0.25, 0.25, 0.25, 0.25, 0.25, 0.25, 0.25, 0.25, 0.25, 0.25, 0.25, 0.25, 0.25, 0.25, 0.25, 0.25, 0.25, 0.25, 0.25, 0.25, 0.25, 0.25, 0.25, 0.25, 0.25, 0.25, 0.25, 0.25, 0.25].filter((_,i)=>t[i]>0),name:'d_Hung',line:{color:'#f85149',width:3}},
+],{...L,title:{text:'Escala log: EB converge suavemente a 0',font:{size:15}},
+  xaxis:{...L.xaxis,title:'t (semitonos)',type:'log',autorange:'reversed'},
+  yaxis:{...L.yaxis,title:'Distancia'}});
+
+Plotly.newPlot('compChart',[
+  {x:t,y:[0.25, 0.25, 0.25, 0.25, 0.25, 0.25, 0.25, 0.25, 0.25, 0.25, 0.25, 0.25, 0.25, 0.25, 0.25, 0.25, 0.25, 0.25, 0.25, 0.25, 0.25, 0.25, 0.25, 0.25, 0.25, 0.25, 0.25, 0.25, 0.25, 0.25, 0.25, 0.25, 0.25, 0.25, 0.25, 0.25, 0.25, 0.25, 0.25, 0.25, 0.25, 0.25, 0.25, 0.25, 0.25, 0.25, 0.25, 0.25, 0.25],name:'d_VL (Hungaro)',line:{color:'#f85149',width:2.5}},
+  {x:t,y:[0.36602540378443865, 0.08709484458361717, 0.08709484458361717, 0.08709484458361717, 0.22069039821667397, 0.32261634683986307, 0.32261634683986307, 0.32261634683986307, 0.13715306375641634, 0.36602540378443865, 0.36602540378443865, 0.36602540378443865, 0.36602540378443865, 0.36602540378443865, 0.36602540378443865, 0.36602540378443865, 0.08709484458361717, 0.08709484458361717, 0.08709484458361717, 0.08709484458361717, 0.08709484458361717, 0.08709484458361717, 0.08709484458361717, 0.08709484458361717, 0.08709484458361717, 0.08709484458361717, 0.08709484458361717, 0.08709484458361717, 0.08709484458361717, 0.08709484458361717, 0.08709484458361717, 0.08709484458361717, 0.08709484458361717, 0.08709484458361717, 0.08709484458361717, 0.08709484458361717, 0.08709484458361717, 0.08709484458361717, 0.08709484458361717, 0.08709484458361717, 0.08709484458361717, 0.08709484458361717, 0.08709484458361717, 0.08709484458361717, 0.08709484458361717, 0.08709484458361717, 0.08709484458361717, 0.08709484458361717, 0.08709484458361717],name:'d_Q5 (Quintas)',line:{color:'#3fb950',width:2.5}},
+  {x:t,y:[0.5678917127946148, 0.5784286860415775, 0.46258953084017795, 0.4905579414371659, 0.3889254567006216, 0.47684144343010537, 0.4695733859420726, 0.5772748863333373, 0.5565512290970368, 0.6146674572570382, 0.5512947208912188, 0.5599596877773692, 0.5624475916132357, 0.5609619519680541, 0.5581536397633473, 0.5525006059293884, 0.4564703461774302, 0.4386555695567122, 0.4055912985919755, 0.3358426877820715, 0.32522928859521644, 0.3136327408015056, 0.30088457731142587, 0.2867676115865994, 0.27099322068516896, 0.2531625584713494, 0.2326948715059662, 0.2086799263490508, 0.18120137498090835, 0.17815898253738038, 0.17505055060634023, 0.17187232589484222, 0.16862018764569636, 0.16528959431814783, 0.16187551985342663, 0.15837237692092937, 0.15477392373347162, 0.15107314990835, 0.15069714872371187, 0.15032003755382836, 0.14994180782037675, 0.14956245083319292, 0.14918195778803736, 0.14880031976474262, 0.14841752772487152, 0.14803357250958676, 0.14764844483711306, 0.1474554383948095, 0.14730081970902886],name:'d_JS (Rugosidad)',line:{color:'#d29922',width:2.5}},
+  {x:t,y:[0.3425846935050326, 0.2749594483542198, 0.2517916173139399, 0.2573852994333375, 0.27045769089429283, 0.3135223753959869, 0.3120687638983803, 0.33360906397663326, 0.2830985117585115, 0.3519398423975173, 0.33926529512435344, 0.3409982885015835, 0.3414958692687568, 0.3411987413397205, 0.34063707889877914, 0.33950647213198737, 0.2505677803813904, 0.24700482505724675, 0.24039197086429942, 0.2264422487023186, 0.22431956886494758, 0.22200025930620543, 0.21945062660818948, 0.21662723346322418, 0.2134723552829381, 0.20990622284017418, 0.20581268544709755, 0.20100969641571448, 0.19551398614208598, 0.19490550765338038, 0.19428382126717236, 0.19364817632487275, 0.19299774867504357, 0.19233163000953388, 0.19164881511658963, 0.19094818653009019, 0.19022849589259863, 0.1894883411275743, 0.18941314089064668, 0.18933771865666998, 0.18926207270997966, 0.18918620131254288, 0.18911010270351178, 0.18903377509885283, 0.18895721669087862, 0.18888042564782165, 0.1888034001133269, 0.18876479882486621, 0.18873387508771008],name:'d_w (Compuesta)',line:{color:'#bc8cff',width:3}},
+],{...L,title:{text:'Componentes de d_w: todas fallan E0',font:{size:15}},
+  xaxis:{...L.xaxis,title:'t (semitonos)',autorange:'reversed'},
+  yaxis:{...L.yaxis,title:'Distancia'}});
+</script>
+</body></html>

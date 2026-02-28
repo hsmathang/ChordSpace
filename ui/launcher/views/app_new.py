@@ -363,7 +363,7 @@ class ExperimentLauncher(tk.Tk):
             "metadata": tk.BooleanVar(value=True),
         }
         self.audio_enabled_var = tk.BooleanVar(value=False)
-        self.instructional_enabled_var = tk.BooleanVar(value=False)
+        self.skip_html_report_var = tk.BooleanVar(value=False)
 
     # --- UI Building (similar to original but using extracted widgets where possible) ---
 
@@ -477,8 +477,16 @@ class ExperimentLauncher(tk.Tk):
         sections_frame.grid(row=3, column=0, sticky="nwe", pady=(8, 0))
         self._build_report_sections_frame(sections_frame)
 
+        output_mode_frame = ttk.LabelFrame(compare_container, text="Salida")
+        output_mode_frame.grid(row=4, column=0, sticky="nwe", pady=(8, 0))
+        ttk.Checkbutton(
+            output_mode_frame,
+            text="Sin unificar reporte HTML (solo plots/imágenes y tablas separadas)",
+            variable=self.skip_html_report_var,
+        ).grid(row=0, column=0, sticky="w", padx=6, pady=6)
+
         exp_actions = ttk.Frame(compare_container)
-        exp_actions.grid(row=4, column=0, sticky="w", pady=(8, 0))
+        exp_actions.grid(row=5, column=0, sticky="w", pady=(8, 0))
         self.run_button = ttk.Button(exp_actions, text="Generar visualización", command=self._on_visualize_clicked)
         self.run_button.pack(side=tk.LEFT)
         self.compare_open_folder_button = ttk.Button(exp_actions, text="Abrir carpeta", command=self._on_compare_open_folder_clicked, state=tk.DISABLED)
@@ -495,7 +503,7 @@ class ExperimentLauncher(tk.Tk):
         compare_log_frame.rowconfigure(0, weight=1)
         self.compare_log = ScrolledText(compare_log_frame, height=8, state=tk.DISABLED, font=("Consolas", 10))
         self.compare_log.grid(row=0, column=0, sticky="nsew", padx=4, pady=4)
-        compare_container.rowconfigure(5, weight=1)
+        compare_container.rowconfigure(6, weight=1)
 
         log_frame = ttk.LabelFrame(main, text="Registro global")
         log_frame.pack(fill=tk.BOTH, expand=True, pady=(8, 0))
@@ -679,8 +687,6 @@ class ExperimentLauncher(tk.Tk):
         ttk.Separator(frame, orient="horizontal").grid(row=row, column=0, sticky="ew", pady=8)
         row += 1
         ttk.Checkbutton(frame, text="Incluir reproducción de audio (experimental)", variable=self.audio_enabled_var).grid(row=row, column=0, sticky="w", pady=2)
-        row += 1
-        ttk.Checkbutton(frame, text="Mostrar instructivo para músicos y usuarios no expertos", variable=self.instructional_enabled_var).grid(row=row, column=0, sticky="w", pady=2)
 
     def _build_compare_frame(self, frame: ttk.Frame) -> None:
         params = ttk.Frame(frame)
@@ -794,7 +800,7 @@ class ExperimentLauncher(tk.Tk):
         vis_config = VisualizationConfig(
             sections=self._sections_arg().split(",") if self._sections_arg() != "all" else ["all"],
             audio=AudioConfig(enabled=self.audio_enabled_var.get()),
-            instructional_mode=self.instructional_enabled_var.get()
+            skip_html_report=self.skip_html_report_var.get(),
         )
         experiment_config = ExperimentConfig(
             population=pop_config, roughness=rough_config, reduction=red_config, execution=exec_config, name="gui_experiment"

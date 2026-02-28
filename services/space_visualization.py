@@ -31,6 +31,7 @@ from tools.compare_proposals import (
     METRIC_INFO
 )
 from tools.reporting import render_report_html
+from tools.reporting.utils import compute_rank
 
 
 def midi_to_freqs(notes: List[int]) -> List[float]:
@@ -104,6 +105,106 @@ def build_audio_descriptors(result: ExperimentResult) -> Dict[str, Any]:
 
 
 class VisualizationService:
+    @staticmethod
+    def _slugify_filename(name: str) -> str:
+        slug = re.sub(r"[^A-Za-z0-9]+", "_", name).strip("_")
+        return slug or "figure"
+
+    def _export_split_artifacts(
+        self,
+        result: ExperimentResult,
+        figures: List[Tuple[str, go.Figure]],
+        *,
+        sections_enabled: Dict[str, bool],
+        logger: Optional[Callable[[str], None]] = None,
+    ) -> Path:
+        if result.output_path is None:
+            raise ValueError("ExperimentResult must have an output_path to export artifacts.")
+
+        output_dir = result.output_path
+        plots_dir = output_dir / "plots"
+        tables_dir = output_dir / "tables"
+        plots_dir.mkdir(parents=True, exist_ok=True)
+        tables_dir.mkdir(parents=True, exist_ok=True)
+
+        include_section = lambda key, default=True: bool(sections_enabled.get(key, default))
+        manifest: Dict[str, Any] = {"plots": [], "tables": []}
+
+        if include_section("table", True) and result.metrics_df is not None and not result.metrics_df.empty:
+            ranked_df = result.metrics_df.copy()
+            ranked_df["rank"] = compute_rank(ranked_df)
+            ranked_df.sort_values(by=["rank"], inplace=True)
+            ranked_csv_path = tables_dir / "metrics_ranked.csv"
+            ranked_json_path = tables_dir / "metrics_ranked.json"
+            ranked_df.to_csv(ranked_csv_path, index=False)
+            ranked_df.to_json(ranked_json_path, orient="records", indent=2)
+            manifest["tables"].append({"name": "metrics_ranked", "csv": str(ranked_csv_path.name), "json": str(ranked_json_path.name)})
+
+        run_metadata = result.config.population.metadata or {}
+        if include_section("metadata", True) and isinstance(run_metadata, dict) and run_metadata:
+            metadata_path = tables_dir / "run_metadata.json"
+            metadata_path.write_text(json.dumps(run_metadata, indent=2, ensure_ascii=False), encoding="utf-8")
+            manifest["tables"].append({"name": "run_metadata", "json": str(metadata_path.name)})
+
+        exported = 0
+        skipped_png = 0
+        seen: Dict[str, int] = {}
+        scatter_prefixes = ("raw_total", "pair_exp", "types_exp")
+        for title, fig in figures:
+            if fig is None:
+                continue
+
+            if "||" in title:
+                _, suffix = title.split("||", 1)
+            else:
+                suffix = "raw_total"
+            suffix_l = suffix.lower()
+
+            should_export = False
+            if suffix_l.startswith(scatter_prefixes):
+                should_export = include_section("scatter", True)
+            elif suffix_l == "heatmap":
+                should_export = include_section("heatmap", True)
+            elif suffix_l == "shepard":
+                should_export = include_section("shepard", True)
+            else:
+                should_export = include_section("scatter", True)
+
+            if not should_export:
+                continue
+
+            base_slug = self._slugify_filename(title)
+            seen[base_slug] = seen.get(base_slug, 0) + 1
+            slug = base_slug if seen[base_slug] == 1 else f"{base_slug}_{seen[base_slug]}"
+            html_path = plots_dir / f"{slug}.html"
+            png_path = plots_dir / f"{slug}.png"
+
+            fig.write_html(str(html_path), include_plotlyjs="cdn", full_html=True)
+            plot_entry: Dict[str, Any] = {"title": title, "html": str(Path("plots") / html_path.name)}
+
+            try:
+                fig.write_image(str(png_path))
+                plot_entry["png"] = str(Path("plots") / png_path.name)
+            except Exception:
+                skipped_png += 1
+
+            manifest["plots"].append(plot_entry)
+            exported += 1
+
+        manifest_path = output_dir / "plots_manifest.json"
+        manifest_path.write_text(json.dumps(manifest, indent=2, ensure_ascii=False), encoding="utf-8")
+
+        if logger:
+            logger(f"[visualizacion] modo separado: {exported} plots exportados en {plots_dir}")
+            logger(f"[visualizacion] tablas exportadas en {tables_dir}")
+            if skipped_png:
+                logger(
+                    "[visualizacion] algunas imagenes PNG no se exportaron "
+                    "(falta dependencia de exportacion estatica); se mantuvieron los HTML."
+                )
+            logger(f"[visualizacion] manifiesto: {manifest_path}")
+
+        return manifest_path
 
     def generate_report(self, result: ExperimentResult, config: VisualizationConfig) -> Path:
         """
@@ -186,6 +287,16 @@ class VisualizationService:
             sections_enabled=sections_enabled,
             logger=logger,
         )
+
+        if config.skip_html_report:
+            if logger:
+                logger("[visualizacion] opcion activa: sin unificar reporte HTML.")
+            return self._export_split_artifacts(
+                result,
+                figures,
+                sections_enabled=sections_enabled,
+                logger=logger,
+            )
 
         # 4. Prepare Heatmap Data for JS (if eligible)
         heatmap_data: Optional[Dict[str, Any]] = None

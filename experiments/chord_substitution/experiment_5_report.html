@@ -1,0 +1,160 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Experimento 5 &mdash; MDS/UMAP Embedding Quality</title>
+<script src="https://cdn.plot.ly/plotly-2.27.0.min.js"></script>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Fira+Code:wght@400;500&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.css">
+<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.js"></script>
+<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/contrib/auto-render.min.js"
+    onload="renderMathInElement(document.body, {delimiters: [{left: '$$', right: '$$', display: true}, {left: '$', right: '$', display: false}]});"></script>
+<style>
+:root { --bg:#0d1117; --sf:#161b22; --bd:#30363d; --tx:#e6edf3; --tm:#8b949e;
+         --ac:#58a6ff; --gn:#3fb950; --or:#d29922; --rd:#f85149; --pr:#bc8cff; }
+*{ margin:0; padding:0; box-sizing:border-box; }
+body{ font-family:'Inter',sans-serif; background:var(--bg); color:var(--tx); line-height:1.7; padding:2rem; }
+.c{ max-width:1100px; margin:0 auto; }
+h1{ font-size:1.7rem; font-weight:700; background:linear-gradient(135deg,var(--ac),var(--pr));
+     -webkit-background-clip:text; -webkit-text-fill-color:transparent; margin-bottom:.3rem; }
+.sub{ color:var(--tm); font-size:.9rem; margin-bottom:2rem; }
+h2{ font-size:1.2rem; font-weight:600; color:var(--ac); border-bottom:1px solid var(--bd);
+     padding-bottom:.4rem; margin:2.5rem 0 1rem; }
+p,li{ font-size:.9rem; }
+.cd{ background:var(--sf); border:1px solid var(--bd); border-radius:10px; padding:1.2rem; margin:1rem 0; }
+.th{ border-left:3px solid var(--gn); padding:.8rem 1rem; background:rgba(63,185,80,.06);
+      border-radius:0 8px 8px 0; margin:1rem 0; }
+.th-l{ color:var(--gn); font-weight:700; font-size:.8rem; text-transform:uppercase; letter-spacing:.05em; }
+.ins{ border-left:3px solid var(--or); padding:.8rem 1rem; background:rgba(210,153,34,.06);
+       border-radius:0 8px 8px 0; margin:1rem 0; }
+.ins-l{ color:var(--or); font-weight:700; font-size:.8rem; text-transform:uppercase; letter-spacing:.05em; }
+.bg{ display:inline-block; padding:.1rem .5rem; border-radius:12px; font-size:.7rem; font-weight:600; margin-right:.4rem; }
+.bg-g{ background:rgba(63,185,80,.15); color:var(--gn); }
+.bg-b{ background:rgba(88,166,255,.15); color:var(--ac); }
+table{ width:100%; border-collapse:collapse; font-size:.82rem; margin:.8rem 0; }
+th{ background:var(--sf); color:var(--ac); font-weight:600; padding:.5rem .6rem; text-align:left;
+     border-bottom:2px solid var(--bd); }
+td{ padding:.35rem .6rem; border-bottom:1px solid var(--bd); }
+td.num{ font-family:'Fira Code',monospace; font-size:.77rem; }
+tr:hover{ background:rgba(88,166,255,.04); }
+.ch{ border-radius:10px; overflow:hidden; margin:1.2rem 0; }
+.metrics{ display:grid; grid-template-columns:repeat(4,1fr); gap:1rem; margin:1rem 0; }
+.mc{ background:var(--sf); border:1px solid var(--bd); border-radius:10px; padding:.8rem; text-align:center; }
+.mv{ font-size:1.3rem; font-weight:700; font-family:'Fira Code',monospace; }
+.ml{ color:var(--tm); font-size:.72rem; margin-top:.2rem; }
+.tools{ background:var(--sf); border:1px solid var(--bd); border-radius:10px; padding:1rem; margin:1rem 0; }
+.tools code{ color:var(--ac); font-family:'Fira Code',monospace; font-size:.8rem; }
+.tools .src{ color:var(--tm); font-size:.75rem; }
+.ft{ margin-top:2.5rem; padding-top:.8rem; border-top:1px solid var(--bd);
+      color:var(--tm); font-size:.75rem; text-align:center; }
+</style>
+</head>
+<body>
+<div class="c">
+
+<h1>Experimento 5: Calidad del Embedding MDS/UMAP</h1>
+<p class="sub">
+    &iquest;MDS y UMAP preservan vecindarios de sustitucion al proyectar a 2D?
+    <br><span class="bg bg-g">15 configuraciones</span>
+    <span class="bg bg-b">156 acordes &middot; 3 metricas de entrada</span>
+</p>
+
+<h2>Herramientas Utilizadas</h2>
+<div class="tools">
+<table>
+<tr><td><code>sklearn.manifold.MDS</code></td><td class="src">scikit-learn</td><td>MDS metrico y no-metrico con <code>dissimilarity='precomputed'</code></td></tr>
+<tr><td><code>umap.UMAP</code></td><td class="src">umap-learn</td><td>UMAP con <code>metric='precomputed'</code>, n_neighbors=5,10,15</td></tr>
+<tr><td><code>trustworthiness()</code></td><td class="src">sklearn.metrics</td><td>&iquest;Los vecinos en 2D son cercanos en alta dim?</td></tr>
+<tr><td><code>spearmanr()</code></td><td class="src">scipy.stats</td><td>Correlacion de rangos de distancias</td></tr>
+<tr><td><code>stress1()</code></td><td class="src">reduction.py (formula)</td><td>$\sqrt{\sum(d_{orig} - d_{emb})^2 / \sum d_{orig}^2}$</td></tr>
+<tr><td>Matrices de distancia</td><td class="src">Exp. 4</td><td>d_w, d_EB, d_JSD precalculadas</td></tr>
+</table>
+</div>
+
+<h2>1. Metricas de Calidad Explicadas</h2>
+<div class="cd">
+<ul>
+<li><strong>Trustworthiness</strong> (T): de los $k$ vecinos en 2D, &iquest;cuantos son vecinos reales en alta dim? T=1.0 = perfecto.</li>
+<li><strong>Spearman $\rho$</strong>: correlacion de rangos entre distancias originales y 2D. $\rho$=1.0 = orden perfecto.</li>
+<li><strong>Stress-1</strong>: error de reconstruccion normalizado. Menor = mejor.</li>
+<li><strong>Sub-Recovery@5</strong> (SR@5): de los 5 vecinos mas cercanos en 2D, &iquest;cuantos son sustitutos GT? S = P@5 pero evaluado en el <em>embedding</em>.</li>
+</ul>
+</div>
+
+<h2>2. Resultados Comparativos</h2>
+<div class="metrics">
+<div class="mc"><div class="mv" style="color:var(--gn);">0.9999</div><div class="ml">Mejor Trust<br>d_JSD+MDS(metric)</div></div>
+<div class="mc"><div class="mv" style="color:var(--ac);">0.0705</div><div class="ml">Mejor SR@5<br>d_w+UMAP(nn=10)</div></div>
+<div class="mc"><div class="mv" style="color:var(--or);">0.9275</div><div class="ml">Spearman $\rho$</div></div>
+<div class="mc"><div class="mv" style="color:var(--pr);">0.1705</div><div class="ml">Stress-1</div></div>
+</div>
+
+<div class="cd"><table>
+<thead><tr><th>Input</th><th>Metodo</th><th>Trust</th><th>Spearman</th><th>Stress-1</th><th>SR@5</th></tr></thead>
+<tbody><tr style="background:rgba(63,185,80,.08)"><td>d_JSD</td><td>MDS(metric)</td>
+        <td class="num">0.9999</td><td class="num">0.9275</td>
+        <td class="num">0.1705</td><td class="num">0.0051</td></tr><tr><td>d_JSD</td><td>UMAP(nn=5)</td>
+        <td class="num">0.9986</td><td class="num">0.6300</td>
+        <td class="num">23.0736</td><td class="num">0.0077</td></tr><tr><td>d_JSD</td><td>MDS(nmds)</td>
+        <td class="num">0.9981</td><td class="num">0.9626</td>
+        <td class="num">0.5061</td><td class="num">0.0064</td></tr><tr><td>d_JSD</td><td>UMAP(nn=10)</td>
+        <td class="num">0.9980</td><td class="num">0.4732</td>
+        <td class="num">28.3755</td><td class="num">0.0115</td></tr><tr><td>d_JSD</td><td>UMAP(nn=15)</td>
+        <td class="num">0.9967</td><td class="num">0.3499</td>
+        <td class="num">26.8057</td><td class="num">0.0115</td></tr><tr><td>d_w</td><td>UMAP(nn=15)</td>
+        <td class="num">0.9784</td><td class="num">0.5746</td>
+        <td class="num">25.3036</td><td class="num">0.0705</td></tr><tr><td>d_w</td><td>UMAP(nn=10)</td>
+        <td class="num">0.9733</td><td class="num">0.3002</td>
+        <td class="num">34.6346</td><td class="num">0.0705</td></tr><tr><td>d_w</td><td>MDS(metric)</td>
+        <td class="num">0.9670</td><td class="num">0.7483</td>
+        <td class="num">0.3011</td><td class="num">0.0577</td></tr><tr><td>d_w</td><td>MDS(nmds)</td>
+        <td class="num">0.9645</td><td class="num">0.8181</td>
+        <td class="num">1.3288</td><td class="num">0.0513</td></tr><tr><td>d_w</td><td>UMAP(nn=5)</td>
+        <td class="num">0.9638</td><td class="num">0.4257</td>
+        <td class="num">30.8034</td><td class="num">0.0679</td></tr><tr><td>d_EB</td><td>UMAP(nn=15)</td>
+        <td class="num">0.9453</td><td class="num">0.4983</td>
+        <td class="num">1.8833</td><td class="num">0.0244</td></tr><tr><td>d_EB</td><td>UMAP(nn=10)</td>
+        <td class="num">0.9341</td><td class="num">0.4472</td>
+        <td class="num">1.9008</td><td class="num">0.0205</td></tr><tr><td>d_EB</td><td>UMAP(nn=5)</td>
+        <td class="num">0.9202</td><td class="num">0.4671</td>
+        <td class="num">2.4936</td><td class="num">0.0308</td></tr><tr><td>d_EB</td><td>MDS(metric)</td>
+        <td class="num">0.7467</td><td class="num">0.6752</td>
+        <td class="num">0.2988</td><td class="num">0.0346</td></tr><tr><td>d_EB</td><td>MDS(nmds)</td>
+        <td class="num">0.7375</td><td class="num">0.6707</td>
+        <td class="num">0.3141</td><td class="num">0.0346</td></tr></tbody>
+</table></div>
+
+<h2>3. Mejor Embedding: d_JSD + MDS(metric)</h2>
+<div class="ch" id="scatter"></div>
+
+<h2>4. Conclusion</h2>
+<div class="th">
+<p class="th-l">Resultado</p>
+<p>La configuracion <strong>d_JSD + MDS(metric)</strong> logra la mejor preservacion de vecindarios (T=0.9999). UMAP tolera la cuasi-metricidad de d_EB gracias a su construccion de grafos difusos. MDS sufre mas con violaciones M4 pero preserva mejor las distancias globales (Spearman).</p>
+</div>
+
+<div class="ins">
+<p class="ins-l">Implicacion para la tesis</p>
+<p>UMAP con <code>metric='precomputed'</code> es el metodo recomendado para visualizar el espacio de acordes con la EB. MDS puede usarse como complemento para interpretacion de distancias globales, pero con la advertencia de que M4 no esta garantizada.</p>
+</div>
+
+<div class="ft">Generado: 2026-02-22 23:10 &middot; ChordSpace &middot;
+<code>experiments/chord_substitution/run_experiment_5.py</code></div>
+</div>
+<script>
+const L={paper_bgcolor:'#0d1117',plot_bgcolor:'#161b22',font:{family:'Inter',color:'#e6edf3',size:13},
+  xaxis:{gridcolor:'#30363d',zerolinecolor:'#30363d'},yaxis:{gridcolor:'#30363d',zerolinecolor:'#30363d'},
+  legend:{bgcolor:'rgba(22,27,34,0.9)',bordercolor:'#30363d',borderwidth:1},margin:{l:50,r:30,t:45,b:50}};
+const n=["Cmaj", "Dbmaj", "Dmaj", "Ebmaj", "Emaj", "Fmaj", "Gbmaj", "Gmaj", "Abmaj", "Amaj", "Bbmaj", "Bmaj", "Cmin", "Dbmin", "Dmin", "Ebmin", "Emin", "Fmin", "Gbmin", "Gmin", "Abmin", "Amin", "Bbmin", "Bmin", "Cdim", "Dbdim", "Ddim", "Ebdim", "Edim", "Fdim", "Gbdim", "Gdim", "Abdim", "Adim", "Bbdim", "Bdim", "Caug", "Dbaug", "Daug", "Ebaug", "Eaug", "Faug", "Gbaug", "Gaug", "Abaug", "Aaug", "Bbaug", "Baug", "Csus4", "Dbsus4", "Dsus4", "Ebsus4", "Esus4", "Fsus4", "Gbsus4", "Gsus4", "Absus4", "Asus4", "Bbsus4", "Bsus4", "Csus2", "Dbsus2", "Dsus2", "Ebsus2", "Esus2", "Fsus2", "Gbsus2", "Gsus2", "Absus2", "Asus2", "Bbsus2", "Bsus2", "Cdom7", "Dbdom7", "Ddom7", "Ebdom7", "Edom7", "Fdom7", "Gbdom7", "Gdom7", "Abdom7", "Adom7", "Bbdom7", "Bdom7", "Cmaj7", "Dbmaj7", "Dmaj7", "Ebmaj7", "Emaj7", "Fmaj7", "Gbmaj7", "Gmaj7", "Abmaj7", "Amaj7", "Bbmaj7", "Bmaj7", "Cmin7", "Dbmin7", "Dmin7", "Ebmin7", "Emin7", "Fmin7", "Gbmin7", "Gmin7", "Abmin7", "Amin7", "Bbmin7", "Bmin7", "Cdim7", "Dbdim7", "Ddim7", "Ebdim7", "Edim7", "Fdim7", "Gbdim7", "Gdim7", "Abdim7", "Adim7", "Bbdim7", "Bdim7", "Chdim7", "Dbhdim7", "Dhdim7", "Ebhdim7", "Ehdim7", "Fhdim7", "Gbhdim7", "Ghdim7", "Abhdim7", "Ahdim7", "Bbhdim7", "Bhdim7", "Cminmaj7", "Dbminmaj7", "Dminmaj7", "Ebminmaj7", "Eminmaj7", "Fminmaj7", "Gbminmaj7", "Gminmaj7", "Abminmaj7", "Aminmaj7", "Bbminmaj7", "Bminmaj7", "Caug7", "Dbaug7", "Daug7", "Ebaug7", "Eaug7", "Faug7", "Gbaug7", "Gaug7", "Abaug7", "Aaug7", "Bbaug7", "Baug7"], ct=["maj", "maj", "maj", "maj", "maj", "maj", "maj", "maj", "maj", "maj", "maj", "maj", "min", "min", "min", "min", "min", "min", "min", "min", "min", "min", "min", "min", "dim", "dim", "dim", "dim", "dim", "dim", "dim", "dim", "dim", "dim", "dim", "dim", "aug", "aug", "aug", "aug", "aug", "aug", "aug", "aug", "aug", "aug", "aug", "aug", "sus4", "sus4", "sus4", "sus4", "sus4", "sus4", "sus4", "sus4", "sus4", "sus4", "sus4", "sus4", "sus2", "sus2", "sus2", "sus2", "sus2", "sus2", "sus2", "sus2", "sus2", "sus2", "sus2", "sus2", "dom7", "dom7", "dom7", "dom7", "dom7", "dom7", "dom7", "dom7", "dom7", "dom7", "dom7", "dom7", "maj7", "maj7", "maj7", "maj7", "maj7", "maj7", "maj7", "maj7", "maj7", "maj7", "maj7", "maj7", "min7", "min7", "min7", "min7", "min7", "min7", "min7", "min7", "min7", "min7", "min7", "min7", "dim7", "dim7", "dim7", "dim7", "dim7", "dim7", "dim7", "dim7", "dim7", "dim7", "dim7", "dim7", "hdim7", "hdim7", "hdim7", "hdim7", "hdim7", "hdim7", "hdim7", "hdim7", "hdim7", "hdim7", "hdim7", "hdim7", "minmaj7", "minmaj7", "minmaj7", "minmaj7", "minmaj7", "minmaj7", "minmaj7", "minmaj7", "minmaj7", "minmaj7", "minmaj7", "minmaj7", "aug7", "aug7", "aug7", "aug7", "aug7", "aug7", "aug7", "aug7", "aug7", "aug7", "aug7", "aug7"];
+const types=[...new Set(ct)];
+const traces=types.map(t=>{
+  const idx=ct.map((c,i)=>c===t?i:-1).filter(i=>i>=0);
+  return {x:idx.map(i=>[0.10351688716500858, 0.10358259273130174, 0.10383582649639056, 0.10424978710624325, 0.10479574299310418, 0.10544779814130295, 0.10618420224893843, 0.10698720551083736, 0.10784288050343308, 0.1087399150747702, 0.10966861805975023, 0.11062041904398587, 0.0685725408866236, 0.06927675239013367, 0.07013642237462034, 0.07115125594938711, 0.0723193318130846, 0.0736372674309773, 0.07509985773659911, 0.0767000076775678, 0.07842794112098311, 0.08027126145429155, 0.08221455572414374, 0.08423981792939467, -0.543735980399887, -0.5441464029802, -0.544599942771048, -0.5450934505305162, -0.5456230124930558, -0.5461840228389048, -0.5467712700482261, -0.5473790351348599, -0.5480012005042959, -0.548631368244515, -0.5492629871897468, -0.5498894873443175, 0.6089178120583533, 0.6090153399159755, 0.6091154191980832, 0.6092163167246505, 0.6093164047409666, 0.6094140121892723, 0.6095073484672913, 0.6095948485902748, 0.6096748845628877, 0.6097462375667171, 0.6098079416619168, 0.609859229813581, -0.09142583746744548, -0.09389877257932475, -0.09609791122393684, -0.098009865863537, -0.09962535549501576, -0.10094090361294202, -0.10196469905575352, -0.10272492460360483, -0.1032459874135123, -0.10350240112164483, -0.10346044118571482, -0.10309631691904642, -0.12332405159574823, -0.12595955892138622, -0.1283564354233026, -0.13046916647741116, -0.13226535606169576, -0.1337217070906836, -0.13482081711953922, -0.1356052486737961, -0.13603322214073482, -0.13610572976234114, -0.13583295644209695, -0.13522887576670345, -0.16914399761834314, -0.17058665503331596, -0.17192833515599493, -0.173155496550177, -0.17425550647955335, -0.17521687864378205, -0.1760295171318395, -0.17668498737888425, -0.1771767984097115, -0.17750067471872996, -0.17765477703795735, -0.17763983235923578, 0.32709521956857635, 0.3306897596762491, 0.3342312957950193, 0.3376948868439264, 0.34105779484104476, 0.34429967391445443, 0.3474026697327256, 0.35035146980620285, 0.353133312033194, 0.3557379699842352, 0.3581577182560902, 0.3603872855633835, -0.10972530330895666, -0.10922660882021337, -0.10856067408549983, -0.10773045163686064, -0.10673740571454154, -0.10558179327474758, -0.10426378559271933, -0.10278488590526949, -0.10114914635927413, -0.09936389933289076, -0.09743993665129558, -0.09539121780848445, -0.5706604081897616, -0.5708030595638851, -0.5709870336296851, -0.5712098476727039, -0.5714684527488458, -0.5717592513606019, -0.57207815724197, -0.5724206874783535, -0.5727820382749907, -0.5731572176171545, -0.5735411462614883, -0.5739287844390043, -0.22644634311220474, -0.22629180642620797, -0.2259386121375753, -0.22538527000669653, -0.22463432041166698, -0.22369237095014827, -0.22256996801578235, -0.22128129934476967, -0.21984373010477024, -0.2182771759366673, -0.21660331440556305, -0.21484463501623097, 0.3835678253937223, 0.3879280703577187, 0.3922580346690323, 0.39652965930676193, 0.4007170856400569, 0.40479697710798673, 0.4087486934632719, 0.41255434271131264, 0.4161987367919066, 0.4196692761971653, 0.4229558143216282, 0.42605050757388174, 0.3043758639771797, 0.3050934899343935, 0.3058903462362946, 0.30676809426059753, 0.3077281857580866, 0.3087713876938247, 0.3098975006942708, 0.3111052128372114, 0.3123920484687164, 0.3137543697410532, 0.3151874380435909, 0.316685497603887][i]),y:idx.map(i=>[-0.3298382144081639, -0.3283238556535854, -0.32698633522152026, -0.3258021539560856, -0.32474809042182834, -0.32380320347626446, -0.32294788046417017, -0.3221630235389305, -0.3214318393803516, -0.3207394550434125, -0.32007309284342783, -0.3194233815584395, -0.35364735176054934, -0.3521180113206256, -0.3507050582967522, -0.34938268030911945, -0.34812169659190817, -0.34689280277841944, -0.3456689063068622, -0.3444286729227184, -0.3431565082113016, -0.34184428561423635, -0.34048945233355343, -0.33909486270620376, -0.1671020068253789, -0.16580298171092323, -0.1643853342437942, -0.16286433919327542, -0.1612575746065983, -0.15958437071420253, -0.15786520384934266, -0.15612106672671994, -0.15437284764765744, -0.15264074558400678, -0.15094374821553705, -0.14929919120385074, 0.13337307585667924, 0.13423239691458508, 0.13508662183734416, 0.13592389466506677, 0.13673229587881525, 0.13750050263739594, 0.13821833628157754, 0.13887675018878837, 0.1394685033649032, 0.13998782645937072, 0.14043074159129354, 0.14079515676499246, 0.7099902087522895, 0.7101185694519929, 0.7102095889782815, 0.7102618933565656, 0.7102756843962147, 0.7102530859704999, 0.7101972514320481, 0.7101058674968932, 0.7099618800688814, 0.7097577796105461, 0.7095051013743409, 0.709220000646388, 0.7060542209161984, 0.7062585534627359, 0.7064126763959203, 0.7065246400635032, 0.7065997958737104, 0.7066428452920627, 0.7066631912264635, 0.7066499646103934, 0.7066027422967145, 0.7065325122551505, 0.7064439975679049, 0.7063405459410342, -0.11882580290751919, -0.1170586470810514, -0.11526614135840432, -0.11346180160502936, -0.11165767049443946, -0.10986430921582124, -0.10809090545211811, -0.1063455092274353, -0.10463534768309256, -0.10296717134804344, -0.10134756076126865, -0.09978313242754083, -0.3174529320737002, -0.31804830020248487, -0.3186351829521552, -0.31919727490668975, -0.3197213042127213, -0.3201968306692163, -0.320616129888416, -0.320973972540356, -0.32126739308466823, -0.3214954141015174, -0.3216587667699592, -0.32175957881710976, -0.3701017386312697, -0.3689216108235906, -0.36786210300381766, -0.366895086028836, -0.36598992402728064, -0.36511709676349724, -0.36425094074585235, -0.3633711709590867, -0.36246332115843366, -0.3615184442965239, -0.36053240329313146, -0.35950499146013404, -0.018053509089464508, -0.0170919760092393, -0.016025027815796327, -0.014860573213117574, -0.01360862448311994, -0.012281096044811424, -0.010891555217122964, -0.009454920267825066, -0.007987042081413771, -0.006504309323532216, -0.005023161404157682, -0.0035596338120143793, -0.13861661590996568, -0.1368739646394598, -0.1350302550020996, -0.13309119474321507, -0.13106683081371806, -0.1289711363256619, -0.12682123335060963, -0.12463632722756442, -0.12243644613519561, -0.12024107859403985, -0.11806779323485711, -0.11593091087856813, -0.14114176519444632, -0.14121016901267333, -0.14124001155469904, -0.1412305867591626, -0.1411806816577615, -0.14108884581658493, -0.14095367431986114, -0.1407740840946191, -0.1405495488165802, -0.14028025470328415, -0.13996721418011598, -0.13961229213992327, 0.35198249989536873, 0.3517538954490775, 0.3513832642775746, 0.35087286920544536, 0.35022539953441667, 0.34944414580807576, 0.34853319525164606, 0.3474975968474709, 0.34634347259282466, 0.34507805868253255, 0.3437096866510289, 0.3422476964052027][i]),
+    text:idx.map(i=>n[i]),name:t,mode:'markers',type:'scatter',
+    marker:{size:7,color:["#3fb950", "#3fb950", "#3fb950", "#3fb950", "#3fb950", "#3fb950", "#3fb950", "#3fb950", "#3fb950", "#3fb950", "#3fb950", "#3fb950", "#58a6ff", "#58a6ff", "#58a6ff", "#58a6ff", "#58a6ff", "#58a6ff", "#58a6ff", "#58a6ff", "#58a6ff", "#58a6ff", "#58a6ff", "#58a6ff", "#f85149", "#f85149", "#f85149", "#f85149", "#f85149", "#f85149", "#f85149", "#f85149", "#f85149", "#f85149", "#f85149", "#f85149", "#d29922", "#d29922", "#d29922", "#d29922", "#d29922", "#d29922", "#d29922", "#d29922", "#d29922", "#d29922", "#d29922", "#d29922", "#bc8cff", "#bc8cff", "#bc8cff", "#bc8cff", "#bc8cff", "#bc8cff", "#bc8cff", "#bc8cff", "#bc8cff", "#bc8cff", "#bc8cff", "#bc8cff", "#a5d6ff", "#a5d6ff", "#a5d6ff", "#a5d6ff", "#a5d6ff", "#a5d6ff", "#a5d6ff", "#a5d6ff", "#a5d6ff", "#a5d6ff", "#a5d6ff", "#a5d6ff", "#ff7b72", "#ff7b72", "#ff7b72", "#ff7b72", "#ff7b72", "#ff7b72", "#ff7b72", "#ff7b72", "#ff7b72", "#ff7b72", "#ff7b72", "#ff7b72", "#7ee787", "#7ee787", "#7ee787", "#7ee787", "#7ee787", "#7ee787", "#7ee787", "#7ee787", "#7ee787", "#7ee787", "#7ee787", "#7ee787", "#79c0ff", "#79c0ff", "#79c0ff", "#79c0ff", "#79c0ff", "#79c0ff", "#79c0ff", "#79c0ff", "#79c0ff", "#79c0ff", "#79c0ff", "#79c0ff", "#ffa657", "#ffa657", "#ffa657", "#ffa657", "#ffa657", "#ffa657", "#ffa657", "#ffa657", "#ffa657", "#ffa657", "#ffa657", "#ffa657", "#d2a8ff", "#d2a8ff", "#d2a8ff", "#d2a8ff", "#d2a8ff", "#d2a8ff", "#d2a8ff", "#d2a8ff", "#d2a8ff", "#d2a8ff", "#d2a8ff", "#d2a8ff", "#f0883e", "#f0883e", "#f0883e", "#f0883e", "#f0883e", "#f0883e", "#f0883e", "#f0883e", "#f0883e", "#f0883e", "#f0883e", "#f0883e", "#db6d28", "#db6d28", "#db6d28", "#db6d28", "#db6d28", "#db6d28", "#db6d28", "#db6d28", "#db6d28", "#db6d28", "#db6d28", "#db6d28"][idx[0]],opacity:.8},
+    hovertemplate:'%{text}<extra>'+t+'</extra>'};
+});
+Plotly.newPlot('scatter',traces,{...L,title:{text:'d_JSD + MDS(metric)',font:{size:15}},
+  xaxis:{...L.xaxis,title:'Dim 1'},yaxis:{...L.yaxis,title:'Dim 2'}});
+</script>
+</body></html>

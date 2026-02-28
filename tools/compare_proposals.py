@@ -286,6 +286,16 @@ METRIC_INFO = {
         "casual": "Suma diferencias absolutas por componente.",
         "technical": "(d(u,v) = |u-v|_1).",
     },
+    "eb_jsd_combo": {
+        "title": "EB + JSD (α=0.20)",
+        "casual": "Combina similitud de alturas (Expansion Biyectiva) con similitud perceptual (Jensen-Shannon sobre rugosidad).",
+        "technical": "d = α·d_EB_hat + (1-α)·d_JSD_hat, con α=0.20 calibrado por 5-fold CV. Ambas componentes normalizadas por rango a [0,1].",
+    },
+    "eb_euc_combo": {
+        "title": "EB + Euclidiana (α=0.20)",
+        "casual": "Combina similitud de alturas (Expansion Biyectiva) con distancia euclidiana sobre el vector de rugosidad crudo.",
+        "technical": "d = α·d_EB_hat + (1-α)·d_Euc_hat, con α=0.20. d_Euc opera sobre Φ_raw (12D). Ambas componentes normalizadas por rango a [0,1].",
+    },
 }
 
 def parse_args() -> argparse.Namespace:

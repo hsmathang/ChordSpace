@@ -1,0 +1,47 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <title>ValidaciÃ³n Perceptual â€” Bowling et al.</title>
+  <style>
+    body {font-family: 'Segoe UI', sans-serif; max-width: 900px;
+           margin: 40px auto; line-height: 1.7; color: #333;}
+    h1,h2,h3 {color: #2C3E50;}
+    table {width:100%; border-collapse:collapse; margin:20px 0;}
+    th,td {border:1px solid #ddd; padding:10px; text-align:center;}
+    th {background:#f5f5f5;}
+    .note {background:#EBF5FB; padding:12px 16px;
+            border-left:4px solid #2980B9; margin:20px 0;}
+    .win {color:#117a65; font-weight:bold;}
+  </style>
+</head>
+<body>
+  <h1>ValidaciÃ³n Perceptual: 1D vs. 12D</h1>
+  <p>Dataset: Bowling et al. (2018), <strong>N=298</strong> acordes (dÃ­adas, trÃ­adas, tÃ©tradas).
+  <strong>Todas las mÃ©tricas son OOS</strong> â€” 5-fold CV estratificado, semilla=42.</p>
+
+  <div class="note">
+    <strong>ComparaciÃ³n justa:</strong> el control polinÃ³mico (deg=3) otorga al modelo 1D
+    grados de libertad no lineales adicionales. Si el 12D sigue ganando, la superioridad
+    no se debe a la asimetrÃ­a de parÃ¡metros.
+  </div>
+
+  <h2>Tabla de resultados OOS</h2>
+  <table>
+    <tr><th>Modelo</th><th>Pearson r OOS</th><th>RÂ² OOS</th></tr>
+    <tr><td>1D Lineal</td>
+        <td>0.468</td><td>0.218</td></tr>
+    <tr><td>1D PolinÃ³mico (deg=3) â€” control</td>
+        <td>0.456</td><td>0.204</td></tr>
+    <tr><td class="win">12D Ridge (Î±=1.0)</td>
+        <td class="win">0.767</td>
+        <td class="win">0.588</td></tr>
+  </table>
+
+  <h2>Diferencia OOS (Î”)</h2>
+  <p>Î” RÂ² (12D vs 1D lineal): <strong>+0.370</strong><br>
+  Î” RÂ² (12D vs 1D polinÃ³mico): <strong>+0.384</strong></p>
+
+  <p><em>Figura: bowling_correlation_paper_hq.png / .pdf</em></p>
+</body>
+</html>

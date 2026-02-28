@@ -1,0 +1,181 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Experimento 7 &mdash; Calibracion de alpha para d_combo</title>
+<script src="https://cdn.plot.ly/plotly-2.27.0.min.js"></script>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Fira+Code:wght@400;500&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.css">
+<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.js"></script>
+<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/contrib/auto-render.min.js"
+    onload="renderMathInElement(document.body, {delimiters: [{left: '$$', right: '$$', display: true}, {left: '$', right: '$', display: false}]});"></script>
+<style>
+:root { --bg:#0d1117; --sf:#161b22; --bd:#30363d; --tx:#e6edf3; --tm:#8b949e;
+         --ac:#58a6ff; --gn:#3fb950; --or:#d29922; --rd:#f85149; --pr:#bc8cff; }
+*{ margin:0; padding:0; box-sizing:border-box; }
+body{ font-family:'Inter',sans-serif; background:var(--bg); color:var(--tx); line-height:1.7; padding:2rem; }
+.c{ max-width:1100px; margin:0 auto; }
+h1{ font-size:1.6rem; font-weight:700; background:linear-gradient(135deg,var(--or),var(--gn));
+     -webkit-background-clip:text; -webkit-text-fill-color:transparent; margin-bottom:.3rem; }
+.sub{ color:var(--tm); font-size:.88rem; margin-bottom:2rem; }
+h2{ font-size:1.15rem; font-weight:600; color:var(--ac); border-bottom:1px solid var(--bd);
+     padding-bottom:.4rem; margin:2.5rem 0 1rem; }
+h3{ font-size:.95rem; font-weight:600; color:var(--gn); margin:1.5rem 0 .5rem; }
+p,li{ font-size:.88rem; }
+.cd{ background:var(--sf); border:1px solid var(--bd); border-radius:10px; padding:1.2rem; margin:1rem 0; }
+.th{ border-left:3px solid var(--gn); padding:.8rem 1rem; background:rgba(63,185,80,.06);
+      border-radius:0 8px 8px 0; margin:1rem 0; }
+.th-l{ color:var(--gn); font-weight:700; font-size:.78rem; text-transform:uppercase; letter-spacing:.05em; }
+.warn{ border-left:3px solid var(--rd); padding:.8rem 1rem; background:rgba(248,81,73,.06);
+        border-radius:0 8px 8px 0; margin:1rem 0; }
+.warn-l{ color:var(--rd); font-weight:700; font-size:.78rem; text-transform:uppercase; letter-spacing:.05em; }
+.ins{ border-left:3px solid var(--or); padding:.8rem 1rem; background:rgba(210,153,34,.06);
+       border-radius:0 8px 8px 0; margin:1rem 0; }
+.ins-l{ color:var(--or); font-weight:700; font-size:.78rem; text-transform:uppercase; letter-spacing:.05em; }
+.bg{ display:inline-block; padding:.1rem .5rem; border-radius:12px; font-size:.7rem; font-weight:600; }
+.bg-g{ background:rgba(63,185,80,.15); color:var(--gn); }
+.bg-o{ background:rgba(210,153,34,.15); color:var(--or); }
+.bg-b{ background:rgba(88,166,255,.15); color:var(--ac); }
+table{ width:100%; border-collapse:collapse; font-size:.82rem; margin:.8rem 0; }
+th{ background:var(--sf); color:var(--ac); font-weight:600; padding:.5rem .6rem; text-align:left; border-bottom:2px solid var(--bd); }
+td{ padding:.35rem .6rem; border-bottom:1px solid var(--bd); }
+td.num{ font-family:'Fira Code',monospace; font-size:.77rem; }
+.ch{ border-radius:10px; overflow:hidden; margin:1.2rem 0; }
+.metrics{ display:grid; grid-template-columns:repeat(4,1fr); gap:1rem; margin:1rem 0; }
+.mc{ background:var(--sf); border:1px solid var(--bd); border-radius:10px; padding:.8rem; text-align:center; }
+.mv{ font-size:1.3rem; font-weight:700; font-family:'Fira Code',monospace; }
+.ml{ color:var(--tm); font-size:.72rem; margin-top:.2rem; }
+.ft{ margin-top:2.5rem; padding-top:.8rem; border-top:1px solid var(--bd); color:var(--tm); font-size:.75rem; text-align:center; }
+</style>
+</head>
+<body>
+<div class="c">
+
+<h1>Experimento 7: Calibracion de &alpha; para d_combo</h1>
+<p class="sub">
+    $d_{\text{combo}} = \alpha \cdot \hat{d}_{\text{EB}} + (1-\alpha) \cdot \hat{d}_{\text{JSD}}$
+    <br><span class="bg bg-g">alpha* = 0.20</span>
+    <span class="bg bg-o">MRR_cv = 0.3592 +/- 0.0532</span>
+    <span class="bg bg-b">156 acordes &middot; 114 pares GT &middot; 5-fold CV</span>
+</p>
+
+<h2>1. Metodologia</h2>
+<div class="cd">
+<p><strong>Corpus:</strong> 156 acordes (72 triadas + 84 tetradas), 13 tipos &times; 12 raices.</p>
+<p><strong>Componentes:</strong></p>
+<ul>
+<li>$d_{\text{EB}}$: Expansion Biyectiva sobre notas MIDI ($\mathbb{R}/12\mathbb{Z}$)</li>
+<li>$\sqrt{\text{JSD}}$: raiz de Jensen-Shannon sobre $\Phi_{\text{simplex}}$</li>
+</ul>
+<p><strong>Normalizacion:</strong> rango $\hat{D} = D / \max(D)$ para igualar escalas.</p>
+<p><strong>Validacion:</strong> 5-fold CV estratificado por categoria de sustitucion (9 categorias). LOO-CV como sanity check.</p>
+</div>
+
+<h2>2. Resultados: MRR vs &alpha;</h2>
+<div class="metrics">
+<div class="mc"><div class="mv" style="color:var(--gn);">0.20</div><div class="ml">&alpha;* optimo</div></div>
+<div class="mc"><div class="mv" style="color:var(--ac);">0.3592</div><div class="ml">MRR (5-fold CV)</div></div>
+<div class="mc"><div class="mv" style="color:var(--or);">0.4302</div><div class="ml">MRR (full)</div></div>
+<div class="mc"><div class="mv" style="color:var(--pr);">0.2150</div><div class="ml">MRR (LOO-CV)</div></div>
+</div>
+
+<h3>2.1 Curva MRR vs &alpha; (con barras de error &plusmn;1&sigma;)</h3>
+<div class="ch" id="mrr_curve"></div>
+
+<h3>2.2 Robustez: rango vs z-score</h3>
+<div class="ch" id="norm_compare"></div>
+
+<h2>3. Region estable</h2>
+<div class="th">
+<p class="th-l">Sensibilidad</p>
+<p>La region donde MRR &ge; 95% del pico es $\alpha \in [0.15, 0.20]$. Esto indica que el resultado es <strong>sensible</strong> a la eleccion exacta de &alpha;.</p>
+</div>
+
+<h2>4. Comparativa con metricas existentes</h2>
+<div class="cd"><table>
+<thead><tr><th>Metrica</th><th>P@1</th><th>P@5</th><th>P@10</th><th>MRR</th></tr></thead>
+<tbody><tr><td><strong>d_w</strong></td>
+        <td class="num">0.4000</td><td class="num">0.2400</td>
+        <td class="num">0.2083</td>
+        <td class="num" style="color:var(--gn);font-weight:600">0.4355</td></tr><tr style="background:rgba(63,185,80,.08)"><td><strong>d_combo(a=0.20)</strong></td>
+        <td class="num">0.2833</td><td class="num">0.2900</td>
+        <td class="num">0.1767</td>
+        <td class="num" style="color:var(--gn);font-weight:600">0.4302</td></tr><tr><td><strong>d_VL</strong></td>
+        <td class="num">0.3500</td><td class="num">0.1133</td>
+        <td class="num">0.0800</td>
+        <td class="num" style="color:var(--gn);font-weight:600">0.3952</td></tr><tr><td><strong>d_EB</strong></td>
+        <td class="num">0.0000</td><td class="num">0.1200</td>
+        <td class="num">0.0867</td>
+        <td class="num" style="color:var(--gn);font-weight:600">0.1784</td></tr><tr><td><strong>d_Q5</strong></td>
+        <td class="num">0.0000</td><td class="num">0.0800</td>
+        <td class="num">0.0800</td>
+        <td class="num" style="color:var(--gn);font-weight:600">0.1689</td></tr><tr><td><strong>d_JSD</strong></td>
+        <td class="num">0.0000</td><td class="num">0.0133</td>
+        <td class="num">0.0533</td>
+        <td class="num" style="color:var(--gn);font-weight:600">0.0901</td></tr><tr><td><strong>d_cos</strong></td>
+        <td class="num">0.0000</td><td class="num">0.0133</td>
+        <td class="num">0.0533</td>
+        <td class="num" style="color:var(--gn);font-weight:600">0.0871</td></tr><tr><td><strong>d_Euc</strong></td>
+        <td class="num">0.0000</td><td class="num">0.0067</td>
+        <td class="num">0.0633</td>
+        <td class="num" style="color:var(--gn);font-weight:600">0.0796</td></tr></tbody>
+</table></div>
+
+<div class="ch" id="comparison_bar"></div>
+
+<h2>5. Analisis</h2>
+
+<div class="th">
+<p class="th-l">Resultado principal</p>
+<p>$d_{\text{combo}}(\alpha^* = 0.20)$ combina el dominio <strong>espectral/perceptual</strong> ($\sqrt{\text{JSD}}$ sobre rugosidad) con el dominio <strong>de alturas/voice-leading</strong> ($d_{\text{EB}}$). El peso optimo indica que la sustitucion armonica depende mas de la similitud timbrica (JSD).</p>
+</div>
+
+<div class="ins">
+<p class="ins-l">Validacion cruzada</p>
+<p>LOO-CV (0.2150) difiere de 5-fold CV (0.3592), sugiriendo varianza entre folds.</p>
+</div>
+
+<div class="warn">
+<p class="warn-l">Limitaciones</p>
+<p>1. La normalizacion por rango es corpus-dependiente. 2. El ground truth (228 pares, 9 categorias) es un <em>lower bound</em>; sustituciones validas no incluidas se penalizan como falsos positivos. 3. $\alpha^*$ es especifico de esta poblacion de acordes.</p>
+</div>
+
+<div class="ft">Generado: 2026-02-23 11:36 &middot; ChordSpace &middot;
+<code>experiments/chord_substitution/run_experiment_7_alpha_calibration.py</code></div>
+</div>
+<script>
+const L={paper_bgcolor:'#0d1117',plot_bgcolor:'#161b22',font:{family:'Inter',color:'#e6edf3',size:12},
+  xaxis:{gridcolor:'#30363d',zerolinecolor:'#30363d'},yaxis:{gridcolor:'#30363d',zerolinecolor:'#30363d'},
+  legend:{bgcolor:'rgba(22,27,34,0.9)',bordercolor:'#30363d',borderwidth:1},margin:{l:65,r:30,t:45,b:60}};
+
+// MRR curve with error bars
+const a=[0.0, 0.05, 0.1, 0.15, 0.2, 0.25, 0.3, 0.35, 0.4, 0.45, 0.5, 0.55, 0.6, 0.65, 0.7, 0.75, 0.8, 0.85, 0.9, 0.95, 1.0];
+Plotly.newPlot('mrr_curve',[
+  {x:a,y:[0.08656417192346923, 0.25437745103085074, 0.32774023912363043, 0.3580639098099371, 0.3591943876692569, 0.3333712257510477, 0.33428585899545704, 0.334111966035658, 0.3339982474700809, 0.33402615829152493, 0.333763691028932, 0.33334310372403597, 0.3331547204434092, 0.32693474672615336, 0.31413457230925107, 0.2909546138344527, 0.27504074422590613, 0.2332838575760396, 0.16672183188391834, 0.12609279130333978, 0.10629771319156693],name:'MRR (5-fold CV)',
+    error_y:{type:'data',array:[0.005759705210219931, 0.051873342046581186, 0.03303860378565062, 0.03715494660259428, 0.053170448691011035, 0.07142766559298108, 0.06719425127452744, 0.06717612543481626, 0.06717953798345384, 0.06715108037339178, 0.06717538539832986, 0.06715850207377266, 0.06716958295122817, 0.06834676941689931, 0.07144322908800231, 0.06911207704944017, 0.07142772872540376, 0.07643059709619976, 0.037454252880959334, 0.030530215343515892, 0.018828455303225633],visible:true,color:'rgba(63,185,80,0.3)'},
+    line:{color:'#3fb950',width:3},mode:'lines+markers',marker:{size:6}},
+  {x:a,y:[0.09005975154644473, 0.2507940479008157, 0.32804251026026143, 0.3735174757749807, 0.4301841424416473, 0.4967418766464403, 0.4965093745538421, 0.4960835671129629, 0.4958450377464538, 0.49563349944823487, 0.4955898537025523, 0.4951984459851392, 0.4949846809351985, 0.4939426329527701, 0.4943965385282894, 0.4586938493779851, 0.454727630976153, 0.42886583707884296, 0.2961435162672062, 0.19614351626720616, 0.17844537017340503],name:'MRR (full)',
+    line:{color:'#58a6ff',width:1.5,dash:'dot'}},
+  {x:[0.2,0.2],y:[0,0.3951138264361826],name:'alpha*=0.20',
+    line:{color:'#d29922',width:2,dash:'dash'},mode:'lines'},
+],{...L,title:{text:'MRR vs alpha (range normalization)',font:{size:14}},
+  xaxis:{...L.xaxis,title:'alpha',dtick:0.1},yaxis:{...L.yaxis,title:'MRR'}});
+
+// Normalization comparison
+Plotly.newPlot('norm_compare',[
+  {x:a,y:[0.08656417192346923, 0.25437745103085074, 0.32774023912363043, 0.3580639098099371, 0.3591943876692569, 0.3333712257510477, 0.33428585899545704, 0.334111966035658, 0.3339982474700809, 0.33402615829152493, 0.333763691028932, 0.33334310372403597, 0.3331547204434092, 0.32693474672615336, 0.31413457230925107, 0.2909546138344527, 0.27504074422590613, 0.2332838575760396, 0.16672183188391834, 0.12609279130333978, 0.10629771319156693],name:'Range norm',line:{color:'#3fb950',width:2}},
+  {x:a,y:[0.08656417192346923, 0.31005524085500624, 0.35305443215813165, 0.35236249797812663, 0.33820658757904715, 0.33411834260962675, 0.33402029947685813, 0.33402615829152493, 0.3337479834224473, 0.3333300648631582, 0.33311536757866705, 0.32693474672615336, 0.3146399339199858, 0.2913312673758014, 0.2876665712888216, 0.24512266426781984, 0.2304147604992856, 0.1950432187106732, 0.12609279130333978, 0.12609279130333978, 0.10629771319156693],name:'Z-score norm',line:{color:'#bc8cff',width:2}},
+],{...L,title:{text:'MRR_cv: Range vs Z-score normalization',font:{size:14}},
+  xaxis:{...L.xaxis,title:'alpha',dtick:0.1},yaxis:{...L.yaxis,title:'MRR (5-fold CV)'}});
+
+// Comparison bar
+const cmp_names=["d_w", "d_combo(a=0.20)", "d_VL", "d_EB", "d_Q5", "d_JSD", "d_cos", "d_Euc"];
+const cmp_mrr=[0.43548061748593125, 0.4301841424416473, 0.3952185345182928, 0.17844537017340503, 0.16890957917540236, 0.09005975154644473, 0.08714314074699653, 0.07962121432492988];
+const cmp_p5=[0.23999999999999996, 0.29, 0.11333333333333334, 0.12000000000000001, 0.08000000000000002, 0.013333333333333334, 0.013333333333333334, 0.006666666666666667];
+Plotly.newPlot('comparison_bar',[
+  {x:cmp_names,y:cmp_mrr,name:'MRR',type:'bar',marker:{color:'#3fb950'}},
+  {x:cmp_names,y:cmp_p5,name:'P@5',type:'bar',marker:{color:'#58a6ff'}},
+],{...L,barmode:'group',title:{text:'d_combo vs metricas existentes',font:{size:14}},
+  yaxis:{...L.yaxis,title:'Score'}});
+</script>
+</body></html>

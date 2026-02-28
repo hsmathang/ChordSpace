@@ -1,0 +1,142 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Experimento 1b &mdash; &Phi;_raw Travesía Completa de Estratos</title>
+<script src="https://cdn.plot.ly/plotly-2.27.0.min.js"></script>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Fira+Code:wght@400;500&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.css">
+<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.js"></script>
+<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/contrib/auto-render.min.js"
+    onload="renderMathInElement(document.body, {delimiters: [{left: '$$', right: '$$', display: true}, {left: '$', right: '$', display: false}]});"></script>
+<style>
+:root { --bg:#0d1117; --sf:#161b22; --bd:#30363d; --tx:#e6edf3; --tm:#8b949e;
+         --ac:#58a6ff; --gn:#3fb950; --or:#d29922; --rd:#f85149; --pr:#bc8cff; }
+*{ margin:0; padding:0; box-sizing:border-box; }
+body{ font-family:'Inter',sans-serif; background:var(--bg); color:var(--tx); line-height:1.7; padding:2rem; }
+.c{ max-width:1100px; margin:0 auto; }
+h1{ font-size:1.6rem; font-weight:700; background:linear-gradient(135deg,var(--rd),var(--or));
+     -webkit-background-clip:text; -webkit-text-fill-color:transparent; margin-bottom:.3rem; }
+.sub{ color:var(--tm); font-size:.88rem; margin-bottom:2rem; }
+h2{ font-size:1.15rem; font-weight:600; color:var(--ac); border-bottom:1px solid var(--bd);
+     padding-bottom:.4rem; margin:2.5rem 0 1rem; }
+h3{ font-size:.95rem; font-weight:600; color:var(--gn); margin:1.5rem 0 .5rem; }
+p,li{ font-size:.88rem; }
+.cd{ background:var(--sf); border:1px solid var(--bd); border-radius:10px; padding:1.2rem; margin:1rem 0; }
+.th{ border-left:3px solid var(--gn); padding:.8rem 1rem; background:rgba(63,185,80,.06);
+      border-radius:0 8px 8px 0; margin:1rem 0; }
+.th-l{ color:var(--gn); font-weight:700; font-size:.78rem; text-transform:uppercase; letter-spacing:.05em; }
+.warn{ border-left:3px solid var(--rd); padding:.8rem 1rem; background:rgba(248,81,73,.06);
+        border-radius:0 8px 8px 0; margin:1rem 0; }
+.warn-l{ color:var(--rd); font-weight:700; font-size:.78rem; text-transform:uppercase; letter-spacing:.05em; }
+.ins{ border-left:3px solid var(--or); padding:.8rem 1rem; background:rgba(210,153,34,.06);
+       border-radius:0 8px 8px 0; margin:1rem 0; }
+.ins-l{ color:var(--or); font-weight:700; font-size:.78rem; text-transform:uppercase; letter-spacing:.05em; }
+.bg{ display:inline-block; padding:.1rem .5rem; border-radius:12px; font-size:.7rem; font-weight:600; }
+.bg-r{ background:rgba(248,81,73,.15); color:var(--rd); }
+.bg-g{ background:rgba(63,185,80,.15); color:var(--gn); }
+table{ width:100%; border-collapse:collapse; font-size:.82rem; margin:.8rem 0; }
+th{ background:var(--sf); color:var(--ac); font-weight:600; padding:.5rem .6rem; text-align:left; border-bottom:2px solid var(--bd); }
+td{ padding:.35rem .6rem; border-bottom:1px solid var(--bd); }
+td.num{ font-family:'Fira Code',monospace; font-size:.77rem; }
+.ch{ border-radius:10px; overflow:hidden; margin:1.2rem 0; }
+.metrics{ display:grid; grid-template-columns:repeat(3,1fr); gap:1rem; margin:1rem 0; }
+.mc{ background:var(--sf); border:1px solid var(--bd); border-radius:10px; padding:.8rem; text-align:center; }
+.mv{ font-size:1.3rem; font-weight:700; font-family:'Fira Code',monospace; }
+.ml{ color:var(--tm); font-size:.72rem; margin-top:.2rem; }
+.tools{ background:var(--sf); border:1px solid var(--bd); border-radius:10px; padding:1rem; margin:1rem 0; }
+.tools code{ color:var(--ac); font-family:'Fira Code',monospace; font-size:.8rem; }
+.tools .src{ color:var(--tm); font-size:.75rem; }
+.ft{ margin-top:2.5rem; padding-top:.8rem; border-top:1px solid var(--bd); color:var(--tm); font-size:.75rem; text-align:center; }
+</style>
+</head>
+<body>
+<div class="c">
+
+<h1>Experimento 1b: &Phi;_raw &mdash; Travesía Completa &Sigma;<sub>4</sub> &rarr; &Sigma;<sub>1</sub></h1>
+<p class="sub">
+    Continuidad del histograma de rugosidad colapsando C7 &rarr; unísono cuádruple
+    <br><span class="bg bg-r">&Phi; NO converge</span> por cambio combinatorial en $\binom{4}{2} = 6$ pares
+</p>
+
+<h2>1. Configuración Matemática</h2>
+<div class="cd">
+<h3>Camino paramétrico</h3>
+<p>$$\gamma(t) = (60,\; 60 + 4t,\; 60 + 7t,\; 60 + 10t), \quad t \in [0, 1]$$</p>
+<table>
+<tr><th>$t$</th><th>Acorde</th><th>Notas distintas</th><th>Estrato</th></tr>
+<tr><td class="num">1.0</td><td>[60, 64, 67, 70] = C7</td><td>4</td><td>$\Sigma_4$</td></tr>
+<tr><td class="num">0.5</td><td>[60, 62, 63.5, 65]</td><td>4</td><td>$\Sigma_4$</td></tr>
+<tr><td class="num">0.0</td><td>[60, 60, 60, 60]</td><td>1</td><td>$\Sigma_1$</td></tr>
+</table>
+<p style="margin-top:.6rem;">Los 6 pares diádicos $\binom{4}{2}$ coinciden en estructura para todo $t>0$. Al $t=0$, todos colapsan a unísono.</p>
+</div>
+
+<h2>2. Herramientas</h2>
+<div class="tools">
+<table>
+<tr><td><code>sethares_roughness_vector()</code></td><td class="src">pre_process.py</td><td>$\Phi_{\text{raw}} \in \mathbb{R}^{12}$, H=6 armónicos, $\delta=0.88$</td></tr>
+<tr><td><code>phi_simplex()</code></td><td class="src">common.py</td><td>Normalización simplex: $\Phi / \|\Phi\|_1$</td></tr>
+<tr><td><code>jensenshannon()</code></td><td class="src">scipy.spatial.distance</td><td>$\sqrt{\text{JSD}(P \| Q)}$</td></tr>
+</table>
+</div>
+
+<h2>3. Resultados</h2>
+
+<div class="metrics">
+<div class="mc"><div class="mv" style="color:var(--rd);">3.5181</div><div class="ml">$d_{\text{euc}}$ en $t=1$ (C7)</div></div>
+<div class="mc"><div class="mv" style="color:var(--or);">0.0035</div><div class="ml">$d_{\text{euc}}$ en $t \to 0$</div></div>
+<div class="mc"><div class="mv" style="color:var(--pr);">0.3521</div><div class="ml">$\|\Phi(\text{unísono})\|$</div></div>
+</div>
+
+<h3>3.1 Curvas de convergencia (escala log)</h3>
+<div class="ch" id="logPlot"></div>
+
+<h3>3.2 Curvas de convergencia (escala lineal)</h3>
+<div class="ch" id="linPlot"></div>
+
+<h2>4. Análisis</h2>
+
+<div class="warn">
+<p class="warn-l">Resultado principal</p>
+<p>A diferencia del Exp. 1 (frontera $\Sigma_3 \leftrightarrow \Sigma_4$), aquí <strong>el número de pares es constante</strong> ($\binom{4}{2} = 6$) para todo $t$.
+La clave es que al $t \to 0$, los 6 intervalos colapsan a ~0 semitonos, y la rugosidad de Sethares para intervalos cercanos a unísono es dominada por el <strong>batimiento</strong> (término de batimiento $R \to R_0 > 0$ para unísono).</p>
+<p>- Si $\Phi(\gamma(0))$ tiene una estructura no nula (pares de unísono tienen rugosidad finita), entonces $\Phi(\gamma(t))$ converge a $\Phi(\gamma(0))$, i.e. $d_{\text{euc}} \to 0$.</p>
+<p>- Si la estructura es cero (armónicos idénticos se cancelan), el residuo depende del modelo.</p>
+</div>
+
+<div class="th">
+<p class="th-l">Comparación con Exp. 1</p>
+<p><strong>Exp. 1:</strong> $\Sigma_3 \to \Sigma_4$ (tríada → tétrada). La discontinuidad era por el salto de $\binom{3}{2} = 3$ a $\binom{4}{2} = 6$ pares.</p>
+<p><strong>Exp. 1b:</strong> $\Sigma_4 \to \Sigma_1$ (tétrada → unísono). Siempre 4 voces → siempre 6 pares. La cuestión es si $\Phi$ es continua cuando los intervalos colapsan.</p>
+</div>
+
+<div class="ins">
+<p class="ins-l">Implicación para la tesis</p>
+<p>La continuidad de $\Phi$ depende de si el modelo de Sethares produce una función continua del intervalo. Como $R(\Delta f)$ es continua para $\Delta f > 0$ pero tiene un pico en $\Delta f \approx 0$, la convergencia solo es suave si el número de voces se mantiene constante. Esto confirma que <strong>la discontinuidad del Exp. 1 es puramente combinatorial</strong> ($\binom{n}{2}$), no del modelo acústico subyacente.</p>
+</div>
+
+<div class="ft">Generado: 2026-02-23 05:37 &middot; ChordSpace &middot;
+<code>experiments/whitney_stratification/run_experiment_1b.py</code></div>
+</div>
+<script>
+const L={paper_bgcolor:'#0d1117',plot_bgcolor:'#161b22',font:{family:'Inter',color:'#e6edf3',size:12},
+  xaxis:{gridcolor:'#30363d',zerolinecolor:'#30363d'},yaxis:{gridcolor:'#30363d',zerolinecolor:'#30363d'},
+  legend:{bgcolor:'rgba(22,27,34,0.9)',bordercolor:'#30363d',borderwidth:1},margin:{l:65,r:30,t:45,b:60}};
+const t=[1e-05, 1.3738237958832637e-05, 1.8873918221350958e-05, 2.592943797404667e-05, 3.5622478902624444e-05, 4.893900918477499e-05, 6.723357536499335e-05, 9.236708571873866e-05, 0.0001268961003167922, 0.00017433288221999874, 0.0002395026619987486, 0.00032903445623126676, 0.00045203536563602405, 0.0006210169418915617, 0.0008531678524172806, 0.0011721022975334804, 0.0016102620275609393, 0.002212216291070448, 0.0030391953823131978, 0.0041753189365604, 0.005736152510448681, 0.007880462815669913, 0.01082636733874054, 0.014873521072935119, 0.020433597178569417, 0.028072162039411756, 0.03856620421163472, 0.05298316906283707, 0.07278953843983146, 0.1, 0.11, 0.1406896551724138, 0.1713793103448276, 0.2020689655172414, 0.2327586206896552, 0.263448275862069, 0.29413793103448277, 0.32482758620689656, 0.35551724137931034, 0.38620689655172413, 0.4168965517241379, 0.4475862068965517, 0.47827586206896555, 0.5089655172413794, 0.5396551724137931, 0.570344827586207, 0.6010344827586207, 0.6317241379310345, 0.6624137931034483, 0.6931034482758621, 0.7237931034482759, 0.7544827586206897, 0.7851724137931034, 0.8158620689655173, 0.8465517241379311, 0.8772413793103448, 0.9079310344827587, 0.9386206896551724, 0.9693103448275863, 1.0];
+Plotly.newPlot('logPlot',[
+  {x:t,y:[0.0035162770036804014, 0.00483058034721956, 0.0066360554413890105, 0.009116184339047317, 0.012522924052017548, 0.017202202136525957, 0.0236288527307707, 0.032454442059994426, 0.0445726509335882, 0.0612084934132322, 0.08403974774920808, 0.1153616370541578, 0.15830904349230462, 0.21715423698043584, 0.29770176775031804, 0.4078046215860071, 0.5580243991315197, 0.7624480401288696, 1.0396448745115683, 1.4136835734343276, 1.9150009489824278, 2.5806822038272768, 3.453325650079833, 4.5770952784346015, 5.988889738246862, 7.702153716980262, 9.681722742966047, 9.413228128835984, 9.932961077186135, 11.105552326522607, 11.328698102145898, 12.556697245375705, 14.648882221117251, 14.553294983474746, 12.483579988369852, 10.340946267356959, 10.04611677236562, 9.716780182650062, 9.403334419189786, 7.455026387260366, 7.052242026528563, 6.699266897182506, 6.461059610420867, 7.298492404150906, 7.026891724785206, 6.8236734116702715, 6.967397767964637, 5.4347258642977225, 4.8291279583532924, 4.526631489426156, 4.4377810660104595, 4.843411021301594, 4.7087463118445685, 4.202618866252852, 5.211125260246853, 4.026005035861017, 3.998681321986169, 3.8946401326141724, 3.683599932975092, 3.518124071197759],name:'d_Euclidean',line:{color:'#f85149',width:2.5}},
+  {x:t,y:[0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.297534420508279, 0.41061730059271795, 0.501346545027808, 0.49426669272104007, 0.5769407714239705, 0.8325546111576977, 0.8325546111576977, 0.8325546111576978, 0.8325546111576977, 0.8325546111576977, 0.8325546111576978, 0.8325546111576977, 0.8325546111576978, 0.8325546111576977, 0.8325546111576977, 0.8325546111576977, 0.8325546111576978, 0.8325546111576977, 0.8325546111576978, 0.8325546111576978, 0.8325546111576977, 0.8325546111576978, 0.8325546111576977, 0.8325546111576977, 0.8325546111576977, 0.8325546111576977, 0.8325546111576977, 0.8325546111576978, 0.8325546111576977, 0.8325546111576977, 0.8325546111576977, 0.8325546111576977, 0.8325546111576977],name:'d_JSD',line:{color:'#58a6ff',width:2}},
+  {x:t,y:[0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.04325294751889064, 0.17831990400946496, 0.385733851683538, 0.3672866376134425, 0.5860019033493866, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0],name:'d_cosine',line:{color:'#bc8cff',width:2}},
+],{...L,title:{text:'d(Φ(γ(t)), Φ(unísono)) — escala log',font:{size:14}},
+  xaxis:{...L.xaxis,type:'log',title:'t (parámetro)'},
+  yaxis:{...L.yaxis,title:'Distancia'}});
+Plotly.newPlot('linPlot',[
+  {x:t,y:[0.0035162770036804014, 0.00483058034721956, 0.0066360554413890105, 0.009116184339047317, 0.012522924052017548, 0.017202202136525957, 0.0236288527307707, 0.032454442059994426, 0.0445726509335882, 0.0612084934132322, 0.08403974774920808, 0.1153616370541578, 0.15830904349230462, 0.21715423698043584, 0.29770176775031804, 0.4078046215860071, 0.5580243991315197, 0.7624480401288696, 1.0396448745115683, 1.4136835734343276, 1.9150009489824278, 2.5806822038272768, 3.453325650079833, 4.5770952784346015, 5.988889738246862, 7.702153716980262, 9.681722742966047, 9.413228128835984, 9.932961077186135, 11.105552326522607, 11.328698102145898, 12.556697245375705, 14.648882221117251, 14.553294983474746, 12.483579988369852, 10.340946267356959, 10.04611677236562, 9.716780182650062, 9.403334419189786, 7.455026387260366, 7.052242026528563, 6.699266897182506, 6.461059610420867, 7.298492404150906, 7.026891724785206, 6.8236734116702715, 6.967397767964637, 5.4347258642977225, 4.8291279583532924, 4.526631489426156, 4.4377810660104595, 4.843411021301594, 4.7087463118445685, 4.202618866252852, 5.211125260246853, 4.026005035861017, 3.998681321986169, 3.8946401326141724, 3.683599932975092, 3.518124071197759],name:'d_Euclidean',line:{color:'#f85149',width:2.5}},
+  {x:t,y:[0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.297534420508279, 0.41061730059271795, 0.501346545027808, 0.49426669272104007, 0.5769407714239705, 0.8325546111576977, 0.8325546111576977, 0.8325546111576978, 0.8325546111576977, 0.8325546111576977, 0.8325546111576978, 0.8325546111576977, 0.8325546111576978, 0.8325546111576977, 0.8325546111576977, 0.8325546111576977, 0.8325546111576978, 0.8325546111576977, 0.8325546111576978, 0.8325546111576978, 0.8325546111576977, 0.8325546111576978, 0.8325546111576977, 0.8325546111576977, 0.8325546111576977, 0.8325546111576977, 0.8325546111576977, 0.8325546111576978, 0.8325546111576977, 0.8325546111576977, 0.8325546111576977, 0.8325546111576977, 0.8325546111576977],name:'d_JSD',line:{color:'#58a6ff',width:2}},
+  {x:t,y:[0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.04325294751889064, 0.17831990400946496, 0.385733851683538, 0.3672866376134425, 0.5860019033493866, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0],name:'d_cosine',line:{color:'#bc8cff',width:2}},
+],{...L,title:{text:'d(Φ(γ(t)), Φ(unísono)) — escala lineal',font:{size:14}},
+  xaxis:{...L.xaxis,title:'t (parámetro)'},
+  yaxis:{...L.yaxis,title:'Distancia'}});
+</script>
+</body></html>

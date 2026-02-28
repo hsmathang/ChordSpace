@@ -1,0 +1,30 @@
+flowchart TD
+    %% Estilos basados en artículos académicos
+    classDef proceso fill:#e1f5fe,stroke:#0288d1,stroke-width:2px,color:#000000;
+    classDef data fill:#ffffff,stroke:#388e3c,stroke-width:2px,color:#000000;
+    classDef eval fill:#fff3e0,stroke:#f57c00,stroke-width:2px,color:#000000;
+    
+    subgraph S1 [1. Espacio de Entrada]
+        A["Población de Acordes (N)\nTuplas MIDI n ∈ N^m\n(12-TET)"]:::data
+    end
+
+    subgraph S2 [2. Extracción de Características Psicoacústicas]
+        B("Modelo Perceptual\n(Plomp-Levelt / Sethares 1993)"):::proceso
+        C["Firma Psicoacústica: Vector Φ_raw ∈ R^12\n(Rugosidad por Clase de Intervalo)"]:::data
+        D("Normalización y Transformación\n(ej. Proyección al Simplex Δ^11)"):::proceso
+        
+        A --> B --> C --> D
+    end
+
+    subgraph S3 [3. Geometría y Reducción Dimensional]
+        E["Matriz de Disimilitudes D\n(Métricas: Euclidiana, Cosine, JSD, Hellinger)"]:::proceso
+        F["Reducción Dimensional (Ψ)\n(MDS con algoritmo SMACOF, UMAP, t-SNE)"]:::proceso
+        G["Embedding 2D\n(Coordenadas Topológicas Continuas)"]:::data
+        
+        D --> E --> F --> G
+    end
+
+    subgraph S4 [4. Evaluación Cuantitativa]
+        H("Métricas de Preservación y Estructura\n(Trustworthiness, Continuity, Stress, Silhouette)"):::eval
+        G --> H
+    end

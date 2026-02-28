@@ -1,0 +1,24 @@
+## 2.5 Reducción Dimensional Inversa y Análisis del Manifold Tonal
+
+Habiendo cimentado la proyectividad del modelo de rugosidad puramente físico $\mathbb{R}$ en un vector paramétrico de alta dimensionalidad espacial ($\Delta^{11}$) dotado de una métrica distribucional estadística congruente (Divergencia de Jensen-Shannon), la extracción de utilidad analítica macroscópica se ve imposibilitada geométricamente por fronteras cartesianas para la percepción visual tridimensional humana. Resulta ineludible delegar la decodificación topológica inferencial al dominio del análisis estadístico multivariante inverso. 
+
+Para forzar al *manifold* subyacente $\mathcal{M}$ (de 11 grados de libertad de intervalo combinatorio) a colapsar sobre una representación isomórfica tratable visual o relacional $\mathbb{R}^2$ o $\mathbb{R}^3$, el modelo convoca el arsenal asintótico del escalamiento y pre-embotado categórico. Principalmente dos posturas matemáticas contrapuestas debaten prioridades: La Conservación Global Lineal frente a la Fidelidad Geodésica Local Simplicial.
+
+### 2.5.1 Mapeos de Conservación Global Abstracta: Escalamiento Multidimensional (MDS)
+
+El Escalamiento Multidimensional Crudo (MDS, históricamente analizado bajo la métrica clásica Torgerson-Gower) aborda la reingeniería espacial sin inmiscuirse en la topología local. Es un problema estricto de optimización sobre distancias isométricas: dada la matriz rigurosamente simétrica relacional de disimilitudes reales $\Delta_{M \times M} = [d_{i,j}]$, MDS persigue asignar un vector coordenado bajo-dimensional $\mathbf{y}_i \in \mathbb{R}^d \, (\text{donde } d \ll 11)$ para cada entidad armónica, de forma que el mapeo resultante de distancias puramente euclidianas $||\mathbf{y}_i - \mathbf{y}_j||_2$ subtienda la discrepancia de aproximación mínima respecto de las disimilitudes físicas acústicas originales referenciadas $d_{i,j}$.
+
+El éxito algorítmico o fracaso topológico de conservar la disposición original global se penaliza numéricamente y estandariza bajo el funcional de pérdida conocido como **Kruskal Stress** ($\sigma$):
+$$ \sigma = \sqrt{ \frac{\sum_{i<j} \left(d_{i,j} - \|\mathbf{y}_i - \mathbf{y}_j\|\right)^2}{\sum_{i<j} d_{i,j}^2} } $$
+
+Para converger algorítmicamente y eludir los innumerables mínimos locales del hiperescalamiento en acordes altamente disonantes y excéntricos, resulta inexcusable emplear adaptaciones computacionales formales rigurosas de Descenso Acelerado y Mayorización Secuencial (Algoritmo de optimización \textbf{SMACOF} - *Scaling by MAjorizing a COmplicated Function*). El objetivo implícito se vuelca en atestiguar que la conformación macroscópica retiene el mapa armónico entero del temperamento igual si es que este admite realmente reducción plana euclidiana sin una hiper-distorsión forzada estresante a la cual la física disonante intrínseca se resiste.
+
+### 2.5.2 Embeddings No-Lineales Topológicos y Neighborhoods Relacionales (UMAP)
+
+En contraposición axiomática categórica asintente a la distorsión global implícita en métricas rígidas de distancia absoluta proyectada, los *manifold learnings* abstractos como *UMAP (Uniform Manifold Approximation and Projection)* reclaman asimilar geométricamente la estructura vecinal inmediata local e isomorfa de los objetos armónicos. 
+
+Bajo la presunción teórica asimétrica de que los datos acústicos multidimensionales exhiben uniformidad estocástica a lo largo de sub-variedades Riemannianas complejas y densas, UMAP infiere geométricamente complejos simpliciales difusos (fuzzy simplicial sets). El escalamiento optimiza exclusivamente una entropía cruzada local reduciendo divergencias entre distribuciones topológicas difusas conexas a la variable $y_i$. Su métrica intrínseca se evalúa rígidamente no a través del Stress de Kruskal, sino bajo índices bi-vectoriales estocásticos de vecindad de *K-Nearest Neighbors*: **Confiabilidad (*Trustworthiness*)** y **Continuidad (*Continuity*)**.
+
+-   La  **Trustworthiness** prioriza implacablemente penalizar las falsas analogías vecinales originadas en la proyección ($y_{i, j}$ quedan vecinos cercanos pero acústica original $d_{ij}$ estaba en galaxias apartadas), un factor de distorsión severo e interpretativo letal que MDS clásico no reprime asimétricamente.
+
+Bajo este rigor bifurcado, en el próximo capítulo metodológico computacional, confrontaremos la aproximación ruda, confiable y linealmente expansiva del MDS para inferir cartografía tonal macroscópica de los acordes en el campo general semántico, contrastándola empíricamente contra los mapeos densos y reticulares orgánicos conformados no-linealmente por UMAP en su afán de revelar los sutiles subconjuntos isométricos abstractos de progresiones transicionales microscópicas micro-tonales o temperadas, anclando conceptual y computacionalmente la experimentación del espacio musical teórico de la rugosidad psicofisiológico.

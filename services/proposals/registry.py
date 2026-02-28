@@ -143,6 +143,16 @@ METRIC_INFO: Mapping[str, Mapping[str, str]] = _freeze_nested(
             "casual": "Suma diferencias absolutas por componente.",
             "technical": r"\(d(u,v) = \|u-v\|_1\).",
         },
+        "eb_jsd_combo": {
+            "title": "EB + JSD (α=0.20)",
+            "casual": "Combina similitud de alturas (Expansion Biyectiva) con similitud perceptual (Jensen-Shannon sobre rugosidad).",
+            "technical": r"\(d = \alpha\,\hat{d}_{\mathrm{EB}} + (1-\alpha)\,\hat{d}_{\sqrt{\mathrm{JSD}}}\), con \(\alpha=0.20\) calibrado por 5-fold CV. Ambas componentes normalizadas por rango a \([0,1]\). EB opera sobre notas MIDI continuas (\(\mathbb{R}/12\mathbb{Z}\)); \(\sqrt{\mathrm{JSD}}\) sobre histogramas de rugosidad normalizados al simplex.",
+        },
+        "eb_euc_combo": {
+            "title": "EB + Euclidiana (α=0.20)",
+            "casual": "Combina similitud de alturas (Expansion Biyectiva) con distancia euclidiana sobre el vector de rugosidad crudo.",
+            "technical": r"\(d = \alpha\,\hat{d}_{\mathrm{EB}} + (1-\alpha)\,\hat{d}_{\mathrm{Euc}}\), con \(\alpha=0.20\). \(d_{\mathrm{Euc}}\) opera sobre \(\Phi_{\mathrm{raw}} \in \mathbb{R}^{12}\). Ambas componentes normalizadas por rango a \([0,1]\).",
+        },
     }
 )
 

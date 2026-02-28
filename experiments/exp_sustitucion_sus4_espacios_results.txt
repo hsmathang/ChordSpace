@@ -1,0 +1,52 @@
+EXP_SUS4_ESPACIOS
+=================
+
+Parametros comunes:
+- descriptor: perclass_alpha0_75 (12D)
+- distancia: euclidean en espacio original
+- criterio de vecinos: misma cardinalidad (triadas)
+- consulta: sus4 = [0,5,7] / intervalos [5,2]
+
+Espacio A (N=69)
+- catalogo canonico anclado en C3
+- consulta: sus4-fund
+Top 8 cercanos:
+ 1. sus2-inv2        d=0.000
+ 2. sus2-fund        d=0.584
+ 3. sus4-inv1        d=0.584
+ 4. sus2-inv1        d=3.801
+ 5. sus4-inv2        d=3.801
+ 6. Maj-inv2         d=4.223
+ 7. Min-inv2         d=4.544
+ 8. Min-inv1         d=4.556
+Top 8 lejanos:
+ 1. Dim-fund         d=5.640
+ 2. Dim-inv1         d=5.636
+ 3. Dim-inv2         d=5.453
+ 4. Aug-fund         d=5.322
+ 5. Aug-inv1         d=5.322
+ 6. Aug-inv2         d=5.322
+ 7. Min-fund         d=5.156
+ 8. Maj-fund         d=5.077
+
+Espacio B (N=156)
+- generacion combinatoria estructural, octavas=3-4, cardinalidades=[2,3], max_internal_interval<=12
+- consulta: 057 [5,2] struct=[0, 5, 7]
+Top 8 cercanos:
+ 1. 027 [2,5]        d=0.584 struct=[0, 2, 7]
+ 2. 052 [5,9]        d=2.311 struct=[0, 5, 14]
+ 3. 072 [7,7]        d=2.482 struct=[0, 7, 14]
+ 4. 022 [2,12]       d=2.642 struct=[0, 2, 14]
+ 5. 002 [12,2]       d=2.694 struct=[0, 12, 14]
+ 6. 092 [9,5]        d=2.800 struct=[0, 9, 14]
+ 7. 050 [5,7]        d=2.862 struct=[0, 5, 12]
+ 8. 079 [7,2]        d=2.917 struct=[0, 7, 9]
+Top 8 lejanos:
+ 1. 034 [3,1]        d=6.367 struct=[0, 3, 4]
+ 2. 014 [1,3]        d=6.365 struct=[0, 1, 4]
+ 3. 019 [1,8]        d=5.838 struct=[0, 1, 9]
+ 4. 01B [1,10]       d=5.832 struct=[0, 1, 11]
+ 5. 01A [1,9]        d=5.780 struct=[0, 1, 10]
+ 6. 089 [8,1]        d=5.746 struct=[0, 8, 9]
+ 7. 0AB [10,1]       d=5.710 struct=[0, 10, 11]
+ 8. 09A [9,1]        d=5.669 struct=[0, 9, 10]

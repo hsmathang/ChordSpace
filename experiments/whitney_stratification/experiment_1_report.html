@@ -1,0 +1,225 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Experimento 1 &mdash; Continuidad de Phi_raw en Frontera de Whitney</title>
+<script src="https://cdn.plot.ly/plotly-2.27.0.min.js"></script>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Fira+Code:wght@400;500&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.css">
+<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.js"></script>
+<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/contrib/auto-render.min.js"
+    onload="renderMathInElement(document.body, {delimiters: [{left: '$$', right: '$$', display: true}, {left: '$', right: '$', display: false}]});"></script>
+<style>
+:root { --bg:#0d1117; --sf:#161b22; --bd:#30363d; --tx:#e6edf3; --tm:#8b949e;
+         --ac:#58a6ff; --gn:#3fb950; --or:#d29922; --rd:#f85149; --pr:#bc8cff; }
+*{ margin:0; padding:0; box-sizing:border-box; }
+body{ font-family:'Inter',sans-serif; background:var(--bg); color:var(--tx); line-height:1.7; padding:2rem; }
+.c{ max-width:1100px; margin:0 auto; }
+h1{ font-size:1.7rem; font-weight:700; background:linear-gradient(135deg,var(--or),var(--rd));
+     -webkit-background-clip:text; -webkit-text-fill-color:transparent; margin-bottom:.3rem; }
+.sub{ color:var(--tm); font-size:.9rem; margin-bottom:2rem; }
+h2{ font-size:1.2rem; font-weight:600; color:var(--ac); border-bottom:1px solid var(--bd);
+     padding-bottom:.4rem; margin:2.5rem 0 1rem; }
+h3{ font-size:1rem; font-weight:600; color:var(--gn); margin:1.5rem 0 .5rem; }
+p,li{ font-size:.9rem; }
+.cd{ background:var(--sf); border:1px solid var(--bd); border-radius:10px; padding:1.2rem; margin:1rem 0; }
+.th{ border-left:3px solid var(--gn); padding:.8rem 1rem; background:rgba(63,185,80,.06);
+      border-radius:0 8px 8px 0; margin:1rem 0; }
+.th-l{ color:var(--gn); font-weight:700; font-size:.8rem; text-transform:uppercase; letter-spacing:.05em; }
+.rp{ border-left:3px solid var(--rd); padding:.8rem 1rem; background:rgba(248,81,73,.06);
+      border-radius:0 8px 8px 0; margin:1rem 0; }
+.rp-l{ color:var(--rd); font-weight:700; font-size:.8rem; text-transform:uppercase; letter-spacing:.05em; }
+.ins{ border-left:3px solid var(--or); padding:.8rem 1rem; background:rgba(210,153,34,.06);
+       border-radius:0 8px 8px 0; margin:1rem 0; }
+.ins-l{ color:var(--or); font-weight:700; font-size:.8rem; text-transform:uppercase; letter-spacing:.05em; }
+.bg{ display:inline-block; padding:.1rem .5rem; border-radius:12px; font-size:.7rem; font-weight:600; margin-right:.4rem; }
+.bg-r{ background:rgba(248,81,73,.15); color:var(--rd); }
+.bg-b{ background:rgba(88,166,255,.15); color:var(--ac); }
+table{ width:100%; border-collapse:collapse; font-size:.82rem; margin:.8rem 0; }
+th{ background:var(--sf); color:var(--ac); font-weight:600; padding:.5rem .6rem; text-align:left;
+     border-bottom:2px solid var(--bd); }
+td{ padding:.35rem .6rem; border-bottom:1px solid var(--bd); }
+td.num{ font-family:'Fira Code',monospace; font-size:.77rem; }
+tr:hover{ background:rgba(88,166,255,.04); }
+.ch{ border-radius:10px; overflow:hidden; margin:1.2rem 0; }
+.scr{ max-height:400px; overflow-y:auto; }
+.lim{ background:rgba(248,81,73,.08); border:1px dashed var(--rd); border-radius:10px;
+       padding:1rem; margin:1.2rem 0; text-align:center; }
+.lim-v{ font-size:1.5rem; font-weight:700; color:var(--rd); font-family:'Fira Code',monospace; }
+.ft{ margin-top:2.5rem; padding-top:.8rem; border-top:1px solid var(--bd);
+      color:var(--tm); font-size:.75rem; text-align:center; }
+.tools{ background:var(--sf); border:1px solid var(--bd); border-radius:10px; padding:1rem; margin:1rem 0; }
+.tools code{ color:var(--ac); font-family:'Fira Code',monospace; font-size:.8rem; }
+.tools .src{ color:var(--tm); font-size:.75rem; }
+</style>
+</head>
+<body>
+<div class="c">
+
+<h1>Experimento 1: Continuidad de $\Phi_{\text{raw}} \in \mathbb{R}^{12}$ en la Frontera de Whitney</h1>
+<p class="sub">
+    Evaluacion en la frontera $\mathcal{C}_3 \to \mathcal{C}_4$ del espacio estratificado de acordes
+    <br><span class="bg bg-r">DISCONTINUIDAD COMBINATORIA DETECTADA</span>
+    <span class="bg bg-b">MIDI continuo (R) &middot; Sethares H=6, &delta;=0.88</span>
+</p>
+
+<h2>Herramientas Utilizadas</h2>
+<div class="tools">
+<table>
+<tr><td><code>ModeloSetharesVec.calcular()</code></td><td class="src">pre_process.py:508&ndash;586</td><td>Vector de rugosidad $\Phi \in \mathbb{R}^{12}$ via $H=6$ armonicos, $\delta=0.88$</td></tr>
+<tr><td><code>interval_to_ui_bin()</code></td><td class="src">pre_process.py:88</td><td>Mapeo de intervalo a bin del histograma 12-D</td></tr>
+<tr><td><code>midi_to_freq()</code></td><td class="src">pre_process.py</td><td>MIDI continuo (R) &rarr; Hz: $f = 440 \cdot 2^{(n-69)/12}$</td></tr>
+<tr><td><code>jensenshannon()</code></td><td class="src">scipy.spatial.distance</td><td>$\sqrt{\text{JSD}_2}$, base 2</td></tr>
+</table>
+<p style="color:var(--tm); font-size:.78rem; margin-top:.5rem;">Espacio: MIDI continuo ($\mathbb{R}$), 1 unidad = 1 semitono. Compatible con Callender-Quinn-Tymoczko (2008) y Himpel (2022).</p>
+</div>
+
+<h2>1. Configuracion</h2>
+<div class="cd">
+<p><strong>Acorde A</strong> $= (60.0, 64.0, 67.0)$ &mdash; Do mayor (C4-E4-G4). Triada valida en el generador combinatorial (<code>services/combinatorial_generator.py</code>): alfabeto $\{C, E, G\}$, octava 4. Tiene $\binom{3}{2} = 3$ pares diadicos.</p>
+<p><strong>Familia B(t)</strong> $= (60.0, 64.0, 67.0, 67.0 + t)$, $t \in (0, 6]$ semitonos. El parametro $t$ es un diferencial <strong>continuo</strong> sobre $\mathbb{R}$ (glissando microtonal). Tiene $\binom{4}{2} = 6$ pares.</p>
+<p><strong>Barrido:</strong> 40 valores de $t$ desde 6.0 hasta 0.0001 semitonos.</p>
+</div>
+
+<h2>2. Resultados</h2>
+
+<lim>
+<p style="color:var(--tm); margin-bottom:.3rem;">Residuos asintoticos (calculados con $t = 0$ exacto):</p>
+<p class="lim-v">$d_{\text{euc}} = 1.4681$ &emsp; $d_{\text{JSD}} = 0.1473$ &emsp; $d_H = 0.1254$ &emsp; $d_{\cos} = 0.0519$</p>
+</div>
+
+<h3>2.1 Convergencia al residuo (4 metricas)</h3>
+<div class="ch" id="mainChart"></div>
+
+<h3>2.2 Escala logaritmica</h3>
+<div class="ch" id="logChart"></div>
+
+<h3>2.3 Tabla de datos</h3>
+<div class="scr"><table>
+<thead><tr><th>$t$ (st)</th><th>$d_{\text{euc}}$</th><th>$d_{\text{JSD}}$</th><th>$d_H$</th><th>$d_{\cos}$</th></tr></thead>
+<tbody><tr><td>6.0000</td>
+        <td class="num">2.143546</td><td class="num">0.567892</td>
+        <td class="num">0.550356</td><td class="num">0.30113652</td></tr><tr><td>5.5000</td>
+        <td class="num">2.241405</td><td class="num">0.578429</td>
+        <td class="num">0.560019</td><td class="num">0.31725617</td></tr><tr><td>5.0000</td>
+        <td class="num">1.434103</td><td class="num">0.462590</td>
+        <td class="num">0.452585</td><td class="num">0.17489065</td></tr><tr><td>4.5000</td>
+        <td class="num">2.417899</td><td class="num">0.490558</td>
+        <td class="num">0.476302</td><td class="num">0.20445395</td></tr><tr><td>4.0000</td>
+        <td class="num">2.039936</td><td class="num">0.388925</td>
+        <td class="num">0.379534</td><td class="num">0.14869190</td></tr><tr><td>3.5000</td>
+        <td class="num">2.282141</td><td class="num">0.476841</td>
+        <td class="num">0.463189</td><td class="num">0.18297175</td></tr><tr><td>3.0000</td>
+        <td class="num">2.151340</td><td class="num">0.469573</td>
+        <td class="num">0.456086</td><td class="num">0.18081779</td></tr><tr><td>2.5000</td>
+        <td class="num">2.185950</td><td class="num">0.577275</td>
+        <td class="num">0.558962</td><td class="num">0.30817155</td></tr><tr><td>2.0000</td>
+        <td class="num">2.032573</td><td class="num">0.556551</td>
+        <td class="num">0.539934</td><td class="num">0.28237671</td></tr><tr><td>1.5000</td>
+        <td class="num">2.781276</td><td class="num">0.614667</td>
+        <td class="num">0.593102</td><td class="num">0.39844513</td></tr><tr><td>1.0000</td>
+        <td class="num">3.363802</td><td class="num">0.551295</td>
+        <td class="num">0.533364</td><td class="num">0.32292246</td></tr><tr><td>0.9000</td>
+        <td class="num">3.419903</td><td class="num">0.559960</td>
+        <td class="num">0.541702</td><td class="num">0.34410302</td></tr><tr><td>0.8000</td>
+        <td class="num">3.514701</td><td class="num">0.562448</td>
+        <td class="num">0.543922</td><td class="num">0.34952470</td></tr><tr><td>0.7000</td>
+        <td class="num">3.600485</td><td class="num">0.560962</td>
+        <td class="num">0.542292</td><td class="num">0.34511273</td></tr><tr><td>0.6000</td>
+        <td class="num">3.616622</td><td class="num">0.558154</td>
+        <td class="num">0.539521</td><td class="num">0.33875685</td></tr><tr><td>0.5000</td>
+        <td class="num">3.543305</td><td class="num">0.552501</td>
+        <td class="num">0.534171</td><td class="num">0.32718607</td></tr><tr><td>0.4000</td>
+        <td class="num">3.353985</td><td class="num">0.456470</td>
+        <td class="num">0.439136</td><td class="num">0.26985830</td></tr><tr><td>0.3000</td>
+        <td class="num">3.014003</td><td class="num">0.438656</td>
+        <td class="num">0.422498</td><td class="num">0.23812347</td></tr><tr><td>0.2000</td>
+        <td class="num">2.481676</td><td class="num">0.405591</td>
+        <td class="num">0.391348</td><td class="num">0.18517775</td></tr><tr><td>0.1000</td>
+        <td class="num">1.845087</td><td class="num">0.335843</td>
+        <td class="num">0.323957</td><td class="num">0.10477957</td></tr><tr><td>0.0900</td>
+        <td class="num">1.785471</td><td class="num">0.325229</td>
+        <td class="num">0.313494</td><td class="num">0.09651386</td></tr><tr><td>0.0800</td>
+        <td class="num">1.726986</td><td class="num">0.313633</td>
+        <td class="num">0.302007</td><td class="num">0.08853485</td></tr><tr><td>0.0700</td>
+        <td class="num">1.670356</td><td class="num">0.300885</td>
+        <td class="num">0.289310</td><td class="num">0.08094469</td></tr><tr><td>0.0600</td>
+        <td class="num">1.616451</td><td class="num">0.286768</td>
+        <td class="num">0.275161</td><td class="num">0.07386067</td></tr><tr><td>0.0500</td>
+        <td class="num">1.566305</td><td class="num">0.270993</td>
+        <td class="num">0.259232</td><td class="num">0.06741550</td></tr><tr><td>0.0400</td>
+        <td class="num">1.521121</td><td class="num">0.253163</td>
+        <td class="num">0.241062</td><td class="num">0.06175714</td></tr><tr><td>0.0300</td>
+        <td class="num">1.482271</td><td class="num">0.232695</td>
+        <td class="num">0.219961</td><td class="num">0.05704770</td></tr><tr><td>0.0200</td>
+        <td class="num">1.451269</td><td class="num">0.208680</td>
+        <td class="num">0.194805</td><td class="num">0.05346130</td></tr><tr><td>0.0100</td>
+        <td class="num">1.453722</td><td class="num">0.181201</td>
+        <td class="num">0.164597</td><td class="num">0.05192654</td></tr><tr><td>0.0090</td>
+        <td class="num">1.454662</td><td class="num">0.178159</td>
+        <td class="num">0.161181</td><td class="num">0.05185501</td></tr><tr><td>0.0080</td>
+        <td class="num">1.455711</td><td class="num">0.175051</td>
+        <td class="num">0.157674</td><td class="num">0.05179812</td></tr><tr><td>0.0070</td>
+        <td class="num">1.456871</td><td class="num">0.171872</td>
+        <td class="num">0.154069</td><td class="num">0.05175597</td></tr><tr><td>0.0060</td>
+        <td class="num">1.458141</td><td class="num">0.168620</td>
+        <td class="num">0.150360</td><td class="num">0.05172866</td></tr><tr><td>0.0050</td>
+        <td class="num">1.459523</td><td class="num">0.165290</td>
+        <td class="num">0.146537</td><td class="num">0.05171626</td></tr><tr><td>0.0040</td>
+        <td class="num">1.461017</td><td class="num">0.161876</td>
+        <td class="num">0.142593</td><td class="num">0.05171888</td></tr><tr><td>0.0030</td>
+        <td class="num">1.462624</td><td class="num">0.158372</td>
+        <td class="num">0.138516</td><td class="num">0.05173659</td></tr><tr><td>0.0020</td>
+        <td class="num">1.464345</td><td class="num">0.154774</td>
+        <td class="num">0.134293</td><td class="num">0.05176949</td></tr><tr><td>0.0010</td>
+        <td class="num">1.466180</td><td class="num">0.151073</td>
+        <td class="num">0.129911</td><td class="num">0.05181765</td></tr><tr><td>0.0005</td>
+        <td class="num">1.467140</td><td class="num">0.149182</td>
+        <td class="num">0.127655</td><td class="num">0.05184749</td></tr><tr><td>0.0001</td>
+        <td class="num">1.467929</td><td class="num">0.147648</td>
+        <td class="num">0.125817</td><td class="num">0.05187413</td></tr></tbody>
+</table></div>
+
+<h2>3. Diagnostico: Por que $\Phi$ NO converge a cero</h2>
+
+<div class="rp">
+<p class="rp-l">Discontinuidad combinatoria del mapa de caracteristicas</p>
+<p>$\Phi_{\text{raw}}$ agrega rugosidad sobre <strong>todos</strong> los $\binom{n}{2}$ pares. La diferencia entre estratos: $\binom{4}{2} - \binom{3}{2} = 6 - 3 = 3$ pares adicionales.</p>
+</div>
+
+<h3>Desglose par-a-par de B(0) = [60, 64, 67, 67]</h3>
+<div class="cd">
+<table><thead><tr><th>Par</th><th>Intervalo</th><th>Rugosidad</th><th>&iquest;Existe en A?</th></tr></thead>
+<tbody><tr><td>(0,1)</td><td>4 st</td><td class='num'>1.493883</td><td>Yes</td></tr><tr><td>(0,2)</td><td>7 st</td><td class='num'>0.522033</td><td>Yes</td></tr><tr><td>(0,3)</td><td>7 st</td><td class='num'>0.522033</td><td>No (extra)</td></tr><tr><td>(1,2)</td><td>3 st</td><td class='num'>1.372005</td><td>Yes</td></tr><tr><td>(1,3)</td><td>3 st</td><td class='num'>1.372005</td><td>No (extra)</td></tr><tr><td>(2,3)</td><td>0 st</td><td class='num'>0.022087</td><td>No (extra)</td></tr></tbody></table>
+<p style="margin-top:.6rem;">Los pares extra $(0,3)$ y $(1,3)$ duplican asimetricamente los bins de $\Phi$, cambiando la <strong>forma</strong> del histograma incluso tras normalizacion simplex.</p>
+</div>
+
+<div class="ins">
+<p class="ins-l">Implicacion</p>
+<p>La rugosidad par-a-par $R(f_i, f_j)$ si es continua (Sethares). La discontinuidad viene de la <strong>agregacion combinatoria</strong> $\binom{n}{2}$, que cambia discretamente con la cardinalidad. Las comparaciones intra-estrato ($|A| = |B|$) son topologicamente correctas.</p>
+</div>
+
+<div class="ft">
+    Generado: 2026-02-22 22:54 &middot; ChordSpace &middot;
+    <code>experiments/whitney_stratification/run_experiment_1.py</code>
+</div>
+
+</div>
+<script>
+const t=[6.0, 5.5, 5.0, 4.5, 4.0, 3.5, 3.0, 2.5, 2.0, 1.5, 1.0, 0.9, 0.8, 0.7, 0.6, 0.5, 0.4, 0.3, 0.2, 0.1, 0.09, 0.08, 0.07, 0.06, 0.05, 0.04, 0.03, 0.02, 0.01, 0.009, 0.008, 0.007, 0.006, 0.005, 0.004, 0.003, 0.002, 0.001, 0.0005, 0.0001], de=[2.1435458556538443, 2.241405493809547, 1.4341032248104655, 2.4178993495940806, 2.03993649144735, 2.282140962135969, 2.1513401405510844, 2.1859498395882766, 2.032572510588885, 2.78127609703242, 3.3638016930843797, 3.419902935325389, 3.5147014499688405, 3.6004846138368456, 3.6166222850379195, 3.543304890807575, 3.3539849094715968, 3.014003491134052, 2.481675902145473, 1.8450868104037503, 1.7854712590049997, 1.7269859133187895, 1.6703557613728848, 1.6164514298771429, 1.5663053998277825, 1.521121425789385, 1.4822709813824475, 1.4512690684344185, 1.4537215778387425, 1.4546619175743618, 1.455711498074412, 1.4568710906318194, 1.4581414474840866, 1.4595233013592417, 1.4610173650428417, 1.4626243309668594, 1.4643448708211093, 1.4661796351882856, 1.4671400490155226, 1.467929105505695], dj=[0.5678917127946148, 0.5784286860415775, 0.46258953084017795, 0.4905579414371659, 0.3889254567006216, 0.47684144343010537, 0.4695733859420726, 0.5772748863333373, 0.5565512290970368, 0.6146674572570382, 0.5512947208912188, 0.5599596877773692, 0.5624475916132357, 0.5609619519680541, 0.5581536397633473, 0.5525006059293884, 0.4564703461774302, 0.4386555695567122, 0.4055912985919755, 0.3358426877820715, 0.32522928859521644, 0.3136327408015056, 0.30088457731142587, 0.2867676115865994, 0.27099322068516896, 0.2531625584713494, 0.2326948715059662, 0.2086799263490508, 0.18120137498090835, 0.17815898253738038, 0.17505055060634023, 0.17187232589484222, 0.16862018764569636, 0.16528959431814783, 0.16187551985342663, 0.15837237692092937, 0.15477392373347162, 0.15107314990835, 0.14918195778803736, 0.14764844483711306], dh=[0.5503563190965287, 0.5600186376284378, 0.4525849002912138, 0.47630208164944554, 0.3795335136758887, 0.46318918457456576, 0.45608614791540064, 0.5589616011648711, 0.5399340586499876, 0.5931015534356099, 0.5333644652759876, 0.5417017269238961, 0.5439224106825973, 0.5422920333025706, 0.539520793454113, 0.534171310535498, 0.43913630989213215, 0.4224983011715366, 0.39134796291788404, 0.3239567708983514, 0.31349432680113354, 0.3020074249397462, 0.28931048521118446, 0.27516113656177027, 0.2592321681147861, 0.24106226823252208, 0.21996145201912307, 0.19480547345043323, 0.16459691834796666, 0.1611807530936316, 0.15767355183924947, 0.15406888860118678, 0.1503595380550942, 0.14653732714464093, 0.1425929491495829, 0.13851572789050803, 0.13429331465704608, 0.12991129276092975, 0.12765523220876424, 0.12581701363130982], dc=[0.3011365157930491, 0.3172561683439422, 0.17489065227263612, 0.2044539462896361, 0.14869189868483712, 0.182971752926664, 0.18081778665542192, 0.30817155007787245, 0.2823767095254077, 0.398445131343938, 0.3229224626731648, 0.34410301815740396, 0.3495247035480681, 0.34511272671143167, 0.33875684601652656, 0.3271860725148945, 0.26985829573036313, 0.23812347302688952, 0.18517774842368884, 0.1047795706644793, 0.09651386174191368, 0.08853484778177345, 0.08094469308416063, 0.0738606664896041, 0.06741550101041405, 0.06175714499584395, 0.057047696072745735, 0.05346130105786251, 0.051926541765224044, 0.051855006813282034, 0.051798120187095065, 0.051755973829014645, 0.05172865864006959, 0.05171626444044786, 0.051718879929888883, 0.051736592648008894, 0.05176948893458333, 0.05181765388980519, 0.05184748836324371, 0.051874126366230344];
+const L={paper_bgcolor:'#0d1117',plot_bgcolor:'#161b22',font:{family:'Inter',color:'#e6edf3',size:13},
+  xaxis:{gridcolor:'#30363d',zerolinecolor:'#30363d'},yaxis:{gridcolor:'#30363d',zerolinecolor:'#30363d'},
+  legend:{bgcolor:'rgba(22,27,34,0.9)',bordercolor:'#30363d',borderwidth:1},margin:{l:65,r:30,t:45,b:50}};
+const tr=[{x:t,y:de,name:'Euclidiana',line:{color:'#58a6ff',width:2.5}},
+  {x:t,y:dj,name:'JSD',line:{color:'#3fb950',width:2.5}},
+  {x:t,y:dh,name:'Hellinger',line:{color:'#d29922',width:2.5}},
+  {x:t,y:dc,name:'Coseno',line:{color:'#bc8cff',width:2.5}}];
+const lims=[{x:[t[0],t[t.length-1]],y:[1.4681292532033843,1.4681292532033843],name:'Lim euc',line:{color:'#58a6ff',width:1.5,dash:'dash'},mode:'lines'},
+  {x:[t[0],t[t.length-1]],y:[0.14726213530079835,0.14726213530079835],name:'Lim JSD',line:{color:'#3fb950',width:1.5,dash:'dash'},mode:'lines'}];
+Plotly.newPlot('mainChart',[...tr,...lims],{...L,title:{text:'Convergencia al residuo asintotico',font:{size:15}},
+  xaxis:{...L.xaxis,title:'t (semitonos)',autorange:'reversed'},yaxis:{...L.yaxis,title:'Distancia'}});
+Plotly.newPlot('logChart',tr.map(x=>({...x,x:x.x.filter(v=>v>0),y:x.y.filter((_,i)=>x.x[i]>0)})),
+  {...L,title:{text:'Escala log: convergencia suave al residuo',font:{size:15}},
+  xaxis:{...L.xaxis,title:'log(t)',type:'log',autorange:'reversed'},yaxis:{...L.yaxis,title:'Distancia'}});
+</script>
+</body></html>

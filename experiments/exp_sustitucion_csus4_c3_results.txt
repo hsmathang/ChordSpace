@@ -1,0 +1,21 @@
+N=69, consulta=sus4-fund MIDI=[48, 53, 55]
+
+SUSTITUTOS
+1  EUC: sus2-inv2          0.00000   COS: sus2-inv2          0.00000
+2  EUC: sus2-fund          0.58755   COS: sus2-fund          0.00847
+3  EUC: sus4-inv1          0.58755   COS: sus4-inv1          0.00847
+4  EUC: Diada-M2           2.70300   COS: Dom9-inv2          0.25580
+5  EUC: Diada-P4           3.17219   COS: Min9-inv3          0.26490
+6  EUC: Diada-P5           3.59994   COS: Maj9-inv4          0.26983
+7  EUC: Diada-P8           3.88514   COS: Diada-M2           0.27046
+8  EUC: Min7-inv3          3.95672   COS: Min7-inv3          0.27283
+
+ANTI-SUSTITUTOS
+1  EUC: dim7-inv2          10.08798   COS: Diada-M3           1.00000
+2  EUC: dim7-inv1          10.08798   COS: dim7-inv1          1.00000
+3  EUC: dim7-fund          10.08798   COS: dim7-fund          1.00000
+4  EUC: dim7-inv3          10.08798   COS: dim7-inv3          1.00000
+5  EUC: Dom9-inv3          9.21206   COS: dim7-inv2          1.00000
+6  EUC: Dom9-inv2          8.29055   COS: Diada-M7           1.00000
+7  EUC: Dom9-fund          8.16672   COS: Diada-M6           1.00000
+8  EUC: Maj9-inv3          8.13939   COS: Diada-P8           1.00000

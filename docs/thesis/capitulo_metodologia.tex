@@ -7,6 +7,45 @@ Para validar esta propuesta, estructuramos la metodología en torno a tres hipó
 
 El enfoque metodológico desciende desde esta conceptualización hacia la formalización algebraica, el modelado psicoacústico, la construcción del espacio métrico y, finalmente, la validación experimental mediante el contraste entre poblaciones sintéticas y reales.
 
+\begin{figure}[H]
+\centering
+\begin{tikzpicture}[node distance=1.1cm and 0.6cm,
+  stage/.style={draw, very thick, rounded corners=4pt, minimum width=4.8cm,
+                minimum height=1.6cm, fill=gray!6, align=center, font=\small},
+  io/.style={draw, thick, rounded corners=8pt, minimum width=3.4cm,
+             minimum height=1.1cm, fill=blue!8, align=center, font=\small\itshape},
+  arr/.style={-Stealth, very thick, gray!70},
+  lbl/.style={font=\scriptsize, midway, right=2pt}]
+% --- Nodes ---
+\node[io] (input) {Acorde $\mathbf{n} = (n_1, \dots, n_m)$\\Nota MIDI};
+\node[stage, below=of input] (spec) {\textbf{Síntesis Espectral}\\$H=6$ armónicos, $\delta=0.88$};
+\node[stage, below=of spec]  (rough) {\textbf{Modelo de Rugosidad}\\Sethares: $R(f_i, f_j)$};
+\node[stage, below=of rough] (vec) {\textbf{Vectorización 12D}\\$\Phi_{\text{raw}} \in \mathbb{R}^{12}_{\geq 0}$};
+\node[stage, below=of vec]   (norm) {\textbf{Normalización}\\identity $|$ simplex $|$ smooth};
+\node[stage, below=of norm]  (dist) {\textbf{Métrica}\\$d_{\text{euc}}$, $d_{\cos}$, JSD, Hellinger, EB};
+\node[stage, below=of dist]  (mat)  {\textbf{Matriz de Distancias}\\$\mathbf{D} \in \mathbb{R}^{N \times N}$};
+\node[stage, below=of mat]   (red)  {\textbf{Reducción Dimensional}\\MDS (SMACOF) $|$ UMAP $|$ t-SNE};
+\node[io, below=of red]      (out)  {Embedding $Y \subset \mathbb{R}^2$\\+ Métricas de calidad};
+% --- Arrows ---
+\draw[arr] (input) -- (spec);
+\draw[arr] (spec) -- (rough);
+\draw[arr] (rough) -- (vec);
+\draw[arr] (vec) -- (norm);
+\draw[arr] (norm) -- (dist);
+\draw[arr] (dist) -- (mat);
+\draw[arr] (mat) -- (red);
+\draw[arr] (red) -- (out);
+% --- Section refs ---
+\node[font=\scriptsize\sffamily, gray, right=0.3cm of spec]  {§\ref{sec:modelo_psicoacustico}};
+\node[font=\scriptsize\sffamily, gray, right=0.3cm of vec]   {§\ref{sec:modelo_psicoacustico}};
+\node[font=\scriptsize\sffamily, gray, right=0.3cm of norm]  {§\ref{sec:transformaciones}};
+\node[font=\scriptsize\sffamily, gray, right=0.3cm of dist]  {§\ref{sec:metricas_disimilitud}};
+\node[font=\scriptsize\sffamily, gray, right=0.3cm of red]   {§\ref{sec:reduccion_dimensionalidad}};
+\end{tikzpicture}
+\caption{Pipeline metodológico completo. Un acorde MIDI se sintetiza espectralmente, se calcula su vector de rugosidad $\Phi_{\text{raw}} \in \mathbb{R}^{12}$, se normaliza, se mide la distancia entre todos los pares, y se proyecta a $\mathbb{R}^2$ para la visualización y el análisis topológico.}
+\label{fig:pipeline_completo}
+\end{figure}
+
 \section{Conceptualización del Problema y Supuestos Fundamentales}
 \label{sec:conceptualizacion}
 
@@ -112,6 +151,33 @@ R(f_i, f_j) = \sum_{p=1}^{H} \sum_{q=1}^{H} d(p f_i, q f_j, \delta^{p-1}, \delta
 \end{definition}
 
 Se utilizan por defecto $H=6$ armónicos y una tasa de decaimiento $\delta=0.88$. Esta elección es un compromiso entre precisión y eficiencia computacional: los primeros 6 armónicos contienen la mayor parte de la energía y son los principales responsables de la percepción de intervalos básicos.
+
+\begin{figure}[H]
+\centering
+\begin{tikzpicture}[scale=0.85]
+% --- Axes ---
+\draw[-Stealth, thick] (0,0) -- (10.5,0) node[below, font=\small] {$\Delta f / CB$ (separación relativa)};
+\draw[-Stealth, thick] (0,0) -- (0,5.5) node[above, rotate=90, anchor=south, font=\small] {Rugosidad $d(f_1, f_2)$};
+% --- Roughness curve (Plomp-Levelt shape) ---
+\draw[blue!70, very thick, smooth, tension=0.6]
+  plot coordinates {(0,0) (0.3,0.5) (0.8,3.8) (1.2,4.5) (1.8,4.0) (2.5,3.0)
+  (3.5,1.8) (4.5,0.9) (5.5,0.5) (7,0.2) (9,0.05) (10,0.02)};
+% --- Annotations ---
+\draw[dashed, gray, thin] (1.2, 0) -- (1.2, 4.5);
+\node[font=\scriptsize, gray, below] at (1.2, 0) {$\approx 0.25\,CB$};
+\node[font=\scriptsize, text=blue!70] at (2.5, 5) {Máxima rugosidad};
+\draw[-Stealth, thin, blue!50] (2.5, 4.7) -- (1.3, 4.5);
+% --- Zones ---
+\draw[red!60, very thick]
+  (0, -0.6) -- (2, -0.6) node[midway, below=2pt, font=\scriptsize, text=red!60] {Batimiento};
+\draw[orange!60, very thick]
+  (2, -0.6) -- (5, -0.6) node[midway, below=2pt, font=\scriptsize, text=orange!60] {Rugosidad};
+\draw[green!60!black, very thick]
+  (5, -0.6) -- (10, -0.6) node[midway, below=2pt, font=\scriptsize, text=green!60!black] {Separación limpia};
+\end{tikzpicture}
+\caption{Curva de rugosidad teórica para dos sinusoides según el modelo de Sethares. La rugosidad alcanza su máximo cuando la diferencia de frecuencia es aproximadamente $0.25\,CB$ (banda crítica) y decae exponencialmente para separaciones mayores. Se distinguen tres regímenes perceptuales: batimiento lento, rugosidad y separación limpia.}
+\label{fig:curva_rugosidad}
+\end{figure}
 
 \subsection{Vectorización: La Firma de Rugosidad}
 
@@ -233,6 +299,257 @@ Es crucial notar que diferentes métricas inducen topologías distintas. \cite{b
 
 Una propiedad fundamental de $\mathbf{D}$ es su \textit{embeddability}. Una matriz de distancias es representable perfectamente en el espacio euclidiano si y solo si su matriz de Gram centrada es semidefinida positiva (PSD). Las métricas perceptuales frecuentemente violan esta condición \cite{tymoczkoGeometryMusicHarmony2011}. Por esta razón, se utiliza el algoritmo SMACOF para MDS, el cual, a diferencia del MDS clásico (\textit{Strain}), no requiere que $\mathbf{D}$ sea euclidiana; minimiza el error de ajuste (\textit{Stress}) de manera iterativa incluso en presencia de distancias no euclidianas o violaciones de desigualdad triangular \cite{Borg2005}.
 
+\section{Topología del Espacio de Acordes: Estratificación de Whitney}
+\label{sec:estratificacion}
+
+Las secciones anteriores formalizaron el espacio métrico $(\mathcal{A}, d)$ asumiendo que todos los acordes poseen la misma cardinalidad. Sin embargo, el análisis y la sustitución armónica real requieren comparar acordes de cardinalidades distintas ---por ejemplo, una tríada mayor con una tétrada de séptima dominante. Esta sección establece el marco topológico necesario para operar rigurosamente a través de fronteras de cardinalidad.
+
+\subsection{Estratificación por Cardinalidad}
+
+El espacio de $n$-voces $\mathbb{R}^n$ admite una descomposición natural en función del número de alturas distintas presentes.
+
+\begin{definition}[Estratificación de Whitney]
+Se definen los estratos $\Sigma_k^{(n)} = \{ (x_1, \ldots, x_n) \in \mathbb{R}^n : \kappa(x_1, \ldots, x_n) = k \}$ para $k = 1, \ldots, n$, donde $\kappa$ denota la \textbf{cardinalidad} (número de alturas distintas). Las relaciones de clausura satisfacen:
+\begin{equation}
+\overline{\Sigma_k^{(n)}} = \bigcup_{j \leq k} \Sigma_j^{(n)}
+\end{equation}
+\end{definition}
+
+\textbf{Significado musical.} Un acorde en $\Sigma_4^{(4)}$ posee cuatro notas distintas (e.g., Do7: $\{60, 64, 67, 70\}$). Un acorde en $\Sigma_3^{(4)}$ posee tres notas distintas con una duplicación (e.g., $\{60, 64, 67, 67\}$). La frontera $\partial\Sigma_4^{(4)} \subset \Sigma_3^{(4)}$ se alcanza cuando dos voces convergen al unísono.
+
+Esta estructura fue formalizada por \citeA{callenderGeneralizedVoiceLeadingSpaces2008}, quienes demostraron que los espacios de acordes poseen estructura natural de orbifold, y por \citeA{himpelGeometryMusicPerception2022}, quien estableció que dichos espacios admiten una estratificación compatible con la topología de Whitney. En el contexto de este trabajo, una \textit{disimilitud compatible con la estratificación} debe respetar estas estructuras: conforme un acorde $B(t)$ se aproxima a una frontera de estrato (e.g., dos notas se fusionan), la distancia $d(A, B(t))$ debe variar continuamente.
+
+\subsection{El Axioma E0: Continuidad Inter-Estratos}
+
+\begin{definition}[E0: Continuidad Estratificada]
+\label{def:E0}
+Una disimilitud $d$ sobre el espacio de acordes satisface \textbf{continuidad estratificada} (E0) si, para todo acorde $A$ y toda trayectoria continua $B: [0, \epsilon) \to \mathbb{R}^n$ con $B(0) \in \overline{\Sigma_k^{(n)}} \setminus \Sigma_k^{(n)}$:
+\begin{equation}
+\lim_{t \to 0^+} d(A, B(t)) = d(A, B(0))
+\end{equation}
+\end{definition}
+
+En términos musicales, E0 exige que la duplicación de una nota no produzca un salto discontinuo en la distancia, pues duplicar una altura (e.g., doblar el Sol en una tríada) no altera la identidad armónica del acorde.
+
+\subsection{Fallo de la Distancia de Voice-Leading Clásica}
+
+La distancia de voice-leading clásica, basada en el algoritmo húngaro con penalización por gap, constituye el estándar de facto en la geometría de acordes \cite{tymoczkoGeometryMusicalChords2006}. Sin embargo, esta formulación viola el axioma E0 cuando los acordes poseen cardinalidades distintas.
+
+\begin{proposition}[Violación de E0 por $d_{\text{VL}}$]
+\label{prop:VL_falla}
+La distancia húngara $d_{\text{VL}}$ con penalización por gap $g > 0$ no satisface E0 al comparar acordes de cardinalidad distinta a través de una frontera de estrato.
+\end{proposition}
+
+\begin{proof}[Demostración (esquema)]
+Considérese la tríada $A = \{60, 64, 67\}$ y la trayectoria $B(t) = \{60, 64, 67, 67+t\}$ con $t > 0$. Para todo $t > 0$, $B(t)$ es una tétrada ($|B| = 4$), y $d_{\text{VL}}$ computa el emparejamiento óptimo $(4 \times 4)$ entre $A$ (completada con un nodo fantasma de costo $g = 6.5$) y $B(t)$. Conforme $t \to 0^+$, $B(t) \to \{60, 64, 67, 67\}$, musicalmente idéntico a la tríada $A$. Sin embargo, la penalización del gap contribuye un piso constante:
+\begin{equation}
+\lim_{t \to 0^+} d_{\text{VL}}(A, B(t)) = \frac{g}{4g} = 0.25 \neq 0 = d_{\text{VL}}(A, A)
+\end{equation}
+E0 es violado. 
+\end{proof}
+
+\begin{figure}[H]
+\centering
+\begin{tikzpicture}[scale=0.95,
+  stratum/.style={draw, thick, rounded corners=3pt, minimum width=3.2cm,
+                  minimum height=1.2cm, align=center, font=\small},
+  pt/.style={circle, fill, inner sep=1.8pt},
+  lbl/.style={font=\scriptsize}]
+% --- Strata ---
+\node[stratum, fill=blue!10] (s4) at (0,0)    {$\Sigma_4^{(4)}$\\4 notas distintas};
+\node[stratum, fill=orange!10] (s3) at (0,-2.5) {$\Sigma_3^{(4)}$\\3 notas + duplicación};
+\node[stratum, fill=red!10] (s2) at (0,-5)    {$\Sigma_2^{(4)}$\\2 notas + duplicaciones};
+\node[stratum, fill=gray!10] (s1) at (0,-7.5)  {$\Sigma_1^{(4)}$\\Unísono cuádruple};
+% --- Closure arrows ---
+\draw[-Stealth, dashed, thick, gray] (s4.south) -- (s3.north)
+  node[lbl, midway, right=4pt] {$\partial\Sigma_4 \subset \overline{\Sigma_3}$};
+\draw[-Stealth, dashed, thick, gray] (s3.south) -- (s2.north);
+\draw[-Stealth, dashed, thick, gray] (s2.south) -- (s1.north);
+% --- Trajectory B(t) ---
+\node[pt, blue] (Bt) at (4.5, 0) {};
+\node[lbl, right=2pt of Bt, blue] {$B(t) = \{60,64,67,67{+}t\}$};
+\node[pt, orange] (B0) at (4.5, -2.5) {};
+\node[lbl, right=2pt of B0, orange] {$B(0) = \{60,64,67,67\} \sim A$};
+\draw[-Stealth, thick, blue!60] (Bt) -- (B0)
+  node[lbl, midway, left=4pt] {$t \to 0^+$};
+% --- Distance annotations ---
+\node[lbl, right=0.5cm of B0, text width=3.8cm, align=left] (annot) {
+  $d_{\text{VL}} \to 0.25 \neq 0$ \textcolor{red}{$\boldsymbol{\times}$}\\
+  $d_{\text{EB}} \to 0$\phantom{.25 $\neq$ 0} \textcolor{green!60!black}{$\boldsymbol{\checkmark}$}
+};
+\end{tikzpicture}
+\caption{Estratificación del espacio de 4-voces. La trayectoria $B(t)$ parte de $\Sigma_4$ y, conforme $t \to 0^+$, cruza la frontera hacia $\Sigma_3$ donde dos voces colapsan al unísono. La distancia húngara $d_{\text{VL}}$ exhibe una discontinuidad de $0.25$, mientras que $d_{\text{EB}}$ converge suavemente a cero, satisfaciendo el axioma E0.}
+\label{fig:estratificacion_E0}
+\end{figure}
+
+Esta discontinuidad no es un artefacto numérico sino una consecuencia estructural del esquema de padding con penalización fija, el cual introduce un costo residual irreducible independiente de la proximidad real entre los acordes. Este resultado motiva la búsqueda de una disimilitud alternativa compatible con la estratificación.
+
+\section{Disimilitud de Expansión Biyectiva (EB)}
+\label{sec:metrica_EB}
+
+\subsection{Motivación}
+
+La causa raíz del fallo de $d_{\text{VL}}$ es que trata el tamaño de voicing $|A|$ como una propiedad fundamental, requiriendo penalizaciones por gap para manejar $|A| \neq |B|$. La disimilitud de Expansión Biyectiva (EB) opera en cambio sobre la \textbf{cardinalidad} $\kappa(A)$ (alturas distintas), igualando los tamaños mediante \textbf{duplicación de notas existentes} en lugar de introducir gaps artificiales. Duplicar una nota (ejecutar la misma altura en dos octavas) es una técnica estándar de orquestación que no modifica la identidad armónica del acorde.
+
+\subsection{Definición Formal}
+
+\begin{definition}[Soporte y Cardinalidad]
+Para un acorde $A = \{a_1, \ldots, a_n\} \subset \mathbb{R}$, se define el \textbf{soporte} $\text{supp}(A)$ como el conjunto de alturas distintas bajo una tolerancia $\tau = 10^{-6}$ semitonos, y la \textbf{cardinalidad} $\kappa(A) = |\text{supp}(A)|$.
+\end{definition}
+
+\begin{definition}[Expansión]
+Una \textbf{expansión} de $A$ a tamaño $K \geq \kappa(A)$ es un multiconjunto $\tilde{A} = \{a_1', \ldots, a_K'\}$ tal que $\text{supp}(\tilde{A}) \subseteq \text{supp}(A)$ y $|\tilde{A}| = K$. El conjunto de todas las expansiones se denota $\mathcal{E}(A, K)$.
+\end{definition}
+
+\begin{definition}[Disimilitud EB]
+\label{def:EB}
+Para acordes $A, B \subset \mathbb{R}$ con función de paso $s$, se define:
+\begin{equation}
+\label{eq:EB}
+d_{\text{EB}}(A, B) = \min_{\substack{\tilde{A} \in \mathcal{E}(A, K) \\ \tilde{B} \in \mathcal{E}(B, K)}} \frac{1}{K} \min_{\sigma \in S_K} \sum_{i=1}^{K} s(\tilde{a}_i, \tilde{b}_{\sigma(i)})
+\end{equation}
+donde $K = \max(\kappa(A), \kappa(B))$ y la normalización por $K$ garantiza invariancia de escala respecto al número de voces.
+\end{definition}
+
+La función de paso $s$ utilizada en la implementación incorpora una componente de penalización por registro:
+\begin{equation}
+s_{\text{repo}}(x, y) = s_{\circ}(x, y) + 0.35 \cdot \frac{\min(|x - y|, 24)}{24}
+\end{equation}
+donde $s_{\circ}(x,y) = \min(|x' - y'|, 12 - |x' - y'|)$ es la distancia circular en el pitch-class circle.
+
+\subsection{Propiedades Axiomáticas}
+
+\begin{proposition}[Axiomas de EB]
+Con $s = s_{\circ}$ (paso circular), $d_{\text{EB}}$ satisface:
+\begin{enumerate}
+\item \textbf{(M1) No negatividad:} $d_{\text{EB}}(A, B) \geq 0$.
+\item \textbf{(M2) Identidad:} $d_{\text{EB}}(A, A) = 0$.
+\item \textbf{(M3) Simetría:} $d_{\text{EB}}(A, B) = d_{\text{EB}}(B, A)$.
+\item \textbf{(E0) Continuidad estratificada:} Demostrada en el Teorema~\ref{thm:EB_E0}.
+\item \textbf{(M4) Desigualdad triangular:} \textit{Verificada empíricamente} con una tasa de violación de $0.63\%$ (942 de 150\,000 triples evaluados).
+\end{enumerate}
+\end{proposition}
+
+\begin{figure}[H]
+\centering
+\begin{tikzpicture}[scale=0.85,
+  note/.style={circle, draw, thick, minimum size=0.6cm, font=\scriptsize, inner sep=1pt},
+  ghost/.style={circle, draw, dashed, thick, minimum size=0.6cm, font=\scriptsize, inner sep=1pt, gray},
+  match/.style={-Stealth, thick},
+  cost/.style={font=\scriptsize, midway, above, sloped}]
+% --- Hungarian (Left) ---
+\node[font=\small\bfseries] at (2.5, 3.2) {(a) Húngaro con gap};
+\node[note, fill=blue!15] (a1) at (0,2) {Do};
+\node[note, fill=blue!15] (a2) at (0,1) {Mi};
+\node[note, fill=blue!15] (a3) at (0,0) {Sol};
+\node[ghost]               (a4) at (0,-1) {$\varnothing$};
+\node[note, fill=orange!15] (b1) at (5,2) {Do};
+\node[note, fill=orange!15] (b2) at (5,1) {Mi};
+\node[note, fill=orange!15] (b3) at (5,0) {Sol};
+\node[note, fill=orange!15] (b4) at (5,-1) {Si$\flat$};
+\draw[match, green!60!black] (a1) -- (b1) node[cost] {$0$};
+\draw[match, green!60!black] (a2) -- (b2) node[cost] {$0$};
+\draw[match, green!60!black] (a3) -- (b3) node[cost] {$0$};
+\draw[match, red!70]         (a4) -- (b4) node[cost] {$g=6.5$};
+\node[font=\scriptsize, text=red!70] at (2.5, -2) {Costo: $g/4g = 0.25$ siempre};
+% --- EB (Right) ---
+\node[font=\small\bfseries] at (10.5, 3.2) {(b) Expansión Biyectiva};
+\node[note, fill=blue!15]   (ea1) at (8,2) {Do};
+\node[note, fill=blue!15]   (ea2) at (8,1) {Mi};
+\node[note, fill=blue!15]   (ea3) at (8,0) {Sol};
+\node[note, fill=blue!8, draw=blue!40, dashed] (ea4) at (8,-1) {Sol};
+\node[note, fill=orange!15] (eb1) at (13,2) {Do};
+\node[note, fill=orange!15] (eb2) at (13,1) {Mi};
+\node[note, fill=orange!15] (eb3) at (13,0) {Sol};
+\node[note, fill=orange!15] (eb4) at (13,-1) {Si$\flat$};
+\draw[match, green!60!black] (ea1) -- (eb1) node[cost] {$0$};
+\draw[match, green!60!black] (ea2) -- (eb2) node[cost] {$0$};
+\draw[match, green!60!black] (ea3) -- (eb3) node[cost] {$0$};
+\draw[match, blue!60]        (ea4) -- (eb4) node[cost] {$s(\text{Sol}, \text{Si}\flat)$};
+\node[font=\scriptsize, text=blue!60] at (10.5, -2) {Costo: $s(\text{Sol}, \text{Si}\flat)/4 \to 0$ si colapsan};
+\node[font=\scriptsize\itshape, gray, text width=4cm, align=center] at (8, -2.7) {Sol duplicado\\(costo 0)};
+\end{tikzpicture}
+\caption{Comparación del mecanismo de emparejamiento entre la distancia húngara con penalización por gap (a) y la expansión biyectiva EB (b), para comparar la tríada $\{\text{Do, Mi, Sol}\}$ con la tétrada $\{\text{Do, Mi, Sol, Si}\flat\}$. En (a), el nodo fantasma $\varnothing$ incurre un costo fijo $g$ independiente del contenido musical. En (b), el Sol se duplica (costo 0) y se empareja biyectivamente, reflejando la distancia real entre las voces.}
+\label{fig:eb_vs_hungarian}
+\end{figure}
+
+\textbf{Nota sobre M4.} La violación de la desigualdad triangular surge del paso de expansión: la expansión óptima $\tilde{A}$ para comparar $A$ con $B$ puede diferir de la expansión óptima $\tilde{A}$ para comparar $A$ con $C$, violando la transitividad requerida. Por esta razón, $d_{\text{EB}}$ se clasifica formalmente como una \textbf{cuasi-métrica empírica}, no como una métrica estricta. Esta clasificación es compatible con los algoritmos de reducción dimensional empleados: UMAP opera sobre conjuntos simpliciales difusos y tolera entradas cuasi-métricas \cite{McInnes2018}, mientras que MDS-SMACOF minimiza el Stress de manera iterativa sin requerir metricidad estricta \cite{Borg2005}.
+
+\subsection{Demostración de Continuidad Estratificada (E0)}
+
+\begin{theorem}[E0 para EB]
+\label{thm:EB_E0}
+Sean $A \subset \mathbb{R}$ un acorde y $B: [0, \epsilon) \to \mathbb{R}^n$ una trayectoria continua tal que $\kappa(B(t)) = k$ para todo $t > 0$ y $\kappa(B(0)) = k' < k$. Entonces:
+\begin{equation}
+\lim_{t \to 0^+} d_{\text{EB}}(A, B(t)) = d_{\text{EB}}(A, B(0))
+\end{equation}
+\end{theorem}
+
+\begin{proof}[Demostración (esquema)]
+La propiedad clave que habilita E0 es que la \textbf{duplicación tiene costo cero}. Sea $K(t) = \max(\kappa(A), \kappa(B(t)))$. Cuando dos elementos del soporte de $B(t)$ convergen ($b_i(t) \to b_j(t) = b^*$), la expansión que duplicaba cada elemento convergente se aproxima a la expansión del acorde fusionado. Dado que $s_{\circ}$ es continua, $\min_\sigma \sum s(\tilde{a}_i, \tilde{b}_{\sigma(i)})$ es función continua de las coordenadas del soporte, y $d_{\text{EB}}$, definida como mínimo de funciones continuas sobre un conjunto finito de expansiones, es continua. Las copias adicionales $k - k'$ del pitch fusionado $b^*$ pueden redistribuirse libremente en la expansión de $A$ sin alterar el costo óptimo, pues la duplicación no contribuye costo marginal.
+\end{proof}
+
+\subsection{Derivación Analítica}
+
+Para trayectorias de colapso lineal, $d_{\text{EB}}$ admite una fórmula cerrada que revela su dependencia de la estructura interválica del acorde.
+
+\begin{proposition}[Fórmula de Colapso Lineal]
+Para un acorde $A = \{r, r+\Delta_1, \ldots, r+\Delta_{n-1}\}$ con $0 < \Delta_i < 6$ (dentro del semicírculo), la trayectoria de colapso al unísono $\gamma(t) = \{r, r+\Delta_1 t, \ldots, r+\Delta_{n-1} t\}$ satisface:
+\begin{equation}
+d_{\text{EB}}(\gamma(t), U_r^{(n)}) = \bar{\Delta} \cdot t, \quad \text{donde } \bar{\Delta} = \frac{\sum_{i=0}^{n-1} \Delta_i}{n}
+\end{equation}
+es el \textbf{intervalo medio} desde cada voz a la raíz.
+\end{proposition}
+
+Esta fórmula fue verificada numéricamente con precisión de máquina ($O(10^{-16})$) para el caso del acorde de séptima dominante Do7 ($\Delta = \{0, 4, 7, 10\}$, $\bar{\Delta} = 5.25$), proporcionando una demostración computacional exacta de la propiedad E0.
+
+\subsection{Tensión Ontológica: El Teorema de Incompatiblidad}
+
+La adopción de EB como disimilitud en el espacio estratificado conlleva una decisión ontológica explícita. Se demuestra que los siguientes tres requisitos son mutuamente incompatibles:
+\begin{enumerate}
+\item[(A)] \textbf{Consciencia de multiplicidad:} $\{C\} \neq \{C, C\}$ como estados geométricos.
+\item[(B)] \textbf{Duplicación costo cero:} $d(A, A \cup \{a\}) = 0$ para $a \in A$.
+\item[(C)] \textbf{Identidad estricta (M2):} $d(X, Y) = 0 \iff X = Y$.
+\end{enumerate}
+
+Si (B) vale, entonces $d(\{C\}, \{C,C\}) = 0$. Si además (C) vale, entonces $\{C\} = \{C,C\}$, contradiciendo (A). En este trabajo se adopta el \textbf{marco cociente}, operando sobre $\mathcal{C}/\!\!\sim$ donde la multiplicidad no es un observable geométrico, priorizando la continuidad estratificada (E0) que resulta esencial para la coherencia del pipeline de reducción dimensional.
+
+\section{Discontinuidad Combinatoria de $\Phi_{\text{raw}}$}
+\label{sec:discontinuidad_phi}
+
+La sección anterior estableció que la disimilitud EB es continua en las fronteras de estrato. Sin embargo, el propio vector de rugosidad $\Phi_{\text{raw}}$ (§\ref{sec:modelo_psicoacustico}) presenta discontinuidades en dichas fronteras. En esta sección se demuestra que estas discontinuidades son de naturaleza \textbf{combinatoria}, no acústica, y se formalizan condiciones bajo las cuales $\Phi_{\text{raw}}$ es continuo.
+
+\begin{theorem}[Discontinuidad Combinatoria]
+\label{thm:discontinuidad}
+Sea $A = \{a_1, \ldots, a_m\}$ un acorde con $m$ notas distintas, y sea $B(t) = \{a_1, \ldots, a_m, a_m + t\}$ con $t > 0$. Entonces, en general:
+\begin{equation}
+\lim_{t \to 0^+} \Phi_{\text{raw}}(B(t)) \neq \Phi_{\text{raw}}(A)
+\end{equation}
+pues $\Phi_{\text{raw}}(B(t))$ suma sobre $\binom{m+1}{2}$ pares mientras que $\Phi_{\text{raw}}(A)$ suma sobre $\binom{m}{2}$ pares.
+\end{theorem}
+
+\begin{proof}
+El acorde $B(t)$ tiene $m+1$ voces, contribuyendo $\binom{m+1}{2}$ pares diádicos. Conforme $t \to 0^+$, los pares adicionales que involucran la voz $m+1$ contribuyen:
+\begin{equation}
+\sum_{i=1}^{m} R(f_i, f_{m+1}(t)) \to \sum_{i=1}^{m-1} R(f_i, f_m) + R(f_m, f_m) = \sum_{i=1}^{m-1} R(f_i, f_m) + R_0
+\end{equation}
+donde $R_0 = R(f, f)$ es la rugosidad del unísono (no nula en el modelo de Sethares). El residuo $\lim_{t \to 0^+} \Phi_{\text{raw}}(B(t)) - \Phi_{\text{raw}}(A)$ consta de $m$ contribuciones de pares adicionales que existen en $B(t)$ ($m+1$ voces) pero no en $A$ ($m$ voces). Es un artefacto combinatorio derivado del cambio en $\binom{n}{2}$, no de una discontinuidad en el modelo acústico $R$.
+\end{proof}
+
+\begin{theorem}[Continuidad a Cardinalidad Constante]
+\label{thm:continuidad_constante}
+Si $B(t) \in \mathbb{R}^n$ varía continuamente con $t$ y $|B(t)| = n$ para todo $t$, entonces:
+\begin{equation}
+\Phi_{\text{raw}}(B(t)) \to \Phi_{\text{raw}}(B(0)) \quad \text{conforme } t \to 0^+
+\end{equation}
+\end{theorem}
+
+\begin{proof}
+El número de pares $\binom{n}{2}$ es constante. Cada contribución $R(f_i(t), f_j(t))$ es función continua de $t$ (pues la función de rugosidad de Sethares y el mapeo MIDI-frecuencia son continuos). Siendo $\Phi_{\text{raw}}$ una suma finita de funciones continuas, es continua.
+\end{proof}
+
+\textbf{Síntesis.} La discontinuidad de $\Phi_{\text{raw}}$ no es un fenómeno acústico ---la función de rugosidad $R$ es continua--- sino un artefacto \textbf{combinatorio}: surge porque el coeficiente binomial $\binom{n}{2}$ cambia discretamente cuando varía el tamaño de voicing $n$. Cuando $n$ se mantiene constante, $\Phi_{\text{raw}}$ es continuo. Esta distinción tiene implicaciones prácticas: cualquier descriptor que agregue sobre subconjuntos del acorde (pares, triples, etc.) exhibirá discontinuidades combinatoriales análogas en las fronteras de cardinalidad. La disimilitud EB evita este problema operando sobre emparejamientos de voces en lugar de agregaciones de subconjuntos.
+
 \section{Reducción de Dimensionalidad: Test de la Hipótesis de Variedad}
 \label{sec:reduccion_dimensionalidad}
 
@@ -240,12 +557,38 @@ Esta etapa no constituye meramente una herramienta de visualización, sino el in
 
 Bajo este enfoque, los algoritmos de reducción dimensional (MDS, UMAP) actúan como "sondas" topológicas. El éxito de la reducción —medido a través de la minimización del \textit{Stress} y la preservación de vecindarios— se interpreta como evidencia a favor de la existencia de esta variedad musical subyacente. Si el espacio fuera puramente aleatorio o hiperdimensional sin estructura, ninguna proyección en $\mathbb{R}^2$ lograría métricas de calidad aceptables.
 
-\begin{figure}[h]
+\begin{figure}[H]
 \centering
-\fbox{\parbox{0.8\textwidth}{\centering \textbf{[FIGURA 3.X: Pipeline de Reducción Dimensional]} \\
-Esquema lógico: Input $\mathbb{R}^{12}$ $\to$ Matriz $D$ $\to$ Optimizador (SMACOF/UMAP) $\to$ Output $\mathbb{R}^2$. \\
-\textit{Debe mostrar explícitamente la pérdida de información vs preservación de estructura.}}}
-\caption{Flujo de reducción dimensional concebido como test de la hipótesis de variedad.}
+\begin{tikzpicture}[node distance=0.8cm and 1.4cm,
+  box/.style={draw, very thick, rounded corners=4pt, minimum width=3.2cm,
+              minimum height=1.6cm, fill=gray!4, align=center, font=\small},
+  smallbox/.style={draw, thick, rounded corners=3pt, minimum width=2.2cm,
+                   minimum height=1cm, align=center, font=\scriptsize},
+  arr/.style={-Stealth, very thick, gray!70},
+  darr/.style={-Stealth, thick, dashed, red!60}]
+% --- Main flow ---
+\node[box, fill=blue!8] (phi) {$\Phi \in \mathbb{R}^{12}$\\Vectores normalizados\\($N$ acordes)};
+\node[box, fill=green!8, right=2cm of phi] (D) {$\mathbf{D} \in \mathbb{R}^{N \times N}$\\Matriz de\\distancias};
+\node[box, fill=orange!8, right=2cm of D] (Y) {$Y \subset \mathbb{R}^2$\\Embedding\\2D};
+\draw[arr] (phi) -- (D) node[font=\scriptsize, midway, above] {$d(\Phi_i, \Phi_j)$};
+\draw[arr] (D) -- (Y)   node[font=\scriptsize, midway, above] {$\min \sigma(Y)$};
+% --- Algorithms below ---
+\node[smallbox, fill=yellow!10, below=1cm of Y] (mds) {MDS\\SMACOF};
+\node[smallbox, fill=yellow!10, left=0.4cm of mds] (umap) {UMAP};
+\node[smallbox, fill=yellow!10, right=0.4cm of mds] (tsne) {t-SNE};
+\draw[arr, gray!50] (D.south) -- ++(0,-0.5) -| (mds.north);
+\draw[arr, gray!50] (D.south) -- ++(0,-0.5) -| (umap.north);
+\draw[arr, gray!50] (D.south) -- ++(0,-0.5) -| (tsne.north);
+% --- Quality metrics ---
+\node[smallbox, fill=red!8, below=0.8cm of mds] (qual) {$T(k)$, $C(k)$\\Stress, $\rho_S$};
+\draw[darr] (mds.south) -- (qual.north);
+\draw[darr] (umap.south) -- (qual.north west);
+\draw[darr] (tsne.south) -- (qual.north east);
+% --- H2 annotation ---
+\node[font=\footnotesize\itshape, gray, text width=4cm, align=center, below=0.3cm of qual]
+  {Si métricas $> p_{95}$ del modelo nulo:\\H2 (Variedad) respaldada};
+\end{tikzpicture}
+\caption{Pipeline de reducción dimensional como test de la Hipótesis de Variedad (H2). Los vectores $\Phi \in \mathbb{R}^{12}$ se transforman en una matriz de distancias $\mathbf{D}$, la cual se proyecta a $\mathbb{R}^2$ mediante tres algoritmos independientes. La calidad del embedding se evalúa con Trustworthiness $T(k)$, Continuity $C(k)$, Stress de Kruskal y correlación de Spearman $\rho_S$, contrastando contra un modelo nulo de permutaciones aleatorias.}
 \label{fig:pipeline_dimred}
 \end{figure}
 
@@ -398,12 +741,33 @@ Mide la dependencia monótona entre las distancias originales $D_{ij}$ y las pro
 \end{definition}
 
 % PLACEHOLDER: Figura Shepard
-\begin{figure}[h]
+\begin{figure}[H]
 \centering
-\fbox{\parbox{0.6\textwidth}{\centering \textbf{[FIGURA 3.Y: Diagrama de Shepard (Conceptual)]} \\
-Scatterplot $D_{ij}$ vs $\hat{D}_{ij}$. \\
-\textit{Muestra ajuste lineal ideal vs dispersión real.}}}
-\caption{Diagrama de Shepard representativo de un embedding.}
+\begin{tikzpicture}[scale=0.75]
+% --- Axes ---
+\draw[-Stealth, thick] (0,0) -- (8.5,0) node[below, font=\small] {$D_{ij}$ (distancia original)};
+\draw[-Stealth, thick] (0,0) -- (0,8.5) node[above, rotate=90, anchor=south, font=\small] {$\hat{D}_{ij}$ (distancia en embedding)};
+% --- Diagonal (perfect fit) ---
+\draw[red!60, very thick, dashed] (0,0) -- (8,8)
+  node[font=\scriptsize, pos=0.85, above left] {Ajuste perfecto};
+% --- Simulated scatter (conceptual dots) ---
+\foreach \x/\y in {
+  0.5/0.7, 0.8/0.6, 1.0/1.3, 1.2/0.9, 1.5/1.6, 1.7/1.4,
+  2.0/2.3, 2.2/1.8, 2.5/2.6, 2.8/2.4, 3.0/3.4, 3.2/2.9,
+  3.5/3.7, 3.8/3.3, 4.0/4.2, 4.3/3.8, 4.5/4.8, 4.8/4.3,
+  5.0/5.3, 5.3/4.9, 5.5/5.8, 5.8/5.2, 6.0/6.4, 6.3/5.9,
+  6.5/6.8, 6.8/6.3, 7.0/7.2, 7.3/6.8, 7.5/7.6, 7.8/7.3
+} {
+  \fill[blue!50, opacity=0.6] (\x, \y) circle (2pt);
+}
+% --- Annotations ---
+\node[font=\scriptsize, text=blue!70, text width=3cm, align=center] at (2, 6.5)
+  {Puntos sobre la diagonal:\\Distancias \textbf{bien}\\preservadas};
+\draw[-Stealth, thin, blue!50] (2, 5.8) -- (2.5, 2.7);
+\node[font=\scriptsize, text=red!70, text width=3cm, align=center] at (6.5, 2.5)
+  {Dispersión $= \sigma(Y)$\\(Stress de Kruskal)};
+\end{tikzpicture}
+\caption{Diagrama de Shepard conceptual. Cada punto representa un par de acordes $(i,j)$. El eje horizontal muestra la distancia original $D_{ij}$ y el vertical la distancia en el embedding $\hat{D}_{ij}$. Un embedding perfecto alinearía todos los puntos sobre la diagonal (línea roja punteada). La dispersión alrededor de esta diagonal cuantifica el Stress.}
 \label{fig:shepard_conceptual}
 \end{figure}
 
@@ -434,8 +798,10 @@ E4 & Estabilidad ante ruido & La topología es robusta ante perturbaciones micro
 E5 & Validación perceptual & La rugosidad correlaciona con juicios de consonancia humana & $P_{BOWLING}$ & Spearman $\rho$, corr.\ parcial \\ \hline
 E6 & Validación funcional & Acordes de la misma función armónica son vecinos cercanos & $P_{FUNC}$ & Silhouette ($\{T, S, D\}$) \\ \hline
 E7 & Consistencia estilística & Bach, ruido y extremos forman manifolds separables & $P_{BACH} \cup P_{NOISE} \cup P_{EXT}$ & KL, Silhouette (estilo) \\ \hline
+E8 & Estratificación EB & La disimilitud EB satisface E0 en fronteras de estrato & $P_{CANON}$ & $d_{\text{EB}} \to 0$ vs $d_{\text{VL}} \to 0.25$ \\ \hline
+E9 & Regresión 12D vs 1D & El vector $\Phi_{\text{raw}}$ predice ratings humanos mejor que $R_{\text{total}}$ & $P_{BOWLING}$ & $R^2$ Nested CV, Pearson OOS \\ \hline
 \end{tabular}
-\caption{Batería experimental. Cada experimento vincula una hipótesis con una población, un conjunto de métricas y un resultado esperado. Las hipótesis H1 (sustitución), H2 (variedad) y H3 (validez ecológica) se evalúan a través de los experimentos E5--E6, E1--E4, y E7, respectivamente.}
+\caption{Batería experimental. Cada experimento vincula una hipótesis con una población, un conjunto de métricas y un resultado esperado. Las hipótesis H1 (sustitución), H2 (variedad) y H3 (validez ecológica) se evalúan a través de los experimentos E5--E6, E1--E4, y E7, respectivamente. Los experimentos E8 y E9 validan la disimilitud EB (§\ref{sec:metrica_EB}) y el poder predictivo del vector de rugosidad (§\ref{sec:discontinuidad_phi}), respectivamente.}
 \label{tab:experimentos}
 \end{table}
 
@@ -460,6 +826,99 @@ El procedimiento opera en tres pasos. Primero, se importan los estímulos exacto
 \rho_S = \text{Spearman}(\mathbf{r}_{\text{modelo}},\ \mathbf{r}_{\text{humano}})
 \end{equation}
 Se espera $\rho > 0.5$ como indicador de correlación moderada-fuerte. Adicionalmente, se calcula la \textbf{correlación parcial} controlando por cardinalidad del acorde, lo que permite aislar el efecto de la rugosidad acústica de posibles confusores como la ``masa'' disonante total asociada al número de notas.
+
+\subsection{Validación Predictiva Multidimensional: Representación 12D vs.\ Escalar 1D}
+\label{subsec:validacion_12d}
+
+Más allá de la correlación bivariada entre $R_{\text{total}}$ y los juicios humanos (que colapsa toda la información del vector en un único número), se examina si la representación vectorial completa $\Phi_{\text{raw}} \in \mathbb{R}^{12}$ captura estructura perceptual adicional respecto al escalar $R_{\text{total}} = \|\Phi_{\text{raw}}\|_1$.
+
+\paragraph{Diseño del contraste.}
+Se formulan dos modelos de regresión supervisada que predicen las calificaciones de consonancia humana $y$ a partir de las representaciones calculadas por el pipeline psicoacústico:
+\begin{itemize}
+\item \textbf{Modelo 1D (Baseline):} Se expande el escalar $R_{\text{total}}$ mediante características polinómicas (grado $d \in \{2, 3, 4\}$, seleccionado por validación cruzada interna) para dotar al baseline de capacidad no lineal comparable en grados de libertad al modelo 12D.
+\item \textbf{Modelo 12D:} Se aplica regresión Ridge ($L_2$) sobre el vector $\Phi_{\text{raw}} \in \mathbb{R}^{12}$, con el hiperparámetro de regularización $\alpha \in \{0.1, 1.0, 10.0, 100.0\}$ seleccionado por validación cruzada interna.
+\end{itemize}
+
+\begin{figure}[H]
+\centering
+\begin{tikzpicture}[node distance=1cm and 1.5cm,
+  io/.style={draw, thick, rounded corners=4pt, fill=blue!8, align=center, font=\small, minimum height=1cm, minimum width=2.4cm},
+  op/.style={draw, thick, circle, fill=gray!10, font=\small\bfseries, inner sep=2pt},
+  model/.style={draw, very thick, rounded corners=2pt, fill=yellow!10, align=center, font=\small, minimum height=1cm, minimum width=2.8cm},
+  target/.style={draw, thick, dashed, rounded corners=4pt, fill=green!8, align=center, font=\small, minimum height=1cm, minimum width=2.4cm},
+  arr/.style={-Stealth, very thick, gray!80},
+  lbl/.style={font=\scriptsize, midway, above, sloped}]
+% --- Inputs ---
+\node[io] (phi) {Vector Estructural\\$\Phi_{\text{raw}} \in \mathbb{R}^{12}$};
+\node[op, below=1.2cm of phi] (sum) {$\sum$};
+\draw[arr] (phi) -- (sum) node[lbl, right, near start] {Colapso};
+\node[io, right=1.2cm of sum] (rtot) {Escalar\\$R_{\text{total}} \in \mathbb{R}^1$};
+\draw[arr] (sum) -- (rtot);
+% --- Models ---
+\node[model, right=2cm of phi] (m12) {Regresión Ridge ($L_2$)\\12 parámetros};
+\node[model, right=1.2cm of rtot] (m1) {Regresión Ridge ($L_2$)\\+ Expansión Polin.\ ($d$)\\$\approx 12$ parámetros};
+\draw[arr] (phi) -- (m12) node[lbl] {Modelo 12D};
+\draw[arr] (rtot) -- (m1) node[lbl] {Baseline 1D};
+% --- Targets ---
+\node[target, right=2cm of m12] (target) {Rating Humano\\$y \in \mathbb{R}$};
+\draw[arr] (m12) -- (target) node[lbl] {Predicción $\hat{y}_{12}$};
+\draw[arr] (m1) -| (target) node[font=\scriptsize, near end, right] {Predicción $\hat{y}_1$};
+% --- Highlighting the loss ---
+\node[font=\scriptsize\itshape, text=red!70, text width=2.5cm, align=center] at (1.5, -0.6) {Pérdida de\\Topología};
+\end{tikzpicture}
+\caption{Contraste metodológico entre el Modelo 12D y el Baseline 1D. El modelo 12D utiliza la distribución completa de rugosidad $\Phi_{\text{raw}}$ para predecir juicios humanos, asumiendo que interválicas distintas informan diferentemente la disonancia. El Baseline 1D colapsa la topología en un único escalar $R_{\text{total}}$, pero expande polinómicamente el espacio para igualar de manera justa la capacidad paramétrica (grados de libertad) durante el contraste.}
+\label{fig:contraste_12d_1d}
+\end{figure}
+
+\paragraph{Control de grados de libertad.}
+La comparación directa entre un escalar crudo (0 parámetros ajustables) y una regresión Ridge con 12 pesos constituiría una falacia de contraste asimétrico. La expansión polinómica del baseline iguala la capacidad paramétrica, asegurando que cualquier superioridad del modelo 12D sea atribuible al contenido informacional de la distribución interválica y no al mero aumento de parámetros.
+
+\paragraph{Segmentación por cardinalidad.}
+Para controlar la colinealidad entre la cardinalidad del acorde (número de notas) y la magnitud de $R_{\text{total}}$, el análisis se ejecuta de manera aislada por estrato de cardinalidad: tríadas ($k=3$, $N=66$) y tétradas ($k=4$, $N=220$). Las díadas ($k=2$, $N=12$) se excluyen formalmente del análisis segmentado dado que $N=12 \leq D=12$ impide una validación cruzada estable (la matriz de diseño Ridge es cuadrada o subdeterminada).
+
+\paragraph{Protocolo estadístico.}
+El rendimiento predictivo se estima mediante \textbf{Validación Cruzada Repetida} (5 pliegues, 10 repeticiones, semilla fija). La optimización de hiperparámetros emplea \textbf{búsqueda anidada} (\textit{Nested} GridSearchCV con $k=3$ pliegues internos) para prevenir fuga de datos en la selección del modelo. Se reporta la varianza explicada $R^2$ como $\text{Media} \pm \text{Desviación Estándar}$.
+
+\begin{figure}[H]
+\centering
+\begin{tikzpicture}[node distance=0.6cm and 0.8cm,
+  outer/.style={draw, very thick, rounded corners=4pt, minimum width=10cm,
+                minimum height=2.2cm, fill=blue!5, align=center},
+  inner/.style={draw, thick, rounded corners=3pt, minimum width=4.2cm,
+                minimum height=1.4cm, fill=orange!8, align=center, font=\small},
+  fold/.style={draw, thick, minimum width=1.2cm, minimum height=0.8cm,
+               font=\scriptsize, align=center},
+  arr/.style={-Stealth, very thick, gray!70},
+  note/.style={font=\scriptsize\itshape, gray, text width=4cm, align=center}]
+% --- Outer loop ---
+\node[outer] (outer) {};
+\node[font=\small\bfseries, above=1pt of outer.north, anchor=south] {Outer Loop: RepeatedKFold (5$\times$10)};
+% --- Train/Test split ---
+\node[fold, fill=green!15] (train) at (-2.5, 0) {Train\\(4 folds)};
+\node[fold, fill=red!15]   (test)  at (1.5, 0)  {Test\\(1 fold)};
+\draw[arr] (train.east) -- (test.west) node[font=\scriptsize, midway, above] {$R^2$ out-of-fold};
+% --- Inner loop (below) ---
+\node[inner, below=1.5cm of outer] (gridcv) {\textbf{Inner Loop:} GridSearchCV ($k=3$)\\$\alpha \in \{0.1, 1, 10, 100\}$ (Ridge)\\grado $\in \{2, 3, 4\}$ (Poly)};
+\draw[arr] (train.south) -- ++(0, -0.5) -| (gridcv.north)
+  node[font=\scriptsize, pos=0.25, right=2pt] {Solo datos de train};
+% --- Best model ---
+\node[fold, fill=yellow!15, below=0.8cm of gridcv, minimum width=3cm] (best) {Mejor $\hat{\alpha}$};
+\draw[arr] (gridcv.south) -- (best.north);
+\draw[arr, dashed, blue!60] (best.east) -- ++(3, 0) |- (test.east)
+  node[font=\scriptsize, pos=0.25, below] {Evaluar en test};
+\end{tikzpicture}
+\caption{Esquema de Validación Cruzada Anidada (Nested CV). El bucle externo (RepeatedKFold $5 \times 10 = 50$ evaluaciones) divide los datos en train/test. El bucle interno (GridSearchCV $k=3$) optimiza los hiperparámetros \textit{exclusivamente} sobre los datos de entrenamiento, previniendo la fuga de datos. El modelo con mejor $\hat{\alpha}$ se evalúa en el fold de test externo.}
+\label{fig:nested_cv}
+\end{figure}
+
+\paragraph{Limitaciones del protocolo.}
+Es necesario reconocer explícitamente las restricciones de este experimento de validación:
+\begin{enumerate}
+\item \textbf{Registro restringido:} Los estímulos corresponden exclusivamente al registro $C_4$--$C_5$ (261--523 Hz) bajo 12-TET. La generalización a registros extremos o sistemas microtonales requiere validación adicional.
+\item \textbf{Timbre sintético:} Se asume un espectro armónico idealizado ($H=6$, $\delta=0.88$), no instrumentos reales.
+\item \textbf{Díadas excluidas:} La deficiencia muestral ($N=12$) impide la evaluación Ridge aislada para este estrato.
+\item \textbf{Dataset único:} La replicabilidad del hallazgo en otros datasets perceptuales (e.g., Harrison \& Pearce, 2020) constituye trabajo futuro.
+\end{enumerate}
 
 \subsection{Validación Funcional: Funciones Armónicas en el Espacio de Rugosidad}
 \label{subsec:validacion_funcional}

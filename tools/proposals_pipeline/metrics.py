@@ -52,6 +52,22 @@ VOICELEADING_QUINTAS_ALIASES = {
     "vl_quintas",
     "voiceleading5",
 }
+EB_JSD_COMBO_METRIC = "eb_jsd_combo"
+EB_JSD_COMBO_ALIASES = {
+    EB_JSD_COMBO_METRIC,
+    "eb_jsd",
+    "d_combo",
+    "combo",
+}
+EB_JSD_COMBO_DEFAULT_ALPHA = 0.20
+EB_EUC_COMBO_METRIC = "eb_euc_combo"
+EB_EUC_COMBO_ALIASES = {
+    EB_EUC_COMBO_METRIC,
+    "eb_euc",
+    "d_combo_v2",
+    "combo_v2",
+}
+EB_EUC_COMBO_DEFAULT_ALPHA = 0.20
 # Pesos calibrados sobre población estructural diatónica (2-3 notas, max intervalo interno <= 12)
 # para mejorar trustworthiness/continuity sin sacrificar stress.
 STRUCTURAL_ROUGHNESS_WEIGHTS = (0.325, 0.299, 0.214, 0.162)
@@ -201,6 +217,135 @@ def _voice_leading_distance(notes_a: np.ndarray, notes_b: np.ndarray, gap_penalt
     total_cost = float(np.sum(costs[row_ind, col_ind]))
     normalized = total_cost / (size * gap_penalty)
     return float(np.clip(normalized, 0.0, 1.0))
+
+
+# =====================================================================
+# Expansion Bijection (EB) helpers for d_combo
+# =====================================================================
+from itertools import combinations_with_replacement as _cwr
+
+
+def _circular_step(a: float, b: float) -> float:
+    """Pure circular distance on R/12Z."""
+    diff = abs(float(a) % 12.0 - float(b) % 12.0)
+    return min(diff, 12.0 - diff)
+
+
+def _distinct_notes_eb(notes: np.ndarray, tol: float = 1e-6) -> List[float]:
+    sorted_notes = sorted(float(n) for n in notes)
+    if not sorted_notes:
+        return []
+    distinct = [sorted_notes[0]]
+    for n in sorted_notes[1:]:
+        if abs(n - distinct[-1]) > tol:
+            distinct.append(n)
+    return distinct
+
+
+def _expansions_eb(notes: np.ndarray, K: int, tol: float = 1e-6) -> List[Tuple[float, ...]]:
+    distinct = _distinct_notes_eb(notes, tol)
+    m = len(distinct)
+    if m == 0:
+        return []
+    if m >= K:
+        return [tuple(distinct[:K])]
+    extras = K - m
+    expansions: set = set()
+    for combo in _cwr(range(m), extras):
+        exp = tuple(sorted(distinct + [distinct[i] for i in combo]))
+        expansions.add(exp)
+    return list(expansions)
+
+
+def _pairwise_eb(notes_a: np.ndarray, notes_b: np.ndarray, tol: float = 1e-6) -> float:
+    da = _distinct_notes_eb(notes_a, tol)
+    db = _distinct_notes_eb(notes_b, tol)
+    K = max(len(da), len(db))
+    if K == 0:
+        return 0.0
+    exp_a = _expansions_eb(notes_a, K, tol)
+    exp_b = _expansions_eb(notes_b, K, tol)
+    best = float('inf')
+    for ea in exp_a:
+        for eb in exp_b:
+            C = np.zeros((K, K))
+            for i in range(K):
+                for j in range(K):
+                    C[i, j] = _circular_step(ea[i], eb[j])
+            ri, ci = linear_sum_assignment(C)
+            cost = float(np.sum(C[ri, ci])) / K
+            if cost < best:
+                best = cost
+    return best
+
+
+def _eb_jsd_combo_distance(
+    dist_simplex: np.ndarray,
+    entries: Optional[Sequence[ChordEntry]],
+    metric_params: Optional[Mapping[str, float]] = None,
+) -> np.ndarray:
+    """Composite: alpha * d_EB_hat + (1 - alpha) * d_JSD_hat."""
+    if entries is None:
+        raise ValueError("'eb_jsd_combo' requiere entries.")
+    n = dist_simplex.shape[0]
+    if len(entries) != n:
+        raise ValueError("'eb_jsd_combo' entries size mismatch.")
+
+    params = metric_params or {}
+    alpha = _param_float(params, ("alpha", "a"), default=EB_JSD_COMBO_DEFAULT_ALPHA)
+
+    notes_by_entry = [_entry_notes(entry) for entry in entries]
+    pair_count = n * (n - 1) // 2
+    d_eb = np.zeros(pair_count, dtype=float)
+    idx = 0
+    for i in range(n - 1):
+        for j in range(i + 1, n):
+            d_eb[idx] = _pairwise_eb(notes_by_entry[i], notes_by_entry[j])
+            idx += 1
+
+    simplex_probs = _normalize_simplex_rows(dist_simplex)
+    d_jsd = pdist(simplex_probs, metric=lambda u, v: float(jensenshannon(u, v, base=2.0)))
+
+    eb_max = float(np.max(d_eb)) if np.any(d_eb > 0) else 1.0
+    jsd_max = float(np.max(d_jsd)) if np.any(d_jsd > 0) else 1.0
+    d_eb_hat = d_eb / (eb_max + EPSILON)
+    d_jsd_hat = d_jsd / (jsd_max + EPSILON)
+
+    return alpha * d_eb_hat + (1.0 - alpha) * d_jsd_hat
+
+
+def _eb_euc_combo_distance(
+    X: np.ndarray,
+    entries: Optional[Sequence[ChordEntry]],
+    metric_params: Optional[Mapping[str, float]] = None,
+) -> np.ndarray:
+    """Composite v2: alpha * d_EB_hat + (1 - alpha) * d_Euc_hat."""
+    if entries is None:
+        raise ValueError("'eb_euc_combo' requiere entries.")
+    n = X.shape[0]
+    if len(entries) != n:
+        raise ValueError("'eb_euc_combo' entries size mismatch.")
+
+    params = metric_params or {}
+    alpha = _param_float(params, ("alpha", "a"), default=EB_EUC_COMBO_DEFAULT_ALPHA)
+
+    notes_by_entry = [_entry_notes(entry) for entry in entries]
+    pair_count = n * (n - 1) // 2
+    d_eb = np.zeros(pair_count, dtype=float)
+    idx = 0
+    for i in range(n - 1):
+        for j in range(i + 1, n):
+            d_eb[idx] = _pairwise_eb(notes_by_entry[i], notes_by_entry[j])
+            idx += 1
+
+    d_euc = pdist(X, metric="euclidean")
+
+    eb_max = float(np.max(d_eb)) if np.any(d_eb > 0) else 1.0
+    euc_max = float(np.max(d_euc)) if np.any(d_euc > 0) else 1.0
+    d_eb_hat = d_eb / (eb_max + EPSILON)
+    d_euc_hat = d_euc / (euc_max + EPSILON)
+
+    return alpha * d_eb_hat + (1.0 - alpha) * d_euc_hat
 
 
 def _voiceleading_quintas_distance(
@@ -471,6 +616,18 @@ def metric_distance(
         return dist / np.sqrt(2.0)
     if metric in STRUCTURAL_ROUGHNESS_ALIASES:
         return _structural_roughness_distance(X, dist_simplex)
+    if metric in EB_JSD_COMBO_ALIASES:
+        return _eb_jsd_combo_distance(
+            dist_simplex,
+            entries,
+            metric_params=metric_params,
+        )
+    if metric in EB_EUC_COMBO_ALIASES:
+        return _eb_euc_combo_distance(
+            X,
+            entries,
+            metric_params=metric_params,
+        )
     raise ValueError(f"Métrica desconocida: {metric}")
 
 

@@ -114,13 +114,19 @@ class ExperimentController:
             for stage, secs in (result.timing or []):
                 self._log("compare_log", f"[tiempo] {stage}: {secs:.2f}s\n")
 
-            self._log("compare_log", "Pipeline completado. Generando reporte...\n")
+            if vis_config.skip_html_report:
+                self._log("compare_log", "Pipeline completado. Exportando plots/tablas separados (sin HTML unificado)...\n")
+            else:
+                self._log("compare_log", "Pipeline completado. Generando reporte...\n")
             self._log("progress", (80.0, "Generando visualizaciones..."))
 
             report_path = self.visualization_service.generate_report_full(result, vis_config, logger=_service_logger)
             self.last_report_path = report_path
 
-            self._log("compare_log", f"Reporte generado: {report_path}\n")
+            if vis_config.skip_html_report:
+                self._log("compare_log", f"Artefactos generados: {report_path}\n")
+            else:
+                self._log("compare_log", f"Reporte generado: {report_path}\n")
             self._log("compare_status", "Completado")
             self._log("progress", (100.0, "Listo"))
 
