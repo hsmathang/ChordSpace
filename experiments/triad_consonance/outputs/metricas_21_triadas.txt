@@ -1,0 +1,7 @@
+=== 21 Tríadas Diatónicas Do Mayor ===
+N=21 (7 tríadas × 3 posiciones)
+Métrica: Euclidiana sobre vector rugosidad 12-D
+
+Stress-1 (Kruskal) : 0.139540
+Pearson r (Shepard): 0.9510
+R²                 : 0.9043

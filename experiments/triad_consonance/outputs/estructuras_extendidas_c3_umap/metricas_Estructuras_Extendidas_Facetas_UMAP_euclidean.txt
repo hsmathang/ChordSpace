@@ -1,0 +1,22 @@
+=== Estructuras_Extendidas_Facetas_UMAP | métrica=euclidean | N=81 ===
+ModeloSetharesVec (canónico) → vector 12-D
+
+trustworthiness                    : 0.977710
+continuity                         : 0.980315
+knn_recall                         : 0.698765
+rank_corr                          : 0.494412
+stress                             : 0.475394
+shepard_slope                      : 1.014897
+shepard_intercept                  : -0.740307
+shepard_r2                         : 0.242221
+silhouette                         : 0.062283
+davies_bouldin                     : 2.184145
+relative_rank_error                : 0.735809
+var_ratio_dim1                     : 0.870866
+var_ratio_dim2                     : 0.129134
+cardinality_logreg_acc             : 0.541912
+knn_hit_card_2                     : 0.756944
+knn_hit_card_3                     : 0.407407
+knn_hit_card_4                     : 0.493056
+knn_hit_card_5                     : 0.511111
+embedding_mem_kb                   : 0.632812

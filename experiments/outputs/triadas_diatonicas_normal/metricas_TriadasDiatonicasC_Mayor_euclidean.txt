@@ -1,0 +1,19 @@
+=== TriadasDiatonicasC_Mayor | métrica=euclidean | N=21 ===
+ModeloSetharesVec (canónico) → vector 12-D
+
+trustworthiness                    : 0.990476
+continuity                         : 0.990476
+knn_recall                         : 0.971429
+rank_corr                          : 0.884014
+stress                             : 0.138058
+shepard_slope                      : 1.039434
+shepard_intercept                  : -0.097659
+shepard_r2                         : 0.905485
+silhouette                         : None
+davies_bouldin                     : None
+relative_rank_error                : 0.199645
+var_ratio_dim1                     : 0.582644
+var_ratio_dim2                     : 0.417356
+cardinality_logreg_acc             : None
+knn_hit_card_3                     : 1.000000
+embedding_mem_kb                   : 0.328125

@@ -1,0 +1,7 @@
+Orden de rugosidad (menor a mayor) - escenario base:
+Sus4 < Mayor < Menor < Aumentada < Disminuida
+
+Orden de rugosidad (menor a mayor) - escenario robusto anclado:
+Sus4 < Menor < Mayor < Aumentada < Disminuida
+
+NOTA: menor R_total implica menor friccion interparcial.

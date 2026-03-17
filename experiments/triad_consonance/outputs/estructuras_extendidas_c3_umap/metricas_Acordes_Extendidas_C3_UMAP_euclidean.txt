@@ -1,0 +1,22 @@
+=== Acordes_Extendidas_C3_UMAP | métrica=euclidean | N=69 ===
+ModeloSetharesVec (canónico) → vector 12-D
+
+trustworthiness                    : 0.983844
+continuity                         : 0.985792
+knn_recall                         : 0.756522
+rank_corr                          : 0.623222
+stress                             : 0.449951
+shepard_slope                      : 0.798316
+shepard_intercept                  : -0.966944
+shepard_r2                         : 0.405750
+silhouette                         : 0.013812
+davies_bouldin                     : 2.948615
+relative_rank_error                : 0.582552
+var_ratio_dim1                     : 0.694005
+var_ratio_dim2                     : 0.305995
+cardinality_logreg_acc             : 0.392308
+knn_hit_card_2                     : 0.722222
+knn_hit_card_3                     : 0.462963
+knn_hit_card_4                     : 0.548611
+knn_hit_card_5                     : 0.466667
+embedding_mem_kb                   : 0.539062

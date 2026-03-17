@@ -1,0 +1,8 @@
+=== Díadas+Triadas C3–B3 ===
+N=286 (66 díadas + 220 triadas)
+
+Euclidiana:
+  Stress-1=0.268110  r=0.8226  R²=0.6767
+
+Coseno:
+  Stress-1=0.290681  r=0.7569  R²=0.5728

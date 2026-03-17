@@ -1,0 +1,20 @@
+=== EstructurasBasicas_12Tonos | métrica=euclidean | N=288 ===
+ModeloSetharesVec (canónico) → vector 12-D
+
+trustworthiness                    : 0.998891
+continuity                         : 0.999127
+knn_recall                         : 0.845139
+rank_corr                          : 0.807695
+stress                             : 0.267971
+shepard_slope                      : 1.154374
+shepard_intercept                  : -4.793533
+shepard_r2                         : 0.640534
+silhouette                         : 0.284675
+davies_bouldin                     : 1.662840
+relative_rank_error                : 0.357979
+var_ratio_dim1                     : 0.531365
+var_ratio_dim2                     : 0.468635
+cardinality_logreg_acc             : 0.711857
+knn_hit_card_2                     : 1.000000
+knn_hit_card_3                     : 1.000000
+embedding_mem_kb                   : 4.500000

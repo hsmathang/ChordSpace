@@ -1,0 +1,19 @@
+=== estructuras_c3 | métrica=euclidean | N=12 ===
+ModeloSetharesVec (canónico) → vector 12-D
+
+trustworthiness                    : 0.841667
+continuity                         : 0.850000
+knn_recall                         : 0.766667
+rank_corr                          : 0.868338
+stress                             : 0.133965
+shepard_slope                      : 1.093485
+shepard_intercept                  : -0.586870
+shepard_r2                         : 0.912243
+silhouette                         : None
+davies_bouldin                     : None
+relative_rank_error                : 0.294240
+var_ratio_dim1                     : 0.712615
+var_ratio_dim2                     : 0.287385
+cardinality_logreg_acc             : None
+knn_hit_card_3                     : 1.000000
+embedding_mem_kb                   : 0.187500

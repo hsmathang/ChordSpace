@@ -1,0 +1,22 @@
+=== Acordes_Extendidas_C3_MDS_Csn | métrica=cosine | N=69 ===
+ModeloSetharesVec (canónico) → vector 12-D
+
+trustworthiness                    : 0.930387
+continuity                         : 0.932763
+knn_recall                         : 0.631884
+rank_corr                          : 0.412396
+stress                             : 0.238378
+shepard_slope                      : 0.919604
+shepard_intercept                  : 0.017511
+shepard_r2                         : 0.742029
+silhouette                         : -0.071042
+davies_bouldin                     : 7.434281
+relative_rank_error                : 0.293781
+var_ratio_dim1                     : 0.550035
+var_ratio_dim2                     : 0.449965
+cardinality_logreg_acc             : 0.361538
+knn_hit_card_2                     : 0.222222
+knn_hit_card_3                     : 0.407407
+knn_hit_card_4                     : 0.513889
+knn_hit_card_5                     : 0.655556
+embedding_mem_kb                   : 1.078125

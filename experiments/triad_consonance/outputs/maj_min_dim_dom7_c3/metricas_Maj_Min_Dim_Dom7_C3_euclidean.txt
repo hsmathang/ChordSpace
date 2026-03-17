@@ -1,0 +1,20 @@
+=== Maj_Min_Dim_Dom7_C3 | métrica=euclidean | N=13 ===
+ModeloSetharesVec (canónico) → vector 12-D
+
+trustworthiness                    : 0.883077
+continuity                         : 0.883077
+knn_recall                         : 0.738462
+rank_corr                          : 0.797266
+stress                             : 0.216063
+shepard_slope                      : 1.236107
+shepard_intercept                  : -1.304394
+shepard_r2                         : 0.723538
+silhouette                         : 0.218581
+davies_bouldin                     : 1.392750
+relative_rank_error                : 0.451427
+var_ratio_dim1                     : 0.539115
+var_ratio_dim2                     : 0.460885
+cardinality_logreg_acc             : 0.854167
+knn_hit_card_3                     : 0.814815
+knn_hit_card_4                     : 0.333333
+embedding_mem_kb                   : 0.203125

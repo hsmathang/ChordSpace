@@ -1,0 +1,20 @@
+=== 21_triadas_y_12_diadas | métrica=euclidean | N=33 ===
+ModeloSetharesVec (canónico) → vector 12-D
+
+trustworthiness                    : 0.930424
+continuity                         : 0.930424
+knn_recall                         : 0.787879
+rank_corr                          : 0.886133
+stress                             : 0.217558
+shepard_slope                      : 1.091902
+shepard_intercept                  : -0.280934
+shepard_r2                         : 0.790652
+silhouette                         : 0.229890
+davies_bouldin                     : 1.646361
+relative_rank_error                : 0.255690
+var_ratio_dim1                     : 0.554200
+var_ratio_dim2                     : 0.445800
+cardinality_logreg_acc             : 0.942857
+knn_hit_card_3                     : 0.857143
+knn_hit_card_2                     : 0.597222
+embedding_mem_kb                   : 0.515625

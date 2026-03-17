@@ -1,0 +1,19 @@
+=== 21_triadas | métrica=euclidean | N=21 ===
+ModeloSetharesVec (canónico) → vector 12-D
+
+trustworthiness                    : 0.980952
+continuity                         : 0.980952
+knn_recall                         : 0.952381
+rank_corr                          : 0.865840
+stress                             : 0.139540
+shepard_slope                      : 1.037237
+shepard_intercept                  : -0.096830
+shepard_r2                         : 0.904343
+silhouette                         : None
+davies_bouldin                     : None
+relative_rank_error                : 0.207298
+var_ratio_dim1                     : 0.559590
+var_ratio_dim2                     : 0.440410
+cardinality_logreg_acc             : None
+knn_hit_card_3                     : 1.000000
+embedding_mem_kb                   : 0.328125

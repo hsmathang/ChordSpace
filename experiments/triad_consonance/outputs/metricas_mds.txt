@@ -1,0 +1,10 @@
+=== Métricas MDS – Triadas Diatónicas Do Mayor (21 acordes) ===
+
+Modelo de rugosidad    : ModeloSetharesVec (canónico)
+Distancia              : Euclidiana sobre vector 12-D
+Reducción              : MDS clásico (sklearn, metric=True)
+
+Stress (sklearn raw)   : 12.462209
+Stress-1 normalizado   : 0.155877
+Pearson r (Shepard)    : 0.937364  p=3.2345e-97
+R²                     : 0.878651

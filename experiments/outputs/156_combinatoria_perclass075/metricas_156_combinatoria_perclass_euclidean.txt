@@ -1,0 +1,19 @@
+=== 156_combinatoria_perclass | métrica=euclidean | N=144 ===
+ModeloSetharesVec (canónico) → vector 12-D
+
+trustworthiness                    : 0.885652
+continuity                         : 0.885652
+knn_recall                         : 0.412500
+rank_corr                          : 0.736616
+stress                             : 0.310025
+shepard_slope                      : 1.273180
+shepard_intercept                  : -1.629982
+shepard_r2                         : 0.542224
+silhouette                         : None
+davies_bouldin                     : None
+relative_rank_error                : 0.687591
+var_ratio_dim1                     : 0.503094
+var_ratio_dim2                     : 0.496906
+cardinality_logreg_acc             : None
+knn_hit_card_3                     : 1.000000
+embedding_mem_kb                   : 2.250000

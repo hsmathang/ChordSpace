@@ -1,0 +1,20 @@
+=== Estructuras_Tríadas_General | métrica=euclidean | N=24 ===
+ModeloSetharesVec (canónico) → vector 12-D
+
+trustworthiness                    : 0.918750
+continuity                         : 0.919792
+knn_recall                         : 0.691667
+rank_corr                          : 0.843624
+stress                             : 0.242342
+shepard_slope                      : 1.340970
+shepard_intercept                  : -1.665350
+shepard_r2                         : 0.705919
+silhouette                         : 0.218806
+davies_bouldin                     : 1.697990
+relative_rank_error                : 0.352633
+var_ratio_dim1                     : 0.522658
+var_ratio_dim2                     : 0.477342
+cardinality_logreg_acc             : 0.710000
+knn_hit_card_2                     : 0.805556
+knn_hit_card_3                     : 0.625000
+embedding_mem_kb                   : 0.375000
