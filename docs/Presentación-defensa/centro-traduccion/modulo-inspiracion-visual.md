@@ -10,6 +10,34 @@ Las diapositivas nuevas no deben reemplazar material existente ni reducir la den
 - Si una idea nueva compite con una diapositiva buena, se agrega como variante posterior.
 - La decision final se toma viendo ambas versiones en el navegador, no por intuicion en codigo.
 
+## Regla de lenguaje simbolico existente
+
+Antes de inventar un diagrama, revisar si el proyecto ya tiene una forma simbolica propia para expresar esa idea. Si existe, se reutiliza, se limpia o se reordena; solo se crea un simbolo nuevo cuando el existente no comunica el concepto, no se puede adaptar o contradice el flujo narrativo.
+
+Orden de preferencia:
+
+1. Diagrama existente del deck.
+2. Imagen seleccionada como util por el usuario.
+3. Figura de tesis, articulo o experimento reproducible.
+4. Diagrama nuevo inspirado por el lenguaje visual anterior.
+5. Diagrama completamente nuevo, solo si aporta una diferencia conceptual clara.
+
+Ejemplo aplicado:
+Para clases de altura y PC-set, no inventar primero una rueda nueva. Ya existe un lenguaje circular con nombres de notas, clases numericas y centro negro; cualquier variante debe partir de ese vocabulario visual.
+
+## Flujo canonico para crear una diapositiva
+
+1. **Intencion oral**: escribir la frase que se debe poder decir mientras aparece la diapositiva.
+2. **Busqueda de lenguaje propio**: revisar diapositivas existentes, imagenes utiles, figuras de tesis y codigo antes de crear un simbolo nuevo.
+3. **Fuente de verdad**: anotar de donde sale el contenido conceptual: LaTeX, markdown, articulo MAPI, codigo, imagen, audio o experimento.
+4. **Boceto imprimible**: generar o dibujar una composicion estatica cuando la diapositiva sea importante o riesgosa.
+5. **Conteo de densidad**: verificar numero de objetos, grupos visuales y posibles apariciones animadas.
+6. **Plan de animacion**: definir que aparece primero, que se transforma y que debe quedarse visible para la explicacion oral.
+7. **Programacion**: construir con React/SVG/CSS usando componentes y sistema institucional existentes.
+8. **Comparacion**: ver la nueva version junto a la anterior; nunca evaluar aislada.
+9. **Control de calidad**: revisar legibilidad, coherencia simbolica, numeracion, audio si aplica, y consistencia con el guion.
+10. **Registro**: dejar nota breve de fuentes, decisiones y dudas.
+
 ## Modulo 1 - Imagen imprimible de referencia
 
 Antes de programar una diapositiva importante, generar una composicion estatica tipo lamina impresa. Esa imagen funciona como boceto de disenador: permite contar elementos, revisar jerarquia, detectar vacios y comparar contra el estilo de las diapositivas modelo.
