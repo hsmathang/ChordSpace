@@ -73,12 +73,17 @@
 <script type="text/babel" src="AnimatedVectorSlide.jsx?v=20260501-anim-reset-3"></script>
 <script type="text/babel" src="AnimatedPCSetSlide.jsx?v=20260502-piano-footer-3"></script>
 <script type="text/babel" src="AnimatedSchematicSlide.jsx?v=20260502-piano-reference-4"></script>
-<script type="text/babel" src="IntervalRoughnessSlide.jsx?v=20260502-piano-footer-3"></script>
+<script type="text/babel" src="IntervalRoughnessSlide.jsx?v=20260502-roughness-code-1"></script>
 <script type="text/babel" src="CMajorVectorSlide.jsx?v=20260502-piano-footer-3"></script>
 <script type="text/babel" src="ChordsToVectorsSlide.jsx?v=20260502-piano-footer-3"></script>
 
 <script type="text/babel">
 const DEPT = "Facultad de Ciencias · Matemáticas Aplicadas";
+const slideNumber = (slideId) => {
+  const slides = Array.from(document.querySelectorAll('deck-stage > section'));
+  const index = slides.findIndex((slide) => slide.id === slideId);
+  return index >= 0 ? index + 1 : undefined;
+};
 
 // --- Render Cover ---
 ReactDOM.createRoot(document.getElementById('slide-cover')).render(
@@ -92,7 +97,7 @@ ReactDOM.createRoot(document.getElementById('slide-cover')).render(
 // --- Render Title ---
 ReactDOM.createRoot(document.getElementById('slide-title')).render(
   <TitleSlide
-    pageNum={2}
+    pageNum={slideNumber('slide-title')}
     title="Computational Exploration of a Musical Chord Space"
     subtitle="Una representación perceptual para acordes musicales"
     department={DEPT}
@@ -101,37 +106,37 @@ ReactDOM.createRoot(document.getElementById('slide-title')).render(
 
 // --- Render Content ---
 ReactDOM.createRoot(document.getElementById('slide-content')).render(
-  <AnimatedPianoSlide pageNum={11} department={DEPT} />
+  <AnimatedPianoSlide pageNum={slideNumber('slide-content')} department={DEPT} />
 );
 
 // --- Render Diagram ---
 ReactDOM.createRoot(document.getElementById('slide-diagram')).render(
-  <AnimatedVectorSlide pageNum={14} department={DEPT} />
+  <AnimatedVectorSlide pageNum={slideNumber('slide-diagram')} department={DEPT} />
 );
 
 // --- Render Split ---
 ReactDOM.createRoot(document.getElementById('slide-split')).render(
-  <AnimatedPCSetSlide pageNum={15} department={DEPT} />
+  <AnimatedPCSetSlide pageNum={slideNumber('slide-split')} department={DEPT} />
 );
 
 // --- Render Closing ---
 ReactDOM.createRoot(document.getElementById('slide-closing')).render(
-  <AnimatedSchematicSlide pageNum={16} department={DEPT} />
+  <AnimatedSchematicSlide pageNum={slideNumber('slide-closing')} department={DEPT} />
 );
 
 // --- Render Interval Roughness ---
 ReactDOM.createRoot(document.getElementById('slide-interval')).render(
-  <IntervalRoughnessSlide pageNum={15} />
+  <IntervalRoughnessSlide pageNum={slideNumber('slide-interval')} department={DEPT} />
 );
 
 // --- Render C Major Vector Diagram ---
 ReactDOM.createRoot(document.getElementById('slide-c-major')).render(
-  <CMajorVectorSlide pageNum={14} />
+  <CMajorVectorSlide pageNum={slideNumber('slide-c-major')} department={DEPT} />
 );
 
 // --- Render Chords To Vectors Diagram ---
 ReactDOM.createRoot(document.getElementById('slide-chords-vectors')).render(
-  <ChordsToVectorsSlide pageNum={16} />
+  <ChordsToVectorsSlide pageNum={slideNumber('slide-chords-vectors')} department={DEPT} />
 );
 </script>
 </body>

@@ -58,53 +58,97 @@ const PlayButton = ({ onClick, visible }) => (
 );
 
 const RoughnessCurveSVG = ({ step }) => {
-  // Chart spans 100% width and height using viewBox 0 0 1200 600
-  // Origin X: 100, Y: 550
-  // X scale: 1 unit = 80px (12 units = 960px). Ends at X=1060
-  // Y scale: 1 unit = 140px. 3.5 units = 490px. Y max at Y=60.
-  
-  // Custom path approximating the peaks and dips (consonances) exactly
-  const curvePath = "M 100 550 C 110 100, 140 0, 180 160 C 220 320, 290 350, 340 370 C 350 370, 360 400, 370 380 C 390 350, 410 350, 420 390 C 440 320, 470 320, 500 420 C 530 350, 550 340, 580 340 C 620 340, 640 460, 660 350 C 690 330, 710 330, 740 360 C 780 430, 800 370, 820 370 C 860 370, 890 320, 940 320 C 970 320, 980 200, 980 200 C 1000 130, 1040 450, 1060 450 C 1080 200, 1100 150, 1140 230";
+  const W = 1200;
+  const H = 600;
+  const plot = { left: 100, right: 54, top: 28, bottom: 72 };
+  const xMax = 12;
+  const yMax = 3.2;
+  // Same theoretical Sethares curve used by tools/plot_sethares_sweep.py.
+  const params = {
+    baseFreq: 500,
+    nHarmonics: 6,
+    decay: 0.88,
+    C1: 5.0,
+    C2: -5.0,
+    A1: -3.51,
+    A2: -5.75,
+    Dstar: 0.24,
+    S1: 0.0207,
+    S2: 18.96,
+  };
+
+  const pairRoughness = (f1, f2, a1, a2) => {
+    const fmin = Math.min(f1, f2);
+    const s = params.Dstar / (params.S1 * fmin + params.S2);
+    const df = Math.abs(f2 - f1);
+    return a1 * a2 * (
+      params.C1 * Math.exp(params.A1 * s * df) +
+      params.C2 * Math.exp(params.A2 * s * df)
+    );
+  };
+
+  const roughnessAt = (semitones) => {
+    const f1 = params.baseFreq;
+    const f2 = params.baseFreq * Math.pow(2, semitones / 12);
+    let total = 0;
+    for (let k1 = 1; k1 <= params.nHarmonics; k1 += 1) {
+      for (let k2 = 1; k2 <= params.nHarmonics; k2 += 1) {
+        total += pairRoughness(
+          f1 * k1,
+          f2 * k2,
+          Math.pow(params.decay, k1 - 1),
+          Math.pow(params.decay, k2 - 1)
+        );
+      }
+    }
+    return total;
+  };
+
+  const xScale = (x) => plot.left + (x / xMax) * (W - plot.left - plot.right);
+  const yScale = (y) => H - plot.bottom - (y / yMax) * (H - plot.top - plot.bottom);
+  const curvePoints = Array.from({ length: 520 }, (_, i) => {
+    const x = (i / 519) * xMax;
+    return [xScale(x), yScale(roughnessAt(x))];
+  });
+  const curvePath = curvePoints.map(([x, y], i) => `${i === 0 ? 'M' : 'L'} ${x.toFixed(1)} ${y.toFixed(1)}`).join(' ');
+  const interval1 = { x: xScale(1), y: yScale(roughnessAt(1)), value: roughnessAt(1) };
+  const interval11 = { x: xScale(11), y: yScale(roughnessAt(11)), value: roughnessAt(11) };
+  const yTicks = [0, 0.5, 1, 1.5, 2, 2.5, 3];
   
   return (
-    <svg width="100%" height="100%" viewBox="0 0 1200 600" preserveAspectRatio="none">
-      {/* Grid lines vertical */}
+    <svg width="100%" height="100%" viewBox={`0 0 ${W} ${H}`} preserveAspectRatio="none">
       {[0,1,2,3,4,5,6,7,8,9,10,11,12].map(i => (
         <g key={`grid-x-${i}`}>
-          <line x1={100 + i*80} y1="0" x2={100 + i*80} y2="550" stroke="#CCCCCC" strokeWidth="2" />
-          <text x={100 + i*80} y="580" fill="#1A1A1A" fontSize="18" textAnchor="middle" fontFamily="'Raleway',sans-serif">{i}</text>
+          <line x1={xScale(i)} y1={plot.top} x2={xScale(i)} y2={H - plot.bottom} stroke="#D8D8D8" strokeWidth="1.4" />
+          <text x={xScale(i)} y={H - 35} fill="#1A1A1A" fontSize="22" textAnchor="middle" fontFamily="'Raleway',sans-serif">{i}</text>
         </g>
       ))}
-      <line x1="100" y1="0" x2="100" y2="550" stroke="#1A1A1A" strokeWidth="2" />
-      <line x1="100" y1="550" x2="1160" y2="550" stroke="#1A1A1A" strokeWidth="2" />
-      
-      {/* Y-axis labels */}
-      {[0, 0.5, 1.0, 1.5, 2.0, 2.5, 3.0].map(v => (
+      {yTicks.map(v => (
         <g key={`grid-y-${v}`}>
-          <line x1="90" y1={550 - v*140} x2="100" y2={550 - v*140} stroke="#1A1A1A" strokeWidth="2" />
-          <text x="80" y={550 - v*140 + 6} fill="#1A1A1A" fontSize="18" textAnchor="end" fontFamily="'Raleway',sans-serif">{v.toFixed(1)}</text>
+          <line x1={plot.left} y1={yScale(v)} x2={W - plot.right} y2={yScale(v)} stroke="#D8D8D8" strokeWidth="1.2" />
+          <text x={plot.left - 18} y={yScale(v) + 7} fill="#1A1A1A" fontSize="20" textAnchor="end" fontFamily="'Raleway',sans-serif">{v.toFixed(1)}</text>
         </g>
       ))}
+      <line x1={plot.left} y1={plot.top} x2={plot.left} y2={H - plot.bottom} stroke="#1A1A1A" strokeWidth="2.2" />
+      <line x1={plot.left} y1={H - plot.bottom} x2={W - plot.right} y2={H - plot.bottom} stroke="#1A1A1A" strokeWidth="2.2" />
       
-      {/* Axis Titles */}
-      <text x="600" y="595" fill="#1A1A1A" fontSize="20" textAnchor="middle" fontFamily="'Raleway',sans-serif">Interval (semitones)</text>
-      <text x="-40" y="275" fill="#1A1A1A" fontSize="20" textAnchor="middle" transform="rotate(-90, -40, 275)" fontFamily="'Raleway',sans-serif">Sensory dissonance</text>
+      <text x="600" y="592" fill="#1A1A1A" fontSize="24" textAnchor="middle" fontFamily="'Raleway',sans-serif">Intervalo a (semitonos)</text>
+      <text x="28" y="275" fill="#1A1A1A" fontSize="24" textAnchor="middle" transform="rotate(-90, 28, 275)" fontFamily="'Raleway',sans-serif">Rugosidad sensorial</text>
 
-      {/* Main Curve */}
-      <path d={curvePath} fill="none" stroke="#1E6BB8" strokeWidth="3" strokeLinejoin="round" />
+      <path d={curvePath} fill="none" stroke="#2E86C1" strokeWidth="3.2" strokeLinejoin="round" strokeLinecap="round" />
 
-      {/* Interval 1 (Red) */}
       <g style={{ opacity: step >= 2 ? 1 : 0, transition: 'opacity 0.5s' }}>
-        {/* Y value for interval 1 is 2.45 = 550 - 2.45*140 = 207 */}
-        <line x1="100" y1={207} x2="1200" y2={207} stroke="#C0392B" strokeWidth="2.5" strokeDasharray="10,10" />
-        <circle cx={180} cy={207} r="12" fill="#C0392B" />
+        <line x1={plot.left} y1={interval1.y} x2={W - plot.right} y2={interval1.y} stroke="#C0392B" strokeWidth="2.6" strokeDasharray="10,10" />
+        <line x1={interval1.x} y1={plot.top} x2={interval1.x} y2={H - plot.bottom} stroke="#1A1A1A" strokeWidth="2.6" strokeDasharray="10,10" />
+        <circle cx={interval1.x} cy={interval1.y} r="13" fill="#E42E12" />
+        <text x={interval1.x + 18} y={interval1.y - 18} fill="#C0392B" fontSize="22" fontWeight="700" fontFamily="'Raleway',sans-serif">a = 1</text>
       </g>
 
-      {/* Interval 11 (Green) */}
       <g style={{ opacity: step >= 3 ? 1 : 0, transition: 'opacity 0.5s' }}>
-        {/* Y value for interval 11 is 1.25 = 550 - 1.25*140 = 375 */}
-        <line x1="100" y1={375} x2="1200" y2={375} stroke="#27AE60" strokeWidth="2.5" strokeDasharray="10,10" />
-        <circle cx={980} cy={375} r="12" fill="#27AE60" />
+        <line x1={plot.left} y1={interval11.y} x2={W - plot.right} y2={interval11.y} stroke="#6AA84F" strokeWidth="2.6" strokeDasharray="10,10" />
+        <line x1={interval11.x} y1={plot.top} x2={interval11.x} y2={H - plot.bottom} stroke="#1A1A1A" strokeWidth="2.6" strokeDasharray="10,10" />
+        <circle cx={interval11.x} cy={interval11.y} r="13" fill="#6AA84F" />
+        <text x={interval11.x - 88} y={interval11.y - 18} fill="#4F8D38" fontSize="22" fontWeight="700" fontFamily="'Raleway',sans-serif">a = 11</text>
       </g>
     </svg>
   );
@@ -207,10 +251,10 @@ const IntervalRoughnessSlide = ({ pageNum = 15, department = "Facultad de Cienci
 
         {/* Formula overlay bottom left */}
         <div style={{
-          position: 'absolute', left: 100, bottom: 124,
+          position: 'absolute', left: 100, bottom: 200,
           border: '1px solid #E8610A',
           backgroundColor: 'white',
-          padding: '15px 35px',
+          padding: '12px 28px',
           opacity: step >= 1 ? 1 : 0,
           transform: step >= 1 ? 'translateY(0)' : 'translateY(20px)',
           transition: 'all 0.6s ease',
@@ -218,7 +262,7 @@ const IntervalRoughnessSlide = ({ pageNum = 15, department = "Facultad de Cienci
         }}>
           <MathText 
             math="R(i,j) = a \cdot \left(5e^{-3.51 \cdot S(f_j - f_i)} - 5e^{-5.75 \cdot S(f_j - f_i)}\right)" 
-            style={{ fontSize: 38, color: '#1A1A1A' }}
+            style={{ fontSize: 32, color: '#1A1A1A' }}
           />
         </div>
 
