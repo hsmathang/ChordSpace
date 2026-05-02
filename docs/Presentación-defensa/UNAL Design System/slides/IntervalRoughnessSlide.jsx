@@ -169,7 +169,7 @@ const IntervalRoughnessSlide = ({ pageNum = 15, department = "Facultad de Cienci
       <div style={{ flex: 1, position: 'relative', overflow: 'hidden' }}>
         
         {/* Roughness Chart spans entire area */}
-        <div style={{ position: 'absolute', inset: '0 40px 48px 40px' }}>
+        <div style={{ position: 'absolute', inset: '0 40px 64px 40px' }}>
           <RoughnessCurveSVG step={step} />
         </div>
 
@@ -207,7 +207,7 @@ const IntervalRoughnessSlide = ({ pageNum = 15, department = "Facultad de Cienci
 
         {/* Formula overlay bottom left */}
         <div style={{
-          position: 'absolute', left: 100, bottom: 104,
+          position: 'absolute', left: 100, bottom: 124,
           border: '1px solid #E8610A',
           backgroundColor: 'white',
           padding: '15px 35px',

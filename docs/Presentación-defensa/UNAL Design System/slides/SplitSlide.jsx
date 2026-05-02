@@ -9,12 +9,12 @@ const SplitSlide = ({
 }) => (
   <div style={{position:'absolute',inset:0,display:'flex',overflow:'hidden'}}>
       {/* Left white panel */}
-      <div style={{ flex: '0 0 40%', background: '#fff', padding: '52px 32px 100px 72px', display: 'flex', flexDirection: 'column', justifyContent: 'center', position: 'relative' }}>
+      <div style={{ flex: '0 0 40%', background: '#fff', padding: '52px 32px 116px 72px', display: 'flex', flexDirection: 'column', justifyContent: 'center', position: 'relative' }}>
         <div style={{ position: 'absolute', top: 14, left: 18, fontSize: 13, fontFamily: "'Raleway',sans-serif", color: '#777' }}>{pageNum}</div>
         {leftContent}
       </div>
       {/* Right orange panel */}
-      <div style={{ flex: '0 0 60%', background: '#E8610A', padding: '40px 48px 100px', display: 'flex', flexDirection: 'column', gap: 28 }}>
+      <div style={{ flex: '0 0 60%', background: '#E8610A', padding: '40px 48px 116px', display: 'flex', flexDirection: 'column', gap: 28 }}>
         <div style={{
           fontFamily: "'Raleway',sans-serif",
           fontWeight: 700,

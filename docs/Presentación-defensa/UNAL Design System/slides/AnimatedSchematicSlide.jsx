@@ -1,4 +1,35 @@
-const dotStyle = { position: 'absolute', bottom: 25, width: 10, height: 10, borderRadius: '50%' };
+const pianoDotColors = {
+  red: '#C0392B',
+  blue: '#2980B9',
+  green: '#27AE60',
+};
+
+const PianoDotStack = ({ colors }) => (
+  <div style={{
+    position: 'absolute',
+    left: '50%',
+    top: 18,
+    transform: 'translateX(-50%)',
+    display: 'grid',
+    gap: 4,
+    justifyItems: 'center',
+    zIndex: 4,
+  }}>
+    {colors.map((color) => (
+      <div
+        key={color}
+        style={{
+          width: 11,
+          height: 11,
+          borderRadius: '50%',
+          backgroundColor: pianoDotColors[color],
+          border: '1px solid rgba(255,255,255,0.9)',
+          boxShadow: '0 0 0 1px rgba(26,26,26,0.28)',
+        }}
+      />
+    ))}
+  </div>
+);
 
 const FullPiano = () => {
   const whiteKeys = [
@@ -14,22 +45,25 @@ const FullPiano = () => {
   ];
 
   const dots = [
-    { key: 36, render: () => <div style={{...dotStyle, backgroundColor: '#C0392B', left: '50%', transform: 'translateX(-50%)'}} /> },
-    { key: 40, render: () => <><div style={{...dotStyle, backgroundColor: '#C0392B', left: '20%'}} /><div style={{...dotStyle, backgroundColor: '#2980B9', left: '80%', transform: 'translateX(-100%)'}} /></> },
-    { key: 43, render: () => <><div style={{...dotStyle, backgroundColor: '#C0392B', left: '15%'}} /><div style={{...dotStyle, backgroundColor: '#2980B9', left: '50%', transform: 'translateX(-50%)'}} /><div style={{...dotStyle, backgroundColor: '#27AE60', left: '85%', transform: 'translateX(-100%)'}} /></> },
-    { key: 48, render: () => <><div style={{...dotStyle, backgroundColor: '#2980B9', left: '20%'}} /><div style={{...dotStyle, backgroundColor: '#27AE60', left: '80%', transform: 'translateX(-100%)'}} /></> },
-    { key: 52, render: () => <div style={{...dotStyle, backgroundColor: '#27AE60', left: '50%', transform: 'translateX(-50%)'}} /> }
+    { key: 36, colors: ['red'] },
+    { key: 40, colors: ['red', 'blue'] },
+    { key: 43, colors: ['red', 'blue', 'green'] },
+    { key: 48, colors: ['blue', 'green'] },
+    { key: 52, colors: ['green'] },
   ];
 
   return (
     <div style={{ position: 'relative', width: '100%', height: '100%', border: '3px solid #1A1A1A', display: 'flex' }}>
-      {whiteKeys.map((k, i) => (
-        <div key={k.midi} style={{ flex: 1, borderRight: i < 9 ? '2px solid #1A1A1A' : 'none', position: 'relative', backgroundColor: 'white' }}>
-          <span style={{ position: 'absolute', bottom: 5, width: '100%', textAlign: 'center', fontSize: 12, color: '#1A1A1A', fontWeight: 'bold' }}>{k.note}</span>
-          <span style={{ position: 'absolute', top: 55, width: '100%', textAlign: 'center', fontSize: 12, color: '#888' }}>{k.midi}</span>
-          {dots.find(d => d.key === k.midi)?.render()}
-        </div>
-      ))}
+      {whiteKeys.map((k, i) => {
+        const marker = dots.find(d => d.key === k.midi);
+        return (
+          <div key={k.midi} style={{ flex: 1, borderRight: i < 9 ? '2px solid #1A1A1A' : 'none', position: 'relative', backgroundColor: 'white' }}>
+            <span style={{ position: 'absolute', bottom: 5, width: '100%', textAlign: 'center', fontSize: 12, color: '#1A1A1A', fontWeight: 'bold' }}>{k.note}</span>
+            <span style={{ position: 'absolute', top: 55, width: '100%', textAlign: 'center', fontSize: 12, color: '#888' }}>{k.midi}</span>
+            {marker && <PianoDotStack colors={marker.colors} />}
+          </div>
+        );
+      })}
       {blackKeys.map((k) => (
         <div key={k.midi} style={{
           position: 'absolute', left: `${(k.left / 10) * 100}%`, top: 0, transform: 'translateX(-50%)',

@@ -129,7 +129,7 @@ const ChordsToVectorsSlide = ({ pageNum = 16, department = "Facultad de Ciencias
         <div style={{
           position: 'absolute',
           left: 38,
-          bottom: 112,
+          bottom: 132,
           display: 'flex',
           alignItems: 'center',
           gap: 14,
