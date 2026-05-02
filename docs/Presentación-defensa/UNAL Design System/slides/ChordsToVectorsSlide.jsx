@@ -4,7 +4,7 @@ const MathText = ({ math, inline = true, style }) => {
   return <span style={style} dangerouslySetInnerHTML={{ __html: html }} />;
 };
 
-const ChordsToVectorsSlide = ({ pageNum = 16 }) => {
+const ChordsToVectorsSlide = ({ pageNum = 16, department = "Facultad de Ciencias · Matemáticas Aplicadas" }) => {
   const step = window.useDeckStep(4, 'slide-chords-vectors');
 
   const rows = [
@@ -129,7 +129,7 @@ const ChordsToVectorsSlide = ({ pageNum = 16 }) => {
         <div style={{
           position: 'absolute',
           left: 38,
-          bottom: 56,
+          bottom: 112,
           display: 'flex',
           alignItems: 'center',
           gap: 14,
@@ -180,6 +180,8 @@ const ChordsToVectorsSlide = ({ pageNum = 16 }) => {
 
         </svg>
       </div>
+
+      <InstitutionalFooter pageNum={pageNum} department={department} />
     </div>
   );
 };

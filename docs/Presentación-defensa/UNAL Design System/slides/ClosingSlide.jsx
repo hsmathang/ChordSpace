@@ -3,6 +3,8 @@
 const ClosingSlide = ({
   text = "Gracias",
   institution = "Universidad Nacional de Colombia",
+  pageNum = 65,
+  department = "Facultad de Ciencias · Matemáticas Aplicadas",
 }) => (
   <div style={{
     position: 'absolute', inset: 0,
@@ -39,9 +41,7 @@ const ClosingSlide = ({
       color: 'rgba(255,255,255,0.8)',
     }}>{institution}</div>
 
-    {/* Bottom accent lines */}
-    <div style={{ position: 'absolute', bottom: 30, left: 24, width: 52, height: 2, background: '#2DC56E' }} />
-    <div style={{ position: 'absolute', bottom: 24, left: 24, width: 30, height: 2, background: '#2DC56E' }} />
+    <InstitutionalFooter pageNum={pageNum} department={department} />
   </div>
 );
 

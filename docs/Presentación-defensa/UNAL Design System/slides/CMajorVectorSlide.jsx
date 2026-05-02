@@ -36,14 +36,14 @@ const ArrayGrid = ({ length, startX, startY, values, colors, step, visibleStep }
   );
 };
 
-const CMajorVectorSlide = ({ pageNum = 14 }) => {
+const CMajorVectorSlide = ({ pageNum = 14, department = "Facultad de Ciencias · Matemáticas Aplicadas" }) => {
   const step = window.useDeckStep(6, 'slide-c-major');
 
   return (
     <div style={{ position: 'absolute', inset: 0, backgroundColor: 'white', display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
       
       {/* Background SVG Canvas for precise absolute positioning */}
-      <svg width="100%" height="100%" viewBox="0 0 1200 800" style={{ position: 'absolute', inset: 0 }}>
+      <svg width="100%" height="100%" viewBox="0 0 1200 800" style={{ position: 'absolute', top: 0, left: 0, right: 0, height: 'calc(100% - 80px)' }}>
         
         <defs>
           <marker id="arrowGray" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
@@ -146,21 +146,7 @@ const CMajorVectorSlide = ({ pageNum = 14 }) => {
         }}
       />
 
-      {/* Footer Strip */}
-      <div style={{ position: 'absolute', bottom: 0, left: 0, right: 0, height: 48, backgroundColor: '#F0EBE0', display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '0 40px', zIndex: 10 }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 15 }}>
-          <div style={{ display: 'flex', gap: 4 }}>
-            <div style={{ width: 12, height: 4, backgroundColor: '#2DC56E' }}></div>
-            <div style={{ width: 30, height: 4, backgroundColor: '#2DC56E' }}></div>
-          </div>
-          <span style={{ fontFamily: "'EB Garamond', serif", fontStyle: 'italic', fontSize: 14, color: '#1B7A3E' }}>
-            Facultad de Ciencias · Matemáticas Aplicadas
-          </span>
-        </div>
-        <div style={{ fontFamily: "'Raleway', sans-serif", fontSize: 14, color: '#1A1A1A' }}>
-          {pageNum}
-        </div>
-      </div>
+      <InstitutionalFooter pageNum={pageNum} department={department} />
 
     </div>
   );

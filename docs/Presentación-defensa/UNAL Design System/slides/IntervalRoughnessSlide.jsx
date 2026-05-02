@@ -110,7 +110,7 @@ const RoughnessCurveSVG = ({ step }) => {
   );
 };
 
-const IntervalRoughnessSlide = ({ pageNum = 15 }) => {
+const IntervalRoughnessSlide = ({ pageNum = 15, department = "Facultad de Ciencias · Matemáticas Aplicadas" }) => {
   const step = window.useDeckStep(3, 'slide-interval');
 
   // Audio simulation handlers
@@ -169,7 +169,7 @@ const IntervalRoughnessSlide = ({ pageNum = 15 }) => {
       <div style={{ flex: 1, position: 'relative', overflow: 'hidden' }}>
         
         {/* Roughness Chart spans entire area */}
-        <div style={{ position: 'absolute', inset: '0 40px 20px 40px' }}>
+        <div style={{ position: 'absolute', inset: '0 40px 48px 40px' }}>
           <RoughnessCurveSVG step={step} />
         </div>
 
@@ -207,7 +207,7 @@ const IntervalRoughnessSlide = ({ pageNum = 15 }) => {
 
         {/* Formula overlay bottom left */}
         <div style={{
-          position: 'absolute', left: 100, bottom: 60,
+          position: 'absolute', left: 100, bottom: 104,
           border: '1px solid #E8610A',
           backgroundColor: 'white',
           padding: '15px 35px',
@@ -224,21 +224,7 @@ const IntervalRoughnessSlide = ({ pageNum = 15 }) => {
 
       </div>
 
-      {/* Footer Strip */}
-      <div style={{ height: 48, backgroundColor: '#F0EBE0', display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '0 40px', position: 'relative', zIndex: 10 }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 15 }}>
-          <div style={{ display: 'flex', gap: 4 }}>
-            <div style={{ width: 12, height: 4, backgroundColor: '#2DC56E' }}></div>
-            <div style={{ width: 30, height: 4, backgroundColor: '#2DC56E' }}></div>
-          </div>
-          <span style={{ fontFamily: "'EB Garamond', serif", fontStyle: 'italic', fontSize: 14, color: '#1B7A3E' }}>
-            Facultad de Ciencias · Matemáticas Aplicadas
-          </span>
-        </div>
-        <div style={{ fontFamily: "'Raleway', sans-serif", fontSize: 14, color: '#1A1A1A' }}>
-          {pageNum}
-        </div>
-      </div>
+      <InstitutionalFooter pageNum={pageNum} department={department} />
 
     </div>
   );

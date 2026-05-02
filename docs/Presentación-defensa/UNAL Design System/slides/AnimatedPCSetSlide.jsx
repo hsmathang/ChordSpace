@@ -87,14 +87,14 @@ const WarningTriangle = ({ step }) => (
   </div>
 );
 
-const AnimatedPCSetSlide = ({ pageNum = 15 }) => {
+const AnimatedPCSetSlide = ({ pageNum = 15, department = "Facultad de Ciencias · Matemáticas Aplicadas" }) => {
   const step = window.useDeckStep(7, 'slide-split');
 
   return (
     <div style={{ position: 'absolute', inset: 0, backgroundColor: 'white', display: 'flex', overflow: 'hidden' }}>
       
       {/* Left White Panel */}
-      <div style={{ flex: '6.5', position: 'relative', padding: '100px 80px', fontSize: 36, fontFamily: "'Raleway',sans-serif", color: '#1A1A1A', lineHeight: 1.4 }}>
+      <div style={{ flex: '6.5', position: 'relative', padding: '90px 80px 120px', fontSize: 36, fontFamily: "'Raleway',sans-serif", color: '#1A1A1A', lineHeight: 1.4 }}>
          
          {/* Intro Text */}
          <div>
@@ -149,7 +149,7 @@ const AnimatedPCSetSlide = ({ pageNum = 15 }) => {
       </div>
 
       {/* Right Orange Panel */}
-      <div style={{ flex: '3.5', backgroundColor: '#E8610A', display: 'flex', flexDirection: 'column', alignItems: 'center', paddingTop: 80, borderLeft: '4px solid #1A1A1A' }}>
+      <div style={{ flex: '3.5', backgroundColor: '#E8610A', display: 'flex', flexDirection: 'column', alignItems: 'center', paddingTop: 80, paddingBottom: 100, borderLeft: '4px solid #1A1A1A' }}>
          <h1 style={{ color: 'white', fontFamily: "'Raleway',sans-serif", fontSize: 65, fontWeight: 700, margin: 0 }}>
            PC-Set Theory
          </h1>
@@ -163,6 +163,8 @@ const AnimatedPCSetSlide = ({ pageNum = 15 }) => {
            <ChromaticCircleSVG step={step} size={500} />
          </div>
       </div>
+
+      <InstitutionalFooter pageNum={pageNum} department={department} />
 
     </div>
   );

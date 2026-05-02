@@ -1,5 +1,38 @@
 // TitleSlide.jsx — White slide with title, subtitle, department
 
+const InstitutionalFooter = ({ pageNum, department = "Facultad de Ciencias · Matemáticas Aplicadas" }) => (
+  <div style={{
+    position: 'absolute', bottom: 0, left: 0, right: 0, height: 80,
+    background: '#F0EBE0',
+    display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+    padding: '0 26px 0 28px',
+    zIndex: 80,
+    boxShadow: '0 -1px 0 rgba(27, 122, 62, 0.16)',
+  }}>
+    <div style={{ display: 'flex', alignItems: 'center', gap: 16, minWidth: 0 }}>
+      <div style={{ display: 'grid', gap: 5, flex: '0 0 auto' }}>
+        <div style={{ width: 62, height: 3, background: '#2DC56E' }} />
+        <div style={{ width: 36, height: 3, background: '#2DC56E' }} />
+      </div>
+      <div style={{ fontFamily: "'Raleway',sans-serif", fontSize: 13, color: '#1B7A3E', fontStyle: 'italic', lineHeight: 1.25, fontWeight: 700 }}>
+        {department.split(/[·•]/).map((d, i) => <div key={i}>{d.trim()}</div>)}
+      </div>
+    </div>
+    <div style={{ display: 'flex', alignItems: 'center', gap: 18, flex: '0 0 auto' }}>
+      {pageNum !== undefined && (
+        <div style={{ fontFamily: "'Raleway',sans-serif", fontSize: 14, color: '#1A1A1A', fontWeight: 700 }}>
+          {pageNum}
+        </div>
+      )}
+      <img
+        src="assets/escudo-un-2016-footer.png"
+        alt="Escudo Universidad Nacional de Colombia"
+        style={{ width: 84, height: 74, objectFit: 'contain', mixBlendMode: 'multiply', opacity: 0.96 }}
+      />
+    </div>
+  </div>
+);
+
 const SlideChrome = ({ pageNum = 2, department = "Facultad de Ciencias · Matemáticas Aplicadas", children }) => (
   <div style={{ position: 'absolute', inset: 0, background: '#fff', overflow: 'hidden' }}>
     {/* Page number */}
@@ -7,26 +40,8 @@ const SlideChrome = ({ pageNum = 2, department = "Facultad de Ciencias · Matem�
     {/* Gold accent line top-right */}
     <div style={{ position: 'absolute', top: 16, right: 0, width: '58%', height: 2, background: '#E8A020' }} />
     {/* Content */}
-    <div style={{ position: 'absolute', inset: '0 0 36px 0', padding: '52px 72px 0' }}>{children}</div>
-    {/* Bottom green accent lines */}
-    <div style={{ position: 'absolute', bottom: 58, left: 28, width: 58, height: 3, background: '#2DC56E' }} />
-    <div style={{ position: 'absolute', bottom: 50, left: 28, width: 34, height: 3, background: '#2DC56E' }} />
-    {/* Footer */}
-    <div style={{
-      position: 'absolute', bottom: 0, left: 0, right: 0, height: 48,
-      background: '#F0EBE0',
-      display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-      padding: '0 22px',
-    }}>
-      <div style={{ fontFamily: "'Raleway',sans-serif", fontSize: 12, color: '#1B7A3E', fontStyle: 'italic', lineHeight: 1.35, fontWeight: 600 }}>
-        {department.split('·').map((d, i) => <div key={i}>{d.trim()}</div>)}
-      </div>
-      <img
-        src="assets/escudo-un-2016.jpg"
-        alt="Escudo Universidad Nacional de Colombia"
-        style={{ width: 50, height: 50, objectFit: 'contain', mixBlendMode: 'multiply', opacity: 0.82 }}
-      />
-    </div>
+    <div style={{ position: 'absolute', inset: '0 0 80px 0', padding: '52px 72px 0' }}>{children}</div>
+    <InstitutionalFooter pageNum={pageNum} department={department} />
   </div>
 );
 
@@ -79,4 +94,4 @@ const TitleSlide = ({
   </div>
 );
 
-Object.assign(window, { SlideChrome, TitleSlide });
+Object.assign(window, { InstitutionalFooter, SlideChrome, TitleSlide });
