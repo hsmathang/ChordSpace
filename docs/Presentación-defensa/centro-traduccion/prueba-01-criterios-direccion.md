@@ -63,3 +63,26 @@ Las slides de resultados deben priorizar el contraste `1D scalar roughness` vs `
 ## Primer criterio de aceptacion
 
 Una diapositiva pasa esta prueba si puede explicarse oralmente con una frase corta y si su visual responde a una pregunta: que debe ver o escuchar el jurado para entender esta idea sin leer un parrafo.
+
+## Prueba 02 - Bloque introductorio diagramado
+
+Diapositivas intervenidas:
+
+- 2: pregunta de investigacion, convertida en flujo `acorde -> oido -> espacio navegable`.
+- 3: foco musical, separando melodia, ritmo y armonia para ubicar el acorde como objeto perceptual.
+- 4: demostracion auditiva, melodia frente a intervalos complementarios con botones de reproduccion.
+- 5: decision conceptual, contraste entre colapsar a 6 equivalencias y preservar 12 direcciones.
+
+Fuentes y materiales consultados para esta prueba:
+
+- `docs/Presentacion-defensa/UNAL Design System/presentation/audio.js`
+- `docs/Presentacion-defensa/UNAL Design System/slides/AnimatedPianoSlide.jsx`
+- `docs/Presentacion-defensa/UNAL Design System/slides/AnimatedVectorSlide.jsx`
+- `docs/Presentacion-defensa/UNAL Design System/slides/AnimatedPCSetSlide.jsx`
+- `docs/Presentacion-defensa/imagenes-utiles-externas/17-music-concepts-mapi.png`
+
+Hipotesis narrativa:
+Antes de mostrar formulas o resultados, el jurado debe sentir que perder direccion intervalar cambia la experiencia musical. Desde ahi se justifica que el modelo conserve un perfil de rugosidad de 12 dimensiones y que el mapa venga despues como forma de exploracion, no como argumento principal.
+
+Chequeo de calidad:
+Las cuatro diapositivas nuevas fueron revisadas en navegador local. La diapositiva 4 tiene dos controles de audio; si el gesto auditivo resulta demasiado extremo, se puede ajustar el registro sin cambiar la tesis visual.

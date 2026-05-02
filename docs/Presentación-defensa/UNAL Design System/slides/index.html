@@ -13,6 +13,7 @@
 <script src="https://unpkg.com/@babel/standalone@7.29.0/babel.min.js" integrity="sha384-m08KidiNqLdpJqLq95G/LEi8Qvjl/xUYll3QILypMoQ65QorJ9Lvtp2RXYGBFj1y" crossorigin="anonymous"></script>
 <script src="deck-stage.js?v=20260501-anim-reset-2"></script>
 <script src="deck-step.js?v=20260501-anim-reset-3"></script>
+<script src="../presentation/audio.js?v=20260502-audio-engine-1"></script>
 <style>
   * { margin: 0; padding: 0; box-sizing: border-box; }
   body { background: #111; }
@@ -65,6 +66,7 @@
 
 <script type="text/babel" src="CoverSlide.jsx?v=20260502-formal-cover-1"></script>
 <script type="text/babel" src="TitleSlide.jsx?v=20260502-piano-footer-3"></script>
+<script type="text/babel" src="IntroNarrativeSlides.jsx?v=20260502-intro-pilot-1"></script>
 <script type="text/babel" src="ContentSlide.jsx?v=20260501-anim-reset-3"></script>
 <script type="text/babel" src="DiagramSlide.jsx?v=20260501-anim-reset-3"></script>
 <script type="text/babel" src="SplitSlide.jsx?v=20260502-piano-footer-3"></script>
@@ -100,27 +102,22 @@ ReactDOM.createRoot(document.getElementById('slide-cover')).render(
 
 // --- Render Title ---
 ReactDOM.createRoot(document.getElementById('slide-title')).render(
-  <TitleSlide
-    pageNum={slideNumber('slide-title')}
-    title="Computational Exploration of a Musical Chord Space"
-    subtitle="Una representación perceptual para acordes musicales"
-    department={DEPT}
-  />
+  <ResearchQuestionSlide pageNum={slideNumber('slide-title')} department={DEPT} />
 );
 
 // --- Render Content ---
 ReactDOM.createRoot(document.getElementById('slide-content')).render(
-  <AnimatedPianoSlide pageNum={slideNumber('slide-content')} department={DEPT} />
+  <MusicalFocusSlide pageNum={slideNumber('slide-content')} department={DEPT} />
 );
 
 // --- Render Diagram ---
 ReactDOM.createRoot(document.getElementById('slide-diagram')).render(
-  <AnimatedVectorSlide pageNum={slideNumber('slide-diagram')} department={DEPT} />
+  <ComplementIntervalsSlide pageNum={slideNumber('slide-diagram')} department={DEPT} />
 );
 
 // --- Render Split ---
 ReactDOM.createRoot(document.getElementById('slide-split')).render(
-  <AnimatedPCSetSlide pageNum={slideNumber('slide-split')} department={DEPT} />
+  <TwelveBinsSlide pageNum={slideNumber('slide-split')} department={DEPT} />
 );
 
 // --- Render Closing ---
