@@ -86,3 +86,19 @@ Antes de mostrar formulas o resultados, el jurado debe sentir que perder direcci
 
 Chequeo de calidad:
 Las cuatro diapositivas nuevas fueron revisadas en navegador local. La diapositiva 4 tiene dos controles de audio; si el gesto auditivo resulta demasiado extremo, se puede ajustar el registro sin cambiar la tesis visual.
+
+## Correccion posterior a la prueba
+
+La prueba reemplazo ranuras originales del deck y eso fue un error de integracion. El criterio corregido es:
+
+- Las diapositivas originales se conservan visibles.
+- Las nuevas ideas entran como variantes piloto al final del bloque, para comparar.
+- La calidad no se evalua solo por limpieza visual, sino tambien por densidad de elementos, cantidad de estados animables y capacidad de sostener una explicacion oral rica.
+- Antes de programar una diapositiva nueva importante, se debe generar una imagen imprimible de referencia o una maqueta estatica que permita contar elementos y revisar composicion como lo haria un disenador.
+
+Acciones aplicadas:
+
+- Restaurar las diapositivas originales 2 a 5 en sus posiciones.
+- Mantener las cuatro ideas nuevas como diapositivas piloto posteriores.
+- Corregir la prueba auditiva para usar una frase mas completa de La Cucaracha y duraciones no uniformes.
+- Crear `modulo-inspiracion-visual.md` como nueva fase obligatoria del centro de traduccion.

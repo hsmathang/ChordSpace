@@ -62,6 +62,18 @@
   <!-- Slide 9: Chords to Vectors -->
   <section id="slide-chords-vectors" data-screen-label="09 PC-Set Mapping"></section>
 
+  <!-- Slide 10: Pilot research question -->
+  <section id="slide-pilot-question" data-screen-label="10 Pilot Question"></section>
+
+  <!-- Slide 11: Pilot musical focus -->
+  <section id="slide-pilot-focus" data-screen-label="11 Pilot Musical Focus"></section>
+
+  <!-- Slide 12: Pilot complement intervals -->
+  <section id="slide-pilot-complements" data-screen-label="12 Pilot Complements"></section>
+
+  <!-- Slide 13: Pilot twelve bins -->
+  <section id="slide-pilot-bins" data-screen-label="13 Pilot Twelve Bins"></section>
+
 </deck-stage>
 
 <script type="text/babel" src="CoverSlide.jsx?v=20260502-formal-cover-1"></script>
@@ -102,22 +114,27 @@ ReactDOM.createRoot(document.getElementById('slide-cover')).render(
 
 // --- Render Title ---
 ReactDOM.createRoot(document.getElementById('slide-title')).render(
-  <ResearchQuestionSlide pageNum={slideNumber('slide-title')} department={DEPT} />
+  <TitleSlide
+    pageNum={slideNumber('slide-title')}
+    title="Computational Exploration of a Musical Chord Space"
+    subtitle="Una representación perceptual para acordes musicales"
+    department={DEPT}
+  />
 );
 
 // --- Render Content ---
 ReactDOM.createRoot(document.getElementById('slide-content')).render(
-  <MusicalFocusSlide pageNum={slideNumber('slide-content')} department={DEPT} />
+  <AnimatedPianoSlide pageNum={slideNumber('slide-content')} department={DEPT} />
 );
 
 // --- Render Diagram ---
 ReactDOM.createRoot(document.getElementById('slide-diagram')).render(
-  <ComplementIntervalsSlide pageNum={slideNumber('slide-diagram')} department={DEPT} />
+  <AnimatedVectorSlide pageNum={slideNumber('slide-diagram')} department={DEPT} />
 );
 
 // --- Render Split ---
 ReactDOM.createRoot(document.getElementById('slide-split')).render(
-  <TwelveBinsSlide pageNum={slideNumber('slide-split')} department={DEPT} />
+  <AnimatedPCSetSlide pageNum={slideNumber('slide-split')} department={DEPT} />
 );
 
 // --- Render Closing ---
@@ -138,6 +155,23 @@ ReactDOM.createRoot(document.getElementById('slide-c-major')).render(
 // --- Render Chords To Vectors Diagram ---
 ReactDOM.createRoot(document.getElementById('slide-chords-vectors')).render(
   <ChordsToVectorsSlide pageNum={slideNumber('slide-chords-vectors')} department={DEPT} />
+);
+
+// --- Render Pilot Slides ---
+ReactDOM.createRoot(document.getElementById('slide-pilot-question')).render(
+  <ResearchQuestionSlide pageNum={slideNumber('slide-pilot-question')} department={DEPT} />
+);
+
+ReactDOM.createRoot(document.getElementById('slide-pilot-focus')).render(
+  <MusicalFocusSlide pageNum={slideNumber('slide-pilot-focus')} department={DEPT} />
+);
+
+ReactDOM.createRoot(document.getElementById('slide-pilot-complements')).render(
+  <ComplementIntervalsSlide pageNum={slideNumber('slide-pilot-complements')} department={DEPT} />
+);
+
+ReactDOM.createRoot(document.getElementById('slide-pilot-bins')).render(
+  <TwelveBinsSlide pageNum={slideNumber('slide-pilot-bins')} department={DEPT} />
 );
 </script>
 </body>

@@ -6,9 +6,11 @@ const PlayGlyph = ({ size = 24, color = '#1A1A1A' }) => (
 
 const playMelody = (midis, durations = null) => {
   if (!window.AudioEngine) return;
+  let cursor = 0;
   midis.forEach((midi, i) => {
     const dur = durations?.[i] || 0.34;
-    window.setTimeout(() => window.AudioEngine.playNote(midi, dur), i * 250);
+    window.setTimeout(() => window.AudioEngine.playNote(midi, dur), cursor * 1000);
+    cursor += dur * 0.88;
   });
 };
 
@@ -167,7 +169,20 @@ const MusicalFocusSlide = ({ pageNum, department }) => (
 );
 
 const ComplementIntervalsSlide = ({ pageNum, department }) => {
-  const original = [60, 60, 60, 65, 69, 60, 60, 60, 65, 69];
+  const original = [
+    67, 67, 67, 72, 76,
+    67, 67, 67, 72, 76,
+    72, 72, 71, 71, 69, 69, 67,
+    65, 65, 65, 69, 72,
+    67, 67, 67, 71, 74, 72,
+  ];
+  const durations = [
+    0.22, 0.22, 0.22, 0.42, 0.62,
+    0.22, 0.22, 0.22, 0.42, 0.62,
+    0.22, 0.22, 0.22, 0.22, 0.22, 0.22, 0.62,
+    0.22, 0.22, 0.22, 0.42, 0.62,
+    0.22, 0.22, 0.22, 0.42, 0.42, 0.72,
+  ];
   const altered = complementMelody(original);
   return (
     <div style={{ position: 'absolute', inset: 0 }}>
@@ -176,10 +191,10 @@ const ComplementIntervalsSlide = ({ pageNum, department }) => {
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
             <div style={{ fontFamily: "'Playfair Display','Georgia',serif", fontSize: 60, fontWeight: 800, color: '#1A1A1A' }}>El oído no colapsa intervalos</div>
             <div style={{ display: 'flex', gap: 12 }}>
-              <button onClick={() => playMelody(original)} style={{ width: 54, height: 54, borderRadius: '50%', border: '2px solid #1B7A3E', background: '#fff', display: 'grid', placeItems: 'center', cursor: 'pointer' }} title="Melodía original">
+              <button onClick={() => playMelody(original, durations)} style={{ width: 54, height: 54, borderRadius: '50%', border: '2px solid #1B7A3E', background: '#fff', display: 'grid', placeItems: 'center', cursor: 'pointer' }} title="Melodía original">
                 <PlayGlyph color="#1B7A3E" />
               </button>
-              <button onClick={() => playMelody(altered)} style={{ width: 54, height: 54, borderRadius: '50%', border: '2px solid #C0392B', background: '#fff', display: 'grid', placeItems: 'center', cursor: 'pointer' }} title="Intervalos complementarios">
+              <button onClick={() => playMelody(altered, durations)} style={{ width: 54, height: 54, borderRadius: '50%', border: '2px solid #C0392B', background: '#fff', display: 'grid', placeItems: 'center', cursor: 'pointer' }} title="Intervalos complementarios">
                 <PlayGlyph color="#C0392B" />
               </button>
             </div>
