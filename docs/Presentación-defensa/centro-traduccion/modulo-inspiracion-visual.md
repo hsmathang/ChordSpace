@@ -30,7 +30,7 @@ Para clases de altura y PC-set, no inventar primero una rueda nueva. Ya existe u
 1. **Intencion oral**: escribir la frase que se debe poder decir mientras aparece la diapositiva.
 2. **Busqueda de lenguaje propio**: revisar diapositivas existentes, imagenes utiles, figuras de tesis y codigo antes de crear un simbolo nuevo.
 3. **Fuente de verdad**: anotar de donde sale el contenido conceptual: LaTeX, markdown, articulo MAPI, codigo, imagen, audio o experimento.
-4. **Boceto imprimible**: generar o dibujar una composicion estatica cuando la diapositiva sea importante o riesgosa.
+4. **Boceto imprimible**: generar o dibujar una composicion estatica para toda diapositiva nueva o reestructurada. En esta defensa todas las diapositivas son importantes.
 5. **Conteo de densidad**: verificar numero de objetos, grupos visuales y posibles apariciones animadas.
 6. **Plan de animacion**: definir que aparece primero, que se transforma y que debe quedarse visible para la explicacion oral.
 7. **Programacion**: construir con React/SVG/CSS usando componentes y sistema institucional existentes.
@@ -69,10 +69,12 @@ Checklist:
 
 - Claim oral en una frase.
 - Objeto visual principal.
+- Una frase oral clara no implica pocos elementos visuales. La frase ordena la lectura; la lamina puede y debe tener riqueza diagramatica.
 - Al menos 4 grupos visuales secundarios cuando la idea sea introductoria o conceptual.
 - Al menos 5 apariciones o estados animables cuando la diapositiva explique un mecanismo.
 - Poco texto, pero no poca informacion.
 - Relacion clara con una fuente del repositorio, imagen seleccionada o codigo reproducible.
+- Uso preferente del vocabulario visual propio: flechas curvas, codificacion verde/naranja/azul/rojo, cajitas, conectores, ruedas, mini-esquemas, ejes, puntos y transformaciones por capas.
 
 ## Modulo 3 - Traduccion a codigo
 
