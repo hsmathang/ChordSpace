@@ -1,0 +1,97 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<link href="https://fonts.googleapis.com/css2?family=Raleway:wght@600;700&family=JetBrains+Mono:wght@400&display=swap" rel="stylesheet">
+<style>
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body { background: #f8f8f8; padding: 20px; display: flex; flex-direction: column; gap: 20px; }
+.label { font-size: 9px; font-family: 'Raleway',sans-serif; text-transform: uppercase; letter-spacing: 0.12em; color: #aaa; margin-bottom: 8px; font-weight: 700; }
+.demo { background: #fff; padding: 20px; display: flex; align-items: center; gap: 24px; flex-wrap: wrap; }
+svg { overflow: visible; }
+</style>
+</head>
+<body>
+
+<div>
+  <div class="label">Straight arrows — flow diagram</div>
+  <div class="demo">
+    <svg width="320" height="40">
+      <!-- Red flow -->
+      <line x1="0" y1="10" x2="280" y2="10" stroke="#C0392B" stroke-width="2" marker-end="url(#arr-red)"/>
+      <text x="0" y="28" font-size="11" font-family="Raleway,sans-serif" fill="#C0392B" font-weight="700">(4,7,3)</text>
+      <defs><marker id="arr-red" markerWidth="8" markerHeight="8" refX="6" refY="3" orient="auto"><path d="M0,0 L0,6 L8,3 z" fill="#C0392B"/></marker></defs>
+    </svg>
+    <svg width="320" height="40">
+      <!-- Blue flow -->
+      <line x1="0" y1="10" x2="280" y2="10" stroke="#1E6BB8" stroke-width="2" marker-end="url(#arr-blue)"/>
+      <text x="0" y="28" font-size="11" font-family="Raleway,sans-serif" fill="#1E6BB8" font-weight="700">(3,8,5)</text>
+      <defs><marker id="arr-blue" markerWidth="8" markerHeight="8" refX="6" refY="3" orient="auto"><path d="M0,0 L0,6 L8,3 z" fill="#1E6BB8"/></marker></defs>
+    </svg>
+    <svg width="320" height="40">
+      <!-- Green flow -->
+      <line x1="0" y1="10" x2="280" y2="10" stroke="#27AE60" stroke-width="2" marker-end="url(#arr-green)"/>
+      <text x="0" y="28" font-size="11" font-family="Raleway,sans-serif" fill="#27AE60" font-weight="700">(5,9,4)</text>
+      <defs><marker id="arr-green" markerWidth="8" markerHeight="8" refX="6" refY="3" orient="auto"><path d="M0,0 L0,6 L8,3 z" fill="#27AE60"/></marker></defs>
+    </svg>
+  </div>
+</div>
+
+<div>
+  <div class="label">Curved arc arrows — note relationships</div>
+  <div class="demo">
+    <svg width="280" height="80">
+      <defs>
+        <marker id="arr-black" markerWidth="8" markerHeight="8" refX="6" refY="3" orient="auto"><path d="M0,0 L0,6 L8,3 z" fill="#1A1A1A"/></marker>
+        <marker id="arr-black2" markerWidth="8" markerHeight="8" refX="6" refY="3" orient="auto"><path d="M0,0 L0,6 L8,3 z" fill="#1A1A1A"/></marker>
+      </defs>
+      <text x="30" y="68" font-size="13" font-family="serif" fill="#1A1A1A" font-weight="700">Do</text>
+      <text x="120" y="68" font-size="13" font-family="serif" fill="#1A1A1A" font-weight="700">Mi</text>
+      <text x="210" y="68" font-size="13" font-family="serif" fill="#1A1A1A" font-weight="700">Sol</text>
+      <!-- arc Do-Mi -->
+      <path d="M42 58 Q80 20 128 58" fill="none" stroke="#1A1A1A" stroke-width="1.5" marker-end="url(#arr-black)"/>
+      <text x="78" y="18" font-size="10" fill="#1A1A1A" font-family="Raleway,sans-serif">4</text>
+      <!-- arc Mi-Sol -->
+      <path d="M132 58 Q170 30 218 58" fill="none" stroke="#1A1A1A" stroke-width="1.5" marker-end="url(#arr-black2)"/>
+      <text x="168" y="28" font-size="10" fill="#27AE60" fill-opacity="1" font-family="Raleway,sans-serif" font-weight="700">3</text>
+      <!-- arc Do-Sol span -->
+      <path d="M38 54 Q128 0 215 54" fill="none" stroke="#777" stroke-width="1" stroke-dasharray="3,3"/>
+      <text x="118" y="8" font-size="10" fill="#777" font-family="Raleway,sans-serif">7</text>
+    </svg>
+  </div>
+</div>
+
+<div>
+  <div class="label">Diamond measurement span (interval arrow)</div>
+  <div class="demo">
+    <svg width="300" height="40">
+      <defs>
+        <marker id="diamond-l" markerWidth="8" markerHeight="8" refX="4" refY="4" orient="auto"><polygon points="0,4 4,0 8,4 4,8" fill="none" stroke="#27AE60" stroke-width="1.2"/></marker>
+        <marker id="diamond-r" markerWidth="8" markerHeight="8" refX="4" refY="4" orient="auto-start-reverse"><polygon points="0,4 4,0 8,4 4,8" fill="none" stroke="#27AE60" stroke-width="1.2"/></marker>
+      </defs>
+      <line x1="12" y1="20" x2="288" y2="20" stroke="#27AE60" stroke-width="1.5" marker-start="url(#diamond-l)" marker-end="url(#diamond-r)"/>
+      <text x="135" y="15" font-size="12" fill="#27AE60" font-family="Raleway,sans-serif" font-weight="700">11</text>
+    </svg>
+  </div>
+</div>
+
+<div>
+  <div class="label">Black node → node arrows (schematic)</div>
+  <div class="demo">
+    <svg width="340" height="50">
+      <defs><marker id="arr-n" markerWidth="8" markerHeight="8" refX="6" refY="3" orient="auto"><path d="M0,0 L0,6 L8,3 z" fill="#1A1A1A"/></marker></defs>
+      <rect x="0" y="10" width="80" height="28" fill="none" stroke="#ccc" stroke-width="1"/>
+      <text x="40" y="28" text-anchor="middle" font-size="11" font-family="Raleway,sans-serif" fill="#1A1A1A">Chords</text>
+      <line x1="82" y1="24" x2="138" y2="24" stroke="#1A1A1A" stroke-width="1.5" marker-end="url(#arr-n)"/>
+      <rect x="140" y="10" width="80" height="28" fill="#E8610A"/>
+      <text x="180" y="28" text-anchor="middle" font-size="11" font-family="Raleway,sans-serif" fill="#fff" font-weight="700">iStruct</text>
+      <line x1="222" y1="24" x2="278" y2="24" stroke="#fff" stroke-width="1.5" marker-end="url(#arr-w)"/>
+      <defs><marker id="arr-w" markerWidth="8" markerHeight="8" refX="6" refY="3" orient="auto"><path d="M0,0 L0,6 L8,3 z" fill="#fff"/></marker></defs>
+      <rect x="280" y="10" width="60" height="28" fill="#E8610A"/>
+      <text x="310" y="28" text-anchor="middle" font-size="11" font-family="Raleway,sans-serif" fill="#fff" font-weight="700">iVect</text>
+    </svg>
+  </div>
+</div>
+
+</body>
+</html>

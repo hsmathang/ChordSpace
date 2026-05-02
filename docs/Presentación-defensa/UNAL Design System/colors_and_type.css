@@ -1,0 +1,254 @@
+/* ============================================================
+   UNIVERSIDAD NACIONAL DE COLOMBIA — Design System
+   colors_and_type.css
+   ============================================================ */
+
+/* --- Google Font Imports (Ancízar substitutes) ---
+   Ancízar Serif Extrabold → Playfair Display (Bold/ExtraBold)
+   Ancízar Sans            → Raleway (uppercase, letter-spaced)
+   Body / LaTeX-like       → EB Garamond
+   Mono / diagram labels   → JetBrains Mono
+   ⚠ Flag: Replace with official Ancízar .ttf/.otf from UNAL
+   ------------------------------------------------------------ */
+@import url('https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,400;0,700;0,800;1,400;1,700&family=Raleway:wght@300;400;500;600;700&family=EB+Garamond:ital,wght@0,400;0,500;1,400&family=JetBrains+Mono:wght@400;500&display=swap');
+
+/* ============================================================
+   BASE COLOR TOKENS
+   ============================================================ */
+:root {
+
+  /* --- Brand Greens --- */
+  --unal-green:          #1B7A3E;   /* Primary: cover bg, titles, CTA */
+  --unal-green-dark:     #145F30;   /* Hover/pressed state of green */
+  --unal-green-light:    #2DC56E;   /* Accent: bottom-left slide lines */
+  --unal-green-subtle:   #E8F5EE;   /* Very light green tint for backgrounds */
+
+  /* --- Brand Accent --- */
+  --unal-gold:           #E8A020;   /* Top-right decorative accent line */
+  --unal-gold-dark:      #C4841A;   /* Darker gold for pressed/hover */
+
+  /* --- Content Highlight --- */
+  --unal-orange:         #E8610A;   /* Split-panel highlight, PC-Set Theory panels */
+  --unal-orange-dark:    #C44E08;   /* Darker orange */
+  --unal-orange-light:   #FDE8D8;   /* Very light orange tint */
+
+  /* --- Neutral Surface --- */
+  --unal-beige:          #F0EBE0;   /* Footer strip on content slides */
+  --unal-beige-dark:     #DDD5C5;   /* Beige border / separator */
+  --unal-white:          #FFFFFF;   /* Slide content background */
+  --unal-near-black:     #1A1A1A;   /* Primary body text */
+  --unal-gray-dark:      #444444;   /* Secondary text */
+  --unal-gray-mid:       #888888;   /* Tertiary text, captions */
+  --unal-gray-light:     #CCCCCC;   /* Dividers, borders */
+  --unal-gray-subtle:    #F5F5F5;   /* Subtle bg tint */
+
+  /* --- Diagram Colors --- */
+  --diagram-blue:        #1E6BB8;   /* Primary flow arrows, vector 1 */
+  --diagram-blue-light:  #5B9BD5;   /* Lighter blue */
+  --diagram-red:         #C0392B;   /* Error / emphasis dots, warning */
+  --diagram-green:       #27AE60;   /* Secondary flow arrows, vector 2 */
+  --diagram-gray:        #777777;   /* Tertiary arrows, minor connections */
+  --diagram-purple:      #8E44AD;   /* Occasional quaternary color */
+
+  /* ============================================================
+     SEMANTIC COLOR TOKENS
+     ============================================================ */
+
+  /* Text */
+  --color-text-primary:    var(--unal-near-black);
+  --color-text-secondary:  var(--unal-gray-dark);
+  --color-text-muted:      var(--unal-gray-mid);
+  --color-text-on-green:   var(--unal-white);
+  --color-text-on-orange:  var(--unal-white);
+  --color-text-heading:    var(--unal-green);
+  --color-text-subtitle:   var(--unal-green);
+  --color-text-accent:     var(--unal-orange);
+
+  /* Backgrounds */
+  --color-bg-slide:        var(--unal-white);
+  --color-bg-cover:        var(--unal-green);
+  --color-bg-footer:       var(--unal-beige);
+  --color-bg-highlight:    var(--unal-orange);
+  --color-bg-subtle:       var(--unal-green-subtle);
+
+  /* Borders */
+  --color-border-default:  var(--unal-gray-light);
+  --color-border-formula:  var(--unal-near-black);   /* dashed formula boxes */
+  --color-border-strong:   var(--unal-green);
+
+  /* Accents / decorative lines */
+  --color-accent-top:      var(--unal-gold);         /* top-right line */
+  --color-accent-bottom:   var(--unal-green-light);  /* bottom-left lines */
+
+  /* ============================================================
+     TYPOGRAPHY TOKENS
+     ============================================================ */
+
+  /* Font families */
+  --font-serif:   'Playfair Display', 'Georgia', serif;          /* Ancízar Serif substitute */
+  --font-sans:    'Raleway', 'Helvetica Neue', sans-serif;        /* Ancízar Sans substitute */
+  --font-body:    'EB Garamond', 'Georgia', serif;                /* Body/academic text */
+  --font-mono:    'JetBrains Mono', 'Courier New', monospace;    /* Diagram labels, code */
+
+  /* Font weights */
+  --fw-regular:   400;
+  --fw-medium:    500;
+  --fw-semibold:  600;
+  --fw-bold:      700;
+  --fw-extrabold: 800;
+
+  /* Type scale — slide context (base: 16px = 12pt) */
+  --text-xs:    0.75rem;    /* 12px — footer labels */
+  --text-sm:    0.875rem;   /* 14px — captions, footnotes */
+  --text-base:  1rem;       /* 16px — body text */
+  --text-md:    1.125rem;   /* 18px — body emphasis */
+  --text-lg:    1.375rem;   /* 22px — diagram labels */
+  --text-xl:    1.75rem;    /* 28px — slide subtitle */
+  --text-2xl:   2.25rem;    /* 36px — slide title */
+  --text-3xl:   3rem;       /* 48px — cover title */
+  --text-4xl:   4rem;       /* 64px — closing "Gracias" */
+
+  /* Letter spacing */
+  --tracking-tight:  -0.01em;
+  --tracking-normal:  0;
+  --tracking-wide:    0.08em;   /* Ancízar Sans subtitle style */
+  --tracking-wider:   0.15em;   /* Very open — uppercase labels */
+
+  /* Line heights */
+  --leading-tight:   1.1;
+  --leading-snug:    1.25;
+  --leading-normal:  1.5;
+  --leading-relaxed: 1.7;
+
+  /* ============================================================
+     SPACING TOKENS
+     ============================================================ */
+  --space-1:   4px;
+  --space-2:   8px;
+  --space-3:   12px;
+  --space-4:   16px;
+  --space-5:   24px;
+  --space-6:   32px;
+  --space-7:   48px;
+  --space-8:   64px;
+  --space-9:   96px;
+
+  /* Slide-specific */
+  --slide-pad-x:     64px;   /* Horizontal margin inside slide */
+  --slide-pad-y:     48px;   /* Vertical margin inside slide */
+  --slide-footer-h:  48px;   /* Footer strip height */
+  --slide-chrome-h:  6px;    /* Accent line thickness */
+
+  /* ============================================================
+     BORDER RADIUS
+     ============================================================ */
+  --radius-none:  0px;   /* UNAL uses zero radius everywhere */
+  --radius-sm:    2px;   /* Only for very minor softening if needed */
+
+  /* ============================================================
+     SHADOWS
+     ============================================================ */
+  --shadow-none:  none;   /* UNAL slides use no shadows */
+  --shadow-card:  0 1px 3px rgba(0,0,0,0.10);  /* Minimal if needed */
+}
+
+/* ============================================================
+   SEMANTIC ELEMENT DEFAULTS
+   ============================================================ */
+
+h1 {
+  font-family: var(--font-serif);
+  font-weight: var(--fw-extrabold);
+  font-size: var(--text-2xl);
+  line-height: var(--leading-tight);
+  color: var(--color-text-heading);
+  letter-spacing: var(--tracking-tight);
+}
+
+h2 {
+  font-family: var(--font-serif);
+  font-weight: var(--fw-bold);
+  font-size: var(--text-xl);
+  line-height: var(--leading-snug);
+  color: var(--color-text-heading);
+}
+
+h3 {
+  font-family: var(--font-sans);
+  font-weight: var(--fw-semibold);
+  font-size: var(--text-lg);
+  text-transform: uppercase;
+  letter-spacing: var(--tracking-wide);
+  color: var(--color-text-subtitle);
+}
+
+h4 {
+  font-family: var(--font-sans);
+  font-weight: var(--fw-medium);
+  font-size: var(--text-base);
+  text-transform: uppercase;
+  letter-spacing: var(--tracking-wider);
+  color: var(--color-text-secondary);
+}
+
+p {
+  font-family: var(--font-body);
+  font-weight: var(--fw-regular);
+  font-size: var(--text-base);
+  line-height: var(--leading-relaxed);
+  color: var(--color-text-primary);
+}
+
+code, pre {
+  font-family: var(--font-mono);
+  font-size: var(--text-sm);
+  color: var(--color-text-primary);
+}
+
+/* Subtitle caps style (Ancízar Sans) */
+.subtitle {
+  font-family: var(--font-sans);
+  font-weight: var(--fw-bold);
+  font-size: var(--text-sm);
+  text-transform: uppercase;
+  letter-spacing: var(--tracking-wider);
+  color: var(--color-text-subtitle);
+}
+
+/* Formula / definition box */
+.formula-box {
+  border: 1px dashed var(--color-border-formula);
+  padding: var(--space-3) var(--space-5);
+  font-family: var(--font-mono);
+  font-size: var(--text-base);
+  display: inline-block;
+}
+
+/* Slide title (large, on white slide) */
+.slide-title {
+  font-family: var(--font-serif);
+  font-weight: var(--fw-extrabold);
+  font-size: var(--text-2xl);
+  color: var(--color-text-heading);
+  letter-spacing: var(--tracking-tight);
+}
+
+/* Slide subtitle (caps) */
+.slide-subtitle {
+  font-family: var(--font-sans);
+  font-weight: var(--fw-bold);
+  font-size: var(--text-sm);
+  text-transform: uppercase;
+  letter-spacing: var(--tracking-wider);
+  color: var(--color-text-subtitle);
+}
+
+/* On-green text */
+.on-green {
+  color: var(--color-text-on-green);
+}
+
+/* On-orange text */
+.on-orange {
+  color: var(--color-text-on-orange);
+}

@@ -1,0 +1,138 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>UNAL Slide Templates</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,700;0,800;1,400;1,700&family=Raleway:wght@300;400;600;700&family=EB+Garamond:ital,wght@0,400;1,400&family=JetBrains+Mono:wght@400;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.10/dist/katex.min.css">
+<script src="https://cdn.jsdelivr.net/npm/katex@0.16.10/dist/katex.min.js"></script>
+<script src="https://unpkg.com/react@18.3.1/umd/react.development.js" integrity="sha384-hD6/rw4ppMLGNu3tX5cjIb+uRZ7UkRJ6BPkLpg4hAu/6onKUg4lLsHAs9EBPT82L" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.development.js" integrity="sha384-u6aeetuaXnQ38mYT8rp6sbXaQe3NL9t+IBXmnYxwkUI2Hw4bsp2Wvmx4yRQF1uAm" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/@babel/standalone@7.29.0/babel.min.js" integrity="sha384-m08KidiNqLdpJqLq95G/LEi8Qvjl/xUYll3QILypMoQ65QorJ9Lvtp2RXYGBFj1y" crossorigin="anonymous"></script>
+<script src="deck-stage.js?v=20260501-anim-reset-2"></script>
+<script src="deck-step.js?v=20260501-anim-reset-3"></script>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { background: #111; }
+  deck-stage section {
+    overflow: hidden;
+    width: 100%;
+    height: 100%;
+    display: block;
+    position: relative;
+  }
+  deck-stage section > div,
+  deck-stage section > [data-screen-label] {
+    width: 100%;
+    height: 100%;
+  }
+</style>
+</head>
+<body>
+
+<deck-stage>
+
+  <!-- Slide 1: Cover -->
+  <section id="slide-cover" data-screen-label="01 Cover"></section>
+
+  <!-- Slide 2: Title -->
+  <section id="slide-title" data-screen-label="02 Title"></section>
+
+  <!-- Slide 3: Content -->
+  <section id="slide-content" data-screen-label="03 Content"></section>
+
+  <!-- Slide 4: Diagram -->
+  <section id="slide-diagram" data-screen-label="04 Diagram"></section>
+
+  <!-- Slide 5: Split panel -->
+  <section id="slide-split" data-screen-label="05 Split"></section>
+
+  <!-- Slide 6: Closing -->
+  <section id="slide-closing" data-screen-label="06 Closing"></section>
+
+  <!-- Slide 7: Interval Roughness -->
+  <section id="slide-interval" data-screen-label="07 Roughness"></section>
+
+  <!-- Slide 8: C Major Vector Diagram -->
+  <section id="slide-c-major" data-screen-label="08 C Major Vector"></section>
+
+  <!-- Slide 9: Chords to Vectors -->
+  <section id="slide-chords-vectors" data-screen-label="09 PC-Set Mapping"></section>
+
+</deck-stage>
+
+<script type="text/babel" src="CoverSlide.jsx?v=20260501-institution-2"></script>
+<script type="text/babel" src="TitleSlide.jsx?v=20260501-institution-2"></script>
+<script type="text/babel" src="ContentSlide.jsx?v=20260501-anim-reset-3"></script>
+<script type="text/babel" src="DiagramSlide.jsx?v=20260501-anim-reset-3"></script>
+<script type="text/babel" src="SplitSlide.jsx?v=20260501-institution-2"></script>
+<script type="text/babel" src="ClosingSlide.jsx?v=20260501-anim-reset-3"></script>
+<script type="text/babel" src="AnimatedPianoSlide.jsx?v=20260501-anim-reset-3"></script>
+<script type="text/babel" src="AnimatedVectorSlide.jsx?v=20260501-anim-reset-3"></script>
+<script type="text/babel" src="AnimatedPCSetSlide.jsx?v=20260501-anim-reset-3"></script>
+<script type="text/babel" src="AnimatedSchematicSlide.jsx?v=20260501-anim-reset-3"></script>
+<script type="text/babel" src="IntervalRoughnessSlide.jsx?v=20260501-anim-reset-3"></script>
+<script type="text/babel" src="CMajorVectorSlide.jsx?v=20260501-anim-reset-3"></script>
+<script type="text/babel" src="ChordsToVectorsSlide.jsx?v=20260501-slide9-redesign-4"></script>
+
+<script type="text/babel">
+const DEPT = "Facultad de Ciencias · Matemáticas Aplicadas";
+
+// --- Render Cover ---
+ReactDOM.createRoot(document.getElementById('slide-cover')).render(
+  <CoverSlide
+    title="UNIVERSIDAD"
+    subtitle="NACIONAL DE COLOMBIA"
+    department={DEPT}
+  />
+);
+
+// --- Render Title ---
+ReactDOM.createRoot(document.getElementById('slide-title')).render(
+  <TitleSlide
+    pageNum={2}
+    title="Computational Exploration of a Musical Chord Space"
+    subtitle="Una representación perceptual para acordes musicales"
+    department={DEPT}
+  />
+);
+
+// --- Render Content ---
+ReactDOM.createRoot(document.getElementById('slide-content')).render(
+  <AnimatedPianoSlide pageNum={11} department={DEPT} />
+);
+
+// --- Render Diagram ---
+ReactDOM.createRoot(document.getElementById('slide-diagram')).render(
+  <AnimatedVectorSlide pageNum={14} department={DEPT} />
+);
+
+// --- Render Split ---
+ReactDOM.createRoot(document.getElementById('slide-split')).render(
+  <AnimatedPCSetSlide pageNum={15} department={DEPT} />
+);
+
+// --- Render Closing ---
+ReactDOM.createRoot(document.getElementById('slide-closing')).render(
+  <AnimatedSchematicSlide pageNum={16} department={DEPT} />
+);
+
+// --- Render Interval Roughness ---
+ReactDOM.createRoot(document.getElementById('slide-interval')).render(
+  <IntervalRoughnessSlide pageNum={15} />
+);
+
+// --- Render C Major Vector Diagram ---
+ReactDOM.createRoot(document.getElementById('slide-c-major')).render(
+  <CMajorVectorSlide pageNum={14} />
+);
+
+// --- Render Chords To Vectors Diagram ---
+ReactDOM.createRoot(document.getElementById('slide-chords-vectors')).render(
+  <ChordsToVectorsSlide pageNum={16} />
+);
+</script>
+</body>
+</html>

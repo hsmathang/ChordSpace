@@ -1,0 +1,64 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@800&family=Raleway:wght@600;700&display=swap" rel="stylesheet">
+<style>
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body { background: #eee; padding: 16px; display: flex; gap: 16px; flex-direction: column; }
+.slide { width: 560px; background: #fff; position: relative; overflow: hidden; }
+.chrome-label { font-size: 9px; font-family: 'Raleway', sans-serif; color: #aaa; font-weight: 600; text-transform: uppercase; letter-spacing: 0.1em; margin-bottom: 6px; }
+
+/* Slide chrome */
+.slide-wrap { position: relative; }
+.slide-num { position: absolute; top: 7px; left: 10px; font-size: 9px; font-family: 'Raleway', sans-serif; color: #888; }
+.accent-top { position: absolute; top: 10px; right: 0; width: 58%; height: 2px; background: #E8A020; }
+.accent-bottom-1 { position: absolute; bottom: 38px; left: 10px; width: 40px; height: 2px; background: #2DC56E; }
+.accent-bottom-2 { position: absolute; bottom: 34px; left: 10px; width: 24px; height: 2px; background: #2DC56E; }
+.footer { position: absolute; bottom: 0; left: 0; right: 0; height: 36px; background: #F0EBE0; display: flex; align-items: center; justify-content: space-between; padding: 0 10px; }
+.footer-text { font-size: 8px; font-family: 'Raleway', sans-serif; color: #1B7A3E; font-style: italic; }
+.escudo-placeholder { width: 24px; height: 24px; background: #1B7A3E; border-radius: 50%; display: flex; align-items: center; justify-content: center; }
+.escudo-placeholder svg { width: 14px; height: 14px; }
+.content-area { padding: 24px 32px 52px 32px; min-height: 120px; }
+</style>
+</head>
+<body>
+
+<div>
+  <div class="chrome-label">Content Slide — Standard Chrome</div>
+  <div class="slide slide-wrap" style="height:200px;">
+    <div class="slide-num">4</div>
+    <div class="accent-top"></div>
+    <div class="content-area">
+      <div style="font-family:'Playfair Display',serif;font-weight:800;font-size:22px;color:#1B7A3E;margin-bottom:6px;">Título Ancízar Serif Extrabold 22 pt</div>
+      <div style="font-family:'Raleway',sans-serif;font-weight:700;font-size:10px;text-transform:uppercase;letter-spacing:0.15em;color:#1B7A3E;">Subtítulo Ancízar Sans — Espaciado Interletra Separado — 14pt</div>
+    </div>
+    <div class="accent-bottom-1"></div>
+    <div class="accent-bottom-2"></div>
+    <div class="footer">
+      <div class="footer-text">Facultad de Ciencias<br>Matemática Aplicada</div>
+      <div class="escudo-placeholder">
+        <svg viewBox="0 0 20 20" fill="none"><circle cx="10" cy="10" r="8" stroke="white" stroke-width="1.5"/><path d="M10 4v12M6 8h8" stroke="white" stroke-width="1"/></svg>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div>
+  <div class="chrome-label">Cover Slide — Full Green</div>
+  <div class="slide slide-wrap" style="background:#1B7A3E; height:160px;">
+    <div class="accent-top" style="background:#E8A020; width:45%;"></div>
+    <div style="position:absolute;bottom:22px;left:10px;width:36px;height:2px;background:#2DC56E;"></div>
+    <div style="position:absolute;bottom:17px;left:10px;width:20px;height:2px;background:#2DC56E;"></div>
+    <div style="display:flex;flex-direction:column;align-items:center;justify-content:center;height:100%;gap:8px;">
+      <div class="escudo-placeholder" style="width:40px;height:40px;background:rgba(255,255,255,0.15);border:1.5px solid rgba(255,255,255,0.4);">
+        <svg viewBox="0 0 20 20" fill="none"><circle cx="10" cy="10" r="7" stroke="white" stroke-width="1.2"/><path d="M10 5v10M6 9h8" stroke="white" stroke-width="0.9"/></svg>
+      </div>
+      <div style="font-family:'Playfair Display',serif;font-weight:800;font-size:13px;color:#fff;letter-spacing:0.05em;">UNIVERSIDAD</div>
+      <div style="font-family:'Raleway',sans-serif;font-weight:700;font-size:9px;text-transform:uppercase;letter-spacing:0.2em;color:#fff;margin-top:-6px;">NACIONAL · DE COLOMBIA</div>
+    </div>
+  </div>
+</div>
+
+</body>
+</html>
