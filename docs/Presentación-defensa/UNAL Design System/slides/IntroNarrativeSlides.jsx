@@ -30,12 +30,12 @@ const complementMelody = (midis) => {
   return out;
 };
 
-const MelodyStaff = ({ notes, color = '#1B7A3E', muted = false }) => {
+const MelodyStaff = ({ notes, durations = [], color = '#1B7A3E', muted = false }) => {
   const min = Math.min(...notes);
   const max = Math.max(...notes);
   const span = Math.max(max - min, 1);
   const points = notes.map((midi, i) => {
-    const x = 48 + i * 88;
+    const x = 40 + i * (640 / Math.max(notes.length - 1, 1));
     const y = 150 - ((midi - min) / span) * 92;
     return { x, y, midi };
   });
@@ -50,10 +50,36 @@ const MelodyStaff = ({ notes, color = '#1B7A3E', muted = false }) => {
       {points.map((p, i) => (
         <g key={`${p.midi}-${i}`}>
           <circle cx={p.x} cy={p.y} r="11" fill={color} opacity={muted ? 0.52 : 1} />
-          <text x={p.x} y={p.y + 31} textAnchor="middle" fontSize="13" fontFamily="'JetBrains Mono',monospace" fill="#555">{p.midi}</text>
+          {i % 3 === 0 && <text x={p.x} y={p.y + 31} textAnchor="middle" fontSize="12" fontFamily="'JetBrains Mono',monospace" fill="#555">{p.midi}</text>}
+          <rect x={p.x - 9} y="166" width="18" height={Math.max(5, (durations[i] || 0.22) * 22)} fill={color} opacity={muted ? 0.18 : 0.28} />
         </g>
       ))}
     </svg>
+  );
+};
+
+const IntervalRibbon = ({ notes, color = '#1B7A3E' }) => {
+  const intervals = notes.slice(1).map((n, i) => n - notes[i]);
+  const sample = intervals.slice(0, 15);
+  return (
+    <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap', minHeight: 34 }}>
+      {sample.map((d, i) => (
+        <div key={`${d}-${i}`} style={{
+          minWidth: 34,
+          height: 28,
+          display: 'grid',
+          placeItems: 'center',
+          border: '1.5px solid #1A1A1A',
+          background: d === 0 ? '#F0EBE0' : '#fff',
+          color: d === 0 ? '#777' : color,
+          fontFamily: "'JetBrains Mono',monospace",
+          fontSize: 13,
+          fontWeight: 800,
+        }}>
+          {d > 0 ? `+${d}` : d}
+        </div>
+      ))}
+    </div>
   );
 };
 
@@ -104,6 +130,60 @@ const ChromaticBins = ({ mode = 'twelve' }) => {
     </svg>
   );
 };
+
+const CanonicalPitchClassWheel = ({ size = 500 }) => (
+  <svg width={size} height={size} viewBox="0 0 130 130">
+    <defs>
+      <marker id="pilotArrowRedCirc" viewBox="0 0 10 10" refX="5" refY="5" markerWidth="4" markerHeight="4" orient="auto-start-reverse">
+        <path d="M 0 0 L 10 5 L 0 10 z" fill="#C0392B" />
+      </marker>
+      <marker id="pilotArrowGreenCirc" viewBox="0 0 10 10" refX="5" refY="5" markerWidth="4" markerHeight="4" orient="auto-start-reverse">
+        <path d="M 0 0 L 10 5 L 0 10 z" fill="#27AE60" />
+      </marker>
+      <marker id="pilotArrowBlueCirc" viewBox="0 0 10 10" refX="5" refY="5" markerWidth="4" markerHeight="4" orient="auto-start-reverse">
+        <path d="M 0 0 L 10 5 L 0 10 z" fill="#2980B9" />
+      </marker>
+    </defs>
+    <circle cx="65" cy="65" r="64" fill="white" stroke="#1A1A1A" strokeWidth="0.5"/>
+    <circle cx="65" cy="65" r="42" fill="white" stroke="#1A1A1A" strokeWidth="0.5"/>
+    <circle cx="65" cy="65" r="24" fill="#1A1A1A"/>
+    {[0,1,2,3,4,5,6,7,8,9,10,11].map(i => {
+      const a1 = (i * 30 - 75) * Math.PI / 180;
+      return (
+        <g key={i}>
+          <path d={`M${65 + 42 * Math.cos(a1)},${65 + 42 * Math.sin(a1)} L${65 + 64 * Math.cos(a1)},${65 + 64 * Math.sin(a1)}`} stroke="#1A1A1A" strokeWidth="0.5"/>
+          <path d={`M${65 + 24 * Math.cos(a1)},${65 + 24 * Math.sin(a1)} L${65 + 42 * Math.cos(a1)},${65 + 42 * Math.sin(a1)}`} stroke="#1A1A1A" strokeWidth="0.5"/>
+        </g>
+      );
+    })}
+    {['C','C#','D','D#','E','F','F#','G','G#','A','A#','B'].map((note, i) => {
+      const angle = (i * 30 - 90) * Math.PI / 180;
+      const x = 65 + 53 * Math.cos(angle);
+      const y = 65 + 53 * Math.sin(angle);
+      return <text key={note} x={x} y={y + 4} textAnchor="middle" fontSize="11" fontFamily="'Raleway',sans-serif" fill="#1A1A1A">{note}</text>;
+    })}
+    {[0,1,2,3,4,5,6,7,8,9,10,11].map(i => {
+      const angle = (i * 30 - 90) * Math.PI / 180;
+      return <text key={i} x={65 + 33 * Math.cos(angle)} y={65 + 33 * Math.sin(angle) + 3} textAnchor="middle" fontSize="11" fill="#1A1A1A" fontFamily="'Raleway',sans-serif">{i}</text>;
+    })}
+    <path d="M 65,37 A 28 28 0 0 1 76.83,39.62" fill="none" stroke="#C0392B" strokeWidth="1.8" markerEnd="url(#pilotArrowRedCirc)" />
+    <path d="M 65,37 A 28 28 0 1 0 81.06,42.06" fill="none" stroke="#27AE60" strokeWidth="1.8" markerEnd="url(#pilotArrowGreenCirc)" />
+    <path d="M 37,65 A 28 28 0 0 1 93,65" fill="none" stroke="#2980B9" strokeWidth="1.4" markerEnd="url(#pilotArrowBlueCirc)" opacity="0.72" />
+    <circle cx="65" cy="37" r="2.8" fill="#C0392B" />
+    <circle cx="79" cy="40.75" r="2.8" fill="#27AE60" />
+  </svg>
+);
+
+const DirectionBox = ({ color, title, value, note }) => (
+  <div style={{ border: '2px solid #1A1A1A', background: '#fff', padding: '10px 16px', minWidth: 160 }}>
+    <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 4 }}>
+      <span style={{ width: 26, height: 4, background: color, display: 'inline-block' }} />
+      <span style={{ fontFamily: "'Raleway',sans-serif", fontSize: 18, fontWeight: 800, color: '#1A1A1A' }}>{title}</span>
+    </div>
+    <div style={{ fontFamily: "'JetBrains Mono',monospace", fontSize: 26, fontWeight: 800, color }}>{value}</div>
+    <div style={{ fontFamily: "'Raleway',sans-serif", fontSize: 13, color: '#555', marginTop: 4 }}>{note}</div>
+  </div>
+);
 
 const ResearchQuestionSlide = ({ pageNum, department }) => (
   <div style={{ position: 'absolute', inset: 0 }}>
@@ -187,9 +267,16 @@ const ComplementIntervalsSlide = ({ pageNum, department }) => {
   return (
     <div style={{ position: 'absolute', inset: 0 }}>
       <SlideChrome pageNum={pageNum} department={department}>
-        <div style={{ height: '100%', padding: '28px 70px 36px', display: 'grid', gridTemplateRows: 'auto 1fr', gap: 12 }}>
+        <div style={{ height: '100%', padding: '26px 64px 36px', display: 'grid', gridTemplateRows: 'auto 1fr', gap: 10 }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-            <div style={{ fontFamily: "'Playfair Display','Georgia',serif", fontSize: 60, fontWeight: 800, color: '#1A1A1A' }}>El oído no colapsa intervalos</div>
+            <div>
+              <div style={{ fontFamily: "'Playfair Display','Georgia',serif", fontSize: 58, fontWeight: 800, color: '#1A1A1A', lineHeight: 1.02 }}>El oído no colapsa intervalos</div>
+              <div style={{ marginTop: 8, display: 'flex', alignItems: 'center', gap: 10, fontFamily: "'Raleway',sans-serif", fontSize: 18, color: '#555', fontWeight: 700 }}>
+                <span style={{ border: '2px solid #1B7A3E', padding: '4px 10px' }}>La Cucaracha</span>
+                <span style={{ width: 42, height: 3, background: '#1A1A1A' }} />
+                <span style={{ border: '2px solid #C0392B', padding: '4px 10px' }}>intervalos complementarios</span>
+              </div>
+            </div>
             <div style={{ display: 'flex', gap: 12 }}>
               <button onClick={() => playMelody(original, durations)} style={{ width: 54, height: 54, borderRadius: '50%', border: '2px solid #1B7A3E', background: '#fff', display: 'grid', placeItems: 'center', cursor: 'pointer' }} title="Melodía original">
                 <PlayGlyph color="#1B7A3E" />
@@ -200,20 +287,26 @@ const ComplementIntervalsSlide = ({ pageNum, department }) => {
             </div>
           </div>
 
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 42, alignItems: 'center' }}>
-            <div style={{ display: 'grid', gap: 12 }}>
-              <div style={{ fontFamily: "'Raleway',sans-serif", fontSize: 25, fontWeight: 800, color: '#1B7A3E' }}>melodía</div>
-              <MelodyStaff notes={original} color="#1B7A3E" />
+          <div style={{ display: 'grid', gridTemplateRows: '1fr 1fr auto', gap: 8, alignItems: 'center' }}>
+            <div style={{ display: 'grid', gridTemplateColumns: '180px 1fr 420px', gap: 18, alignItems: 'center' }}>
+              <div style={{ fontFamily: "'Raleway',sans-serif", fontSize: 24, fontWeight: 800, color: '#1B7A3E' }}>melodía<br/><span style={{ fontSize: 14, color: '#555' }}>contorno reconocible</span></div>
+              <MelodyStaff notes={original} durations={durations} color="#1B7A3E" />
+              <IntervalRibbon notes={original} color="#1B7A3E" />
             </div>
-            <div style={{ display: 'grid', gap: 12 }}>
-              <div style={{ fontFamily: "'Raleway',sans-serif", fontSize: 25, fontWeight: 800, color: '#C0392B' }}>complementarios</div>
-              <MelodyStaff notes={altered} color="#C0392B" />
+            <div style={{ display: 'grid', gridTemplateColumns: '180px 1fr 420px', gap: 18, alignItems: 'center' }}>
+              <div style={{ fontFamily: "'Raleway',sans-serif", fontSize: 24, fontWeight: 800, color: '#C0392B' }}>complementarios<br/><span style={{ fontSize: 14, color: '#555' }}>misma regla, otra escucha</span></div>
+              <MelodyStaff notes={altered} durations={durations} color="#C0392B" />
+              <IntervalRibbon notes={altered} color="#C0392B" />
             </div>
-            <div style={{ gridColumn: '1 / span 2', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 18, marginTop: -8 }}>
-              <span style={{ fontFamily: "'JetBrains Mono',monospace", fontSize: 26, color: '#1A1A1A' }}>+5</span>
-              <span style={{ width: 180, height: 3, background: '#D4D0C8' }} />
-              <span style={{ fontFamily: "'JetBrains Mono',monospace", fontSize: 26, color: '#C0392B' }}>+7</span>
-              <span style={{ fontFamily: "'Raleway',sans-serif", fontSize: 22, color: '#555' }}>no cuentan la misma historia sonora</span>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr auto 1fr', alignItems: 'center', gap: 18 }}>
+              <div style={{ height: 2, background: '#D4D0C8' }} />
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 18, border: '2px solid #1A1A1A', background: '#fff', padding: '10px 18px' }}>
+                <span style={{ fontFamily: "'JetBrains Mono',monospace", fontSize: 26, color: '#1A1A1A' }}>+5</span>
+                <span style={{ width: 72, height: 3, background: '#D4D0C8' }} />
+                <span style={{ fontFamily: "'JetBrains Mono',monospace", fontSize: 26, color: '#C0392B' }}>+7</span>
+                <span style={{ fontFamily: "'Raleway',sans-serif", fontSize: 20, color: '#555' }}>no cuentan la misma historia sonora</span>
+              </div>
+              <div style={{ height: 2, background: '#D4D0C8' }} />
             </div>
           </div>
         </div>
@@ -225,22 +318,47 @@ const ComplementIntervalsSlide = ({ pageNum, department }) => {
 const TwelveBinsSlide = ({ pageNum, department }) => (
   <div style={{ position: 'absolute', inset: 0 }}>
     <SlideChrome pageNum={pageNum} department={department}>
-      <div style={{ height: '100%', padding: '36px 70px 42px', display: 'grid', gridTemplateRows: 'auto 1fr', gap: 8 }}>
-        <div style={{ fontFamily: "'Playfair Display','Georgia',serif", fontSize: 62, fontWeight: 800, color: '#1A1A1A' }}>Doce direcciones, no seis equivalencias</div>
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 52, alignItems: 'center' }}>
-          <div style={{ display: 'grid', justifyItems: 'center', gap: 16, opacity: 0.56 }}>
-            <ChromaticBins mode="six" />
-            <div style={{ fontFamily: "'Raleway',sans-serif", fontSize: 28, fontWeight: 800, color: '#555' }}>colapsar</div>
+      <div style={{ height: '100%', padding: '34px 68px 42px', display: 'grid', gridTemplateRows: 'auto 1fr', gap: 8 }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+          <div style={{ fontFamily: "'Playfair Display','Georgia',serif", fontSize: 58, fontWeight: 800, color: '#1A1A1A', lineHeight: 1.04 }}>
+            La rueda ya contiene<br />las dos direcciones
           </div>
-          <div style={{ display: 'grid', justifyItems: 'center', gap: 16 }}>
-            <ChromaticBins mode="twelve" />
-            <div style={{ fontFamily: "'Raleway',sans-serif", fontSize: 28, fontWeight: 800, color: '#1B7A3E' }}>preservar</div>
+          <div style={{ fontFamily: "'Raleway',sans-serif", fontSize: 20, color: '#666', maxWidth: 360, lineHeight: 1.35, paddingTop: 18 }}>
+            No cambiamos de simbolo: enriquecemos la rueda PC-set que ya entiende el deck.
           </div>
-          <div style={{ gridColumn: '1 / span 2', justifySelf: 'center', display: 'flex', alignItems: 'center', gap: 20, fontFamily: "'Raleway',sans-serif", fontSize: 23, color: '#444' }}>
-            <span style={{ color: '#E8610A', fontWeight: 800 }}>1</span>
-            <span>y</span>
-            <span style={{ color: '#E8610A', fontWeight: 800 }}>11</span>
-            <span>pueden ser complementarios en papel, pero no equivalentes para la escucha.</span>
+        </div>
+
+        <div style={{ display: 'grid', gridTemplateColumns: '0.95fr 1.05fr', gap: 42, alignItems: 'center' }}>
+          <div style={{ justifySelf: 'center', position: 'relative' }}>
+            <CanonicalPitchClassWheel size={520} />
+            <div style={{ position: 'absolute', top: 22, left: -22, border: '2px solid #C0392B', background: '#fff', padding: '6px 12px', fontFamily: "'JetBrains Mono',monospace", fontSize: 18, fontWeight: 800, color: '#C0392B' }}>+1</div>
+            <div style={{ position: 'absolute', right: -24, bottom: 54, border: '2px solid #27AE60', background: '#fff', padding: '6px 12px', fontFamily: "'JetBrains Mono',monospace", fontSize: 18, fontWeight: 800, color: '#27AE60' }}>+11</div>
+          </div>
+
+          <div style={{ display: 'grid', gap: 18 }}>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14 }}>
+              <DirectionBox color="#C0392B" title="trayecto corto" value="C -> C#" note="semitono ascendente" />
+              <DirectionBox color="#27AE60" title="trayecto largo" value="C -> B -> ... -> C#" note="complementario" />
+            </div>
+            <div style={{ border: '2px solid #1A1A1A', background: '#F8F5EE', padding: '18px 22px', display: 'grid', gap: 12 }}>
+              <div style={{ fontFamily: "'Raleway',sans-serif", fontSize: 22, fontWeight: 800, color: '#1A1A1A' }}>La equivalencia circular sirve para nombrar clases de altura.</div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
+                <div style={{ fontFamily: "'JetBrains Mono',monospace", fontSize: 30, fontWeight: 800, color: '#C0392B' }}>1</div>
+                <div style={{ height: 2, flex: 1, background: '#D4D0C8' }} />
+                <div style={{ fontFamily: "'JetBrains Mono',monospace", fontSize: 30, fontWeight: 800, color: '#27AE60' }}>11</div>
+              </div>
+              <div style={{ fontFamily: "'Raleway',sans-serif", fontSize: 20, color: '#444', lineHeight: 1.32 }}>
+                Pero para escuchar rugosidad, direccion y registro no son una decoracion: son informacion del objeto perceptual.
+              </div>
+            </div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 10, fontFamily: "'Raleway',sans-serif", fontSize: 18, fontWeight: 800 }}>
+              {['clase', 'direccion', 'perfil 12D', 'rugosidad'].map((label, i) => (
+                <React.Fragment key={label}>
+                  <span style={{ border: '2px solid #1A1A1A', padding: '7px 11px', background: i === 2 ? '#E8610A' : '#fff', color: i === 2 ? '#fff' : '#1A1A1A' }}>{label}</span>
+                  {i < 3 && <span style={{ width: 34, height: 3, background: '#1A1A1A' }} />}
+                </React.Fragment>
+              ))}
+            </div>
           </div>
         </div>
       </div>

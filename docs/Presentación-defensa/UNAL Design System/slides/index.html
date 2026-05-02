@@ -56,29 +56,26 @@
   <!-- Slide 7: Interval Roughness -->
   <section id="slide-interval" data-screen-label="07 Roughness"></section>
 
-  <!-- Slide 8: C Major Vector Diagram -->
-  <section id="slide-c-major" data-screen-label="08 C Major Vector"></section>
+  <!-- Slide 8: Chords to Vectors -->
+  <section id="slide-chords-vectors" data-screen-label="08 PC-Set Mapping"></section>
 
-  <!-- Slide 9: Chords to Vectors -->
-  <section id="slide-chords-vectors" data-screen-label="09 PC-Set Mapping"></section>
+  <!-- Slide 9: Pilot research question -->
+  <section id="slide-pilot-question" data-screen-label="09 Pilot Question"></section>
 
-  <!-- Slide 10: Pilot research question -->
-  <section id="slide-pilot-question" data-screen-label="10 Pilot Question"></section>
+  <!-- Slide 10: Pilot musical focus -->
+  <section id="slide-pilot-focus" data-screen-label="10 Pilot Musical Focus"></section>
 
-  <!-- Slide 11: Pilot musical focus -->
-  <section id="slide-pilot-focus" data-screen-label="11 Pilot Musical Focus"></section>
+  <!-- Slide 11: Pilot complement intervals -->
+  <section id="slide-pilot-complements" data-screen-label="11 Pilot Complements"></section>
 
-  <!-- Slide 12: Pilot complement intervals -->
-  <section id="slide-pilot-complements" data-screen-label="12 Pilot Complements"></section>
-
-  <!-- Slide 13: Pilot twelve bins -->
-  <section id="slide-pilot-bins" data-screen-label="13 Pilot Twelve Bins"></section>
+  <!-- Slide 12: Pilot pitch-class directions -->
+  <section id="slide-pilot-bins" data-screen-label="12 Pilot Pitch-Class Directions"></section>
 
 </deck-stage>
 
 <script type="text/babel" src="CoverSlide.jsx?v=20260502-formal-cover-1"></script>
 <script type="text/babel" src="TitleSlide.jsx?v=20260502-piano-footer-3"></script>
-<script type="text/babel" src="IntroNarrativeSlides.jsx?v=20260502-intro-pilot-1"></script>
+<script type="text/babel" src="IntroNarrativeSlides.jsx?v=20260502-intro-pilot-2"></script>
 <script type="text/babel" src="ContentSlide.jsx?v=20260501-anim-reset-3"></script>
 <script type="text/babel" src="DiagramSlide.jsx?v=20260501-anim-reset-3"></script>
 <script type="text/babel" src="SplitSlide.jsx?v=20260502-piano-footer-3"></script>
@@ -145,11 +142,6 @@ ReactDOM.createRoot(document.getElementById('slide-closing')).render(
 // --- Render Interval Roughness ---
 ReactDOM.createRoot(document.getElementById('slide-interval')).render(
   <IntervalRoughnessSlide pageNum={slideNumber('slide-interval')} department={DEPT} />
-);
-
-// --- Render C Major Vector Diagram ---
-ReactDOM.createRoot(document.getElementById('slide-c-major')).render(
-  <CMajorVectorSlide pageNum={slideNumber('slide-c-major')} department={DEPT} />
 );
 
 // --- Render Chords To Vectors Diagram ---

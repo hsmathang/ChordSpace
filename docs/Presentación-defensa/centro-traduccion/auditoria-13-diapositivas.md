@@ -1,8 +1,9 @@
 # Auditoria de las 13 diapositivas actuales
 
 Fecha: 2026-05-02  
-Deck revisado: `docs/Presentacion-defensa/UNAL Design System/slides/index.html`  
-Captura de conjunto: `auditoria-13-contact-sheet.png`
+Deck revisado: `docs/Presentacion-defensa/UNAL Design System/slides/index.html`
+Captura original de conjunto: `auditoria-13-contact-sheet.png`
+Captura actualizada despues del retiro de duplicado: `auditoria-12-contact-sheet.png`
 
 ## Criterio usado
 
@@ -86,6 +87,14 @@ Slides 4 y 8 explican C mayor hacia vector desde enfoques cercanos. No hay que b
 3. Rehacer slide 13 usando la rueda PC-set existente.
 4. Reorganizar 10-13 para que funcionen como laboratorio de variantes, no como parte final confusa.
 5. Volver a mostrar el deck con originales + variantes comparables.
+
+## Actualizacion posterior
+
+Despues de esta auditoria, el usuario confirmo que las diapositivas 4 y 8 duplicaban la misma idea. Se retiro la antigua slide 8 del flujo visible y el deck paso de 13 a 12 diapositivas. La decision conserva la slide 4 como version principal de C mayor hacia vector, por ser la mas densa y explicativa.
+
+Tambien se corrigio la antigua slide 13: ya no usa una rueda inventada, sino una version enriquecida del simbolo PC-set canonico del deck.
+
+La antigua slide 12 auditiva fue fortalecida: el contorno melodico se escala correctamente, incluye duraciones, cintas de intervalos y conserva los controles de audio para comparar melodia e intervalos complementarios.
 
 ## Fuentes revisadas
 
