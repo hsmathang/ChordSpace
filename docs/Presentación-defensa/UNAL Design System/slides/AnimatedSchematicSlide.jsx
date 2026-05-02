@@ -4,33 +4,6 @@ const pianoDotColors = {
   green: '#27AE60',
 };
 
-const PianoDotStack = ({ colors }) => (
-  <div style={{
-    position: 'absolute',
-    left: '50%',
-    top: 18,
-    transform: 'translateX(-50%)',
-    display: 'grid',
-    gap: 4,
-    justifyItems: 'center',
-    zIndex: 4,
-  }}>
-    {colors.map((color) => (
-      <div
-        key={color}
-        style={{
-          width: 11,
-          height: 11,
-          borderRadius: '50%',
-          backgroundColor: pianoDotColors[color],
-          border: '1px solid rgba(255,255,255,0.9)',
-          boxShadow: '0 0 0 1px rgba(26,26,26,0.28)',
-        }}
-      />
-    ))}
-  </div>
-);
-
 const FullPiano = () => {
   const whiteKeys = [
     { midi: 36, note: 'Do' }, { midi: 38, note: 'Re' }, { midi: 40, note: 'Mi' },
@@ -44,31 +17,57 @@ const FullPiano = () => {
     { midi: 49, left: 8 }, { midi: 51, left: 9 }
   ];
 
-  const dots = [
-    { key: 36, colors: ['red'] },
-    { key: 40, colors: ['red', 'blue'] },
-    { key: 43, colors: ['red', 'blue', 'green'] },
-    { key: 48, colors: ['blue', 'green'] },
-    { key: 52, colors: ['green'] },
+  const pianoWidth = 320;
+  const pianoHeight = 120;
+  const keyX = (midi) => {
+    const index = whiteKeys.findIndex(k => k.midi === midi);
+    return ((index + 0.5) / whiteKeys.length) * pianoWidth;
+  };
+
+  const voiceRows = [
+    { color: 'green', y: 48, keys: [43, 48, 52] },
+    { color: 'blue', y: 66, keys: [40, 43, 48] },
+    { color: 'red', y: 86, keys: [36, 40, 43] },
   ];
 
   return (
-    <div style={{ position: 'relative', width: '100%', height: '100%', border: '3px solid #1A1A1A', display: 'flex' }}>
-      {whiteKeys.map((k, i) => {
-        const marker = dots.find(d => d.key === k.midi);
-        return (
-          <div key={k.midi} style={{ flex: 1, borderRight: i < 9 ? '2px solid #1A1A1A' : 'none', position: 'relative', backgroundColor: 'white' }}>
-            <span style={{ position: 'absolute', bottom: 5, width: '100%', textAlign: 'center', fontSize: 12, color: '#1A1A1A', fontWeight: 'bold' }}>{k.note}</span>
-            <span style={{ position: 'absolute', top: 55, width: '100%', textAlign: 'center', fontSize: 12, color: '#888' }}>{k.midi}</span>
-            {marker && <PianoDotStack colors={marker.colors} />}
-          </div>
-        );
-      })}
+    <div style={{ position: 'relative', width: '100%', height: '100%', border: '3px solid #1A1A1A', display: 'flex', overflow: 'hidden', backgroundColor: 'white' }}>
+      {whiteKeys.map((k, i) => (
+        <div key={k.midi} style={{ flex: 1, borderRight: i < 9 ? '2px solid #1A1A1A' : 'none', position: 'relative', backgroundColor: 'white' }}>
+          <span style={{ position: 'absolute', bottom: 2, width: '100%', textAlign: 'center', fontSize: 13, color: '#1A1A1A', fontWeight: 'bold' }}>{k.note}</span>
+          <span style={{ position: 'absolute', top: 52, width: '100%', textAlign: 'center', fontSize: 12, color: '#1A1A1A' }}>{k.midi}</span>
+        </div>
+      ))}
+      <svg viewBox={`0 0 ${pianoWidth} ${pianoHeight}`} style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', zIndex: 3, pointerEvents: 'none' }}>
+        {voiceRows.map(row => (
+          <g key={row.color}>
+            <line
+              x1={keyX(row.keys[0])}
+              y1={row.y}
+              x2={keyX(row.keys[row.keys.length - 1])}
+              y2={row.y}
+              stroke={pianoDotColors[row.color]}
+              strokeWidth="1.6"
+            />
+            {row.keys.map(midi => (
+              <circle
+                key={`${row.color}-${midi}`}
+                cx={keyX(midi)}
+                cy={row.y}
+                r="7.2"
+                fill={pianoDotColors[row.color]}
+                stroke="rgba(255,255,255,0.92)"
+                strokeWidth="1.4"
+              />
+            ))}
+          </g>
+        ))}
+      </svg>
       {blackKeys.map((k) => (
         <div key={k.midi} style={{
           position: 'absolute', left: `${(k.left / 10) * 100}%`, top: 0, transform: 'translateX(-50%)',
           width: '6%', height: '60%', backgroundColor: '#1A1A1A', color: 'white',
-          display: 'flex', justifyContent: 'center', alignItems: 'flex-end', paddingBottom: 5, fontSize: 11
+          display: 'flex', justifyContent: 'center', alignItems: 'flex-end', paddingBottom: 4, fontSize: 12, zIndex: 2
         }}>
           {k.midi}
         </div>
