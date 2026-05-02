@@ -63,7 +63,7 @@
 
 </deck-stage>
 
-<script type="text/babel" src="CoverSlide.jsx?v=20260501-institution-2"></script>
+<script type="text/babel" src="CoverSlide.jsx?v=20260502-formal-cover-1"></script>
 <script type="text/babel" src="TitleSlide.jsx?v=20260502-piano-footer-3"></script>
 <script type="text/babel" src="ContentSlide.jsx?v=20260501-anim-reset-3"></script>
 <script type="text/babel" src="DiagramSlide.jsx?v=20260501-anim-reset-3"></script>
@@ -88,9 +88,13 @@ const slideNumber = (slideId) => {
 // --- Render Cover ---
 ReactDOM.createRoot(document.getElementById('slide-cover')).render(
   <CoverSlide
-    title="UNIVERSIDAD"
-    subtitle="NACIONAL DE COLOMBIA"
-    department={DEPT}
+    title="Modelo computacional para la exploración de acordes en la composición musical"
+    author="Hernán Santiago Angarita García"
+    program="Maestría en Matemática Aplicada"
+    director="Director: Andrés Torres"
+    codirector="Codirector: Francisco Gómez"
+    university="Universidad Nacional de Colombia"
+    date="2026"
   />
 );
 
