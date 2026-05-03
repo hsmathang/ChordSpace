@@ -42,9 +42,13 @@ window.useDeckStep = function useDeckStep(maxStep, slideId) {
     };
 
     syncActive();
+    const syncTimer = window.setTimeout(syncActive, 80);
     const deck = document.querySelector('deck-stage');
     deck?.addEventListener('slidechange', syncActive);
-    return () => deck?.removeEventListener('slidechange', syncActive);
+    return () => {
+      window.clearTimeout(syncTimer);
+      deck?.removeEventListener('slidechange', syncActive);
+    };
   }, [slideId]);
 
   React.useEffect(() => {

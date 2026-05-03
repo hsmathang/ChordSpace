@@ -12,7 +12,7 @@
 <script src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.development.js" integrity="sha384-u6aeetuaXnQ38mYT8rp6sbXaQe3NL9t+IBXmnYxwkUI2Hw4bsp2Wvmx4yRQF1uAm" crossorigin="anonymous"></script>
 <script src="https://unpkg.com/@babel/standalone@7.29.0/babel.min.js" integrity="sha384-m08KidiNqLdpJqLq95G/LEi8Qvjl/xUYll3QILypMoQ65QorJ9Lvtp2RXYGBFj1y" crossorigin="anonymous"></script>
 <script src="deck-stage.js?v=20260501-anim-reset-2"></script>
-<script src="deck-step.js?v=20260501-anim-reset-3"></script>
+<script src="deck-step.js?v=20260502-active-sync-1"></script>
 <script src="../presentation/audio.js?v=20260502-audio-engine-1"></script>
 <style>
   * { margin: 0; padding: 0; box-sizing: border-box; }
@@ -71,6 +71,18 @@
   <!-- Slide 12: Pilot pitch-class directions -->
   <section id="slide-pilot-bins" data-screen-label="12 Pilot Pitch-Class Directions"></section>
 
+  <!-- Slide 13: Exploration problem -->
+  <section id="slide-exploration-problem" data-screen-label="13 Exploration Problem"></section>
+
+  <!-- Slide 14: Research question rich -->
+  <section id="slide-research-question-rich" data-screen-label="14 Research Question Rich"></section>
+
+  <!-- Slide 15: Substitution hypothesis -->
+  <section id="slide-substitution-hypothesis" data-screen-label="15 Substitution Hypothesis"></section>
+
+  <!-- Slide 16: Representation requirements -->
+  <section id="slide-representation-requirements" data-screen-label="16 Representation Requirements"></section>
+
 </deck-stage>
 
 <script type="text/babel" src="CoverSlide.jsx?v=20260502-formal-cover-1"></script>
@@ -87,6 +99,7 @@
 <script type="text/babel" src="IntervalRoughnessSlide.jsx?v=20260502-roughness-code-1"></script>
 <script type="text/babel" src="CMajorVectorSlide.jsx?v=20260502-piano-footer-3"></script>
 <script type="text/babel" src="ChordsToVectorsSlide.jsx?v=20260502-piano-footer-3"></script>
+<script type="text/babel" src="AnimatedNarrativeBlockSlides.jsx?v=20260502-narrative-block-1"></script>
 
 <script type="text/babel">
 const DEPT = "Facultad de Ciencias · Matemáticas Aplicadas";
@@ -164,6 +177,23 @@ ReactDOM.createRoot(document.getElementById('slide-pilot-complements')).render(
 
 ReactDOM.createRoot(document.getElementById('slide-pilot-bins')).render(
   <TwelveBinsSlide pageNum={slideNumber('slide-pilot-bins')} department={DEPT} />
+);
+
+// --- Render Animated Narrative Block ---
+ReactDOM.createRoot(document.getElementById('slide-exploration-problem')).render(
+  <ExplorationProblemSlide pageNum={slideNumber('slide-exploration-problem')} department={DEPT} />
+);
+
+ReactDOM.createRoot(document.getElementById('slide-research-question-rich')).render(
+  <ResearchQuestionAnimatedSlide pageNum={slideNumber('slide-research-question-rich')} department={DEPT} />
+);
+
+ReactDOM.createRoot(document.getElementById('slide-substitution-hypothesis')).render(
+  <HypothesisSubstitutionSlide pageNum={slideNumber('slide-substitution-hypothesis')} department={DEPT} />
+);
+
+ReactDOM.createRoot(document.getElementById('slide-representation-requirements')).render(
+  <RepresentationRequirementsSlide pageNum={slideNumber('slide-representation-requirements')} department={DEPT} />
 );
 </script>
 </body>
